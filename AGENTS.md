@@ -37,8 +37,9 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - Worker-to-main IPC bridge and WebMCP registration live in `.agents/scripts/scdaw-adapter.js`.
 
 4. **Mobile-First Responsive Layout, BEM & Accessibility**:
-   - All UI components follow a **Mobile-First** architecture with progressive enhancement via `@container` queries (`< 640px` stacked mobile layout, `>= 640px` and `>= 1024px` multi-pane studio CSS Grid) and `@media` fallbacks for graceful degradation.
-   - Styling uses strict BEM naming conventions (`.scdaw-workbench__*`, `.scdaw-transport__*`, `.scdaw-statusbar__*`, `.scdaw-timeline__*`) and WCAG 2.1 AA ARIA landmarks, `aria-pressed` / `aria-selected` states, and `:focus-visible` outlines.
+   - All UI components follow a **Mobile-First** architecture with progressive enhancement via `min-width` `@container` queries (`< 640px` stacked mobile layout, `>= 640px` and `>= 1024px` multi-pane studio CSS Grid) and `@supports not (container-type: inline-size)` isolated `@media` fallbacks so desktop viewport widths never override narrow docked containers.
+   - In `<scdaw-workbench>`, the 4 toolbar groups (`--project`, `--docks`, `--actions`, `--views`) are flattened sibling flex children of `.scdaw-workbench__toolbar` with `flex: 0 0 auto` at `>= 640px` so groups flow directly to the right of `Reset` and wrap cleanly as whole units without `overflow-x: auto` scrollbars or overlapping adjacent buttons.
+   - Styling uses strict BEM naming conventions (`.scdaw-workbench__*`, `.scdaw-transport__*`, `.scdaw-statusbar__*`, `.scdaw-timeline__*`, `.scdaw-devices__*`, `.scdaw-knob__*`) and WCAG 2.1 AA ARIA landmarks, `role="slider"` / `role="separator"` keyboard navigation, `aria-pressed` / `aria-selected` states, and `:focus-visible` outlines.
    - Panel and splitter visibility in `<scdaw-workbench>` is controlled via `.hidden` / `[hidden]` (`display: none !important`). Never force `<scdaw-resize-handle>` visible with `!important` in container queries, and ensure `#mixer-handle` retains the `invert` attribute so dragging left expands the right-hand Mixer dock.
    - When checking Web IDL interfaces such as `LaunchParams`, always test property existence with `"files" in window.LaunchParams.prototype` rather than invoking prototype getters directly.
 

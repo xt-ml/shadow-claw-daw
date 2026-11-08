@@ -15,6 +15,8 @@ import {
   computeCellActiveMap,
   shouldPreserveEditorDom,
   resolveEditorScrollPosition,
+  computeStepVelocity,
+  calculateVelocityFromPointer,
 } from "../.agents/scripts/components/scdaw-editor.js";
 import { getDeviceChainForTrack } from "../.agents/scripts/components/scdaw-devices.js";
 import {
@@ -29,6 +31,8 @@ import {
   formatPosition,
   calculateTransportWheelValue,
   setupTransportWheelControls,
+  calculateBpmDragValue,
+  setupBpmDragControl,
 } from "../.agents/scripts/components/scdaw-transport.js";
 import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
 import {
@@ -776,6 +780,186 @@ test("scdaw-transport: setupTransportWheelControls binds non-passive wheel event
   assert.deepEqual(swingEvents, [15]);
 });
 
+test("scdaw-transport: calculateBpmDragValue adjusts BPM with upward increase, downward decrease, clamping, and shift fine-tuning", () => {
+  // 1. Dragging UP (currentY < startY) increases BPM
+  // startY = 100, currentY = 80 (deltaY = +20) -> with pixelsPerUnit = 2, increases by +10 BPM
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: 80,
+      startValue: 120,
+      min: 40,
+      max: 240,
+      pixelsPerUnit: 2,
+    }),
+    130,
+  );
+
+  // 2. Dragging DOWN (currentY > startY) decreases BPM
+  // startY = 100, currentY = 130 (deltaY = -30) -> with pixelsPerUnit = 2, decreases by -15 BPM
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: 130,
+      startValue: 120,
+      min: 40,
+      max: 240,
+      pixelsPerUnit: 2,
+    }),
+    105,
+  );
+
+  // 3. Shift key fine-tuning (rate scaled by 0.2, so 10px per 1 BPM)
+  // deltaY = +20 with shiftKey -> +2 BPM
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: 80,
+      startValue: 120,
+      min: 40,
+      max: 240,
+      pixelsPerUnit: 2,
+      shiftKey: true,
+      shiftMultiplier: 0.2,
+    }),
+    122,
+  );
+
+  // 4. Clamps to max 240
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: -500,
+      startValue: 120,
+      min: 40,
+      max: 240,
+      pixelsPerUnit: 2,
+    }),
+    240,
+  );
+
+  // 5. Clamps to min 40
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: 500,
+      startValue: 120,
+      min: 40,
+      max: 240,
+      pixelsPerUnit: 2,
+    }),
+    40,
+  );
+
+  // 6. Zero or equal coordinates preserve startValue
+  assert.equal(
+    calculateBpmDragValue({
+      startY: 100,
+      currentY: 100,
+      startValue: 128,
+    }),
+    128,
+  );
+});
+
+test("scdaw-transport: setupBpmDragControl binds touch/pointer drag events, captures pointer, and dispatches updates", () => {
+  const bpmChanges = [];
+  const capturedEvents = [];
+
+  const mockInput = {
+    value: "120",
+    min: "40",
+    max: "240",
+    focused: false,
+    selected: false,
+    blurred: false,
+    focus() {
+      this.focused = true;
+    },
+    select() {
+      this.selected = true;
+    },
+    blur() {
+      this.blurred = true;
+    },
+  };
+
+  const listeners = {};
+  const mockTarget = {
+    setPointerCapture(id) {
+      capturedEvents.push(`capture-${id}`);
+    },
+    releasePointerCapture(id) {
+      capturedEvents.push(`release-${id}`);
+    },
+    addEventListener(type, fn) {
+      listeners[type] = fn;
+    },
+    removeEventListener(type) {
+      delete listeners[type];
+    },
+  };
+
+  setupBpmDragControl({
+    bpmInput: mockInput,
+    bpmContainer: mockTarget,
+    onBpmChange: (bpm) => bpmChanges.push(bpm),
+    pixelsPerUnit: 2,
+  });
+
+  // Verify listeners attached
+  assert.equal(typeof listeners.pointerdown, "function");
+  assert.equal(typeof listeners.pointermove, "function");
+  assert.equal(typeof listeners.pointerup, "function");
+  assert.equal(typeof listeners.pointercancel, "function");
+
+  // 1. Touch/pointerdown captures pointer
+  listeners.pointerdown({
+    pointerId: 7,
+    clientY: 200,
+  });
+  assert.ok(capturedEvents.includes("capture-7"));
+
+  // 2. Drag UP 30px (clientY: 200 -> 170) -> +15 BPM -> 135 BPM
+  let prevented = false;
+  listeners.pointermove({
+    pointerId: 7,
+    clientY: 170,
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(mockInput.value, "135");
+  assert.deepEqual(bpmChanges, [135]);
+
+  // 3. Pointerup finishes drag, releases pointer capture, and blurs input
+  prevented = false;
+  listeners.pointerup({
+    pointerId: 7,
+    preventDefault: () => {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.ok(capturedEvents.includes("release-7"));
+  assert.equal(mockInput.blurred, true);
+
+  // 4. Tap/click without dragging (deltaY < 2) triggers focus & select for text editing
+  mockInput.focused = false;
+  mockInput.selected = false;
+  mockInput.blurred = false;
+  listeners.pointerdown({
+    pointerId: 8,
+    clientY: 200,
+  });
+  listeners.pointerup({
+    pointerId: 8,
+  });
+  assert.equal(mockInput.focused, true);
+  assert.equal(mockInput.selected, true);
+});
+
 test("scdaw-statusbar: formats audio telemetry, project summary, and bounce status", () => {
   const status = formatTelemetryStatus(
     { audio: "running", lastBounce: { durationSec: 4.0, peakDb: -1.2 } },
@@ -1218,4 +1402,458 @@ test("scdaw-engine & components: selectTrack synchronizes selectedTrackId across
   // Ignoring non-existent track ID preserves current selection
   scdaw.selectTrack("non_existent_track_999");
   assert.equal(scdaw.selectedTrackId.get(), secondTrackId);
+});
+
+test("scdaw-timeline & scdaw-mixer: clicking M (Mute) and S (Solo) buttons toggles track mute and solo state on and off", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { DawMixerElement } =
+    await import("../.agents/scripts/components/scdaw-mixer.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+  const initialProject = scdaw.getProject();
+  const trackId = initialProject.tracks[0].id;
+  assert.equal(initialProject.tracks[0].mute, false);
+  assert.equal(initialProject.tracks[0].solo, false);
+
+  // 1. Test DawTimelineElement Mute & Solo buttons
+  const timeline = new DawTimelineElement();
+  const makeBtnMock = (id) => {
+    const listeners = new Map();
+    const btn = {
+      dataset: { track: id },
+      addEventListener: (evt, fn) => listeners.set(evt, fn),
+      click: () =>
+        listeners.get("click")?.({
+          target: btn,
+          currentTarget: btn,
+          stopPropagation() {},
+          preventDefault() {},
+        }),
+    };
+    return btn;
+  };
+
+  let timelineMuteBtn = makeBtnMock(trackId);
+  let timelineSoloBtn = makeBtnMock(trackId);
+
+  timeline.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelectorAll: (sel) => {
+      if (sel === ".mute-btn") {
+        timelineMuteBtn = makeBtnMock(trackId);
+        return [timelineMuteBtn];
+      }
+      if (sel === ".solo-btn") {
+        timelineSoloBtn = makeBtnMock(trackId);
+        return [timelineSoloBtn];
+      }
+      return [];
+    },
+  };
+
+  timeline.render();
+
+  // Click M in Timeline -> mutes track
+  timelineMuteBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].mute,
+    true,
+    "Clicking M in Timeline must set track.mute = true",
+  );
+
+  // Re-render Timeline and verify muted button state + click M a second time -> unmutes track
+  timeline.render();
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    new RegExp(
+      `class="[^"]*btn-danger[^"]*mute-btn"[^>]*data-track="${trackId}"[^>]*aria-pressed="true"`,
+    ),
+  );
+  timelineMuteBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].mute,
+    false,
+    "Clicking M a second time in Timeline must set track.mute = false",
+  );
+
+  // Click S in Timeline -> solos track
+  timeline.render();
+  timelineSoloBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].solo,
+    true,
+    "Clicking S in Timeline must set track.solo = true",
+  );
+
+  // Re-render Timeline and click S a second time -> unsolos track
+  timeline.render();
+  timelineSoloBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].solo,
+    false,
+    "Clicking S a second time in Timeline must set track.solo = false",
+  );
+
+  // 2. Test DawMixerElement Mute & Solo buttons across multiple clicks without full re-render
+  const mixer = new DawMixerElement();
+  const mixerMuteBtn = makeBtnMock(trackId);
+  const mixerSoloBtn = makeBtnMock(trackId);
+
+  mixer.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: (sel) => {
+      if (sel === ".mute-btn") return [mixerMuteBtn];
+      if (sel === ".solo-btn") return [mixerSoloBtn];
+      return [];
+    },
+  };
+
+  mixer.render();
+
+  // Click M in Mixer 1st time -> mutes track
+  mixerMuteBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].mute,
+    true,
+    "Clicking M in Mixer 1st time must mute track",
+  );
+
+  // Click M in Mixer 2nd time (without calling mixer.render(), since shouldPreserveMixerDom preserves DOM) -> unmutes track
+  mixerMuteBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].mute,
+    false,
+    "Clicking M in Mixer 2nd time must unmute track even when DOM is preserved in-place",
+  );
+
+  // Click S in Mixer 1st time -> solos track
+  mixerSoloBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].solo,
+    true,
+    "Clicking S in Mixer 1st time must solo track",
+  );
+
+  // Click S in Mixer 2nd time (without calling mixer.render()) -> unsolos track
+  mixerSoloBtn.click();
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(
+    scdaw.getProject().tracks[0].solo,
+    false,
+    "Clicking S in Mixer 2nd time must unsolo track even when DOM is preserved in-place",
+  );
+});
+
+test("scdaw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .pr-cells geometry and support interactive velocity editing", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+
+  // 1. Pure helpers: computeStepVelocity & calculateVelocityFromPointer
+  assert.equal(computeStepVelocity([], 0), 0);
+  assert.equal(
+    computeStepVelocity(
+      [
+        { position: 0, pitch: 42, velocity: 0.55 },
+        { position: 0, pitch: 36, velocity: 0.95 },
+      ],
+      0,
+    ),
+    0.95,
+    "computeStepVelocity returns max note velocity at a step when multiple notes overlap",
+  );
+
+  const stalkRect = { top: 200, bottom: 240, height: 40 };
+  assert.equal(
+    calculateVelocityFromPointer({ clientY: 200, rect: stalkRect }),
+    1.0,
+    "Clicking top of velocity stalk sets velocity to 1.0 (100%)",
+  );
+  assert.equal(
+    calculateVelocityFromPointer({ clientY: 220, rect: stalkRect }),
+    0.5,
+    "Clicking middle of velocity stalk sets velocity to 0.5 (50%)",
+  );
+  assert.equal(
+    calculateVelocityFromPointer({ clientY: 240, rect: stalkRect }),
+    0.05,
+    "Clicking bottom of velocity stalk clamps velocity to minimum 0.05 (5%)",
+  );
+
+  // 2. DOM Alignment inside .grid-area
+  await scdaw.sendCommand("reset_project", {});
+  const track = scdaw.getProject().tracks[0];
+  scdaw.selectTrack(track.id);
+
+  const editor = new DawEditorElement();
+  const stalkHandlers = {};
+  const mockStalkStep0 = {
+    dataset: { step: "0" },
+    getBoundingClientRect: () => ({ top: 200, bottom: 240, height: 40 }),
+    addEventListener: (evt, fn) => {
+      stalkHandlers[evt] = fn;
+    },
+  };
+
+  editor.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: (sel) => {
+      if (sel === ".vel-stalk") return [mockStalkStep0];
+      return [];
+    },
+  };
+
+  editor.render();
+
+  const html = editor.shadowRoot.innerHTML;
+  // .velocity-stalks MUST be rendered inside .grid-area (before closing .grid-area / .editor-container)
+  // and MUST contain a 48px .pr-key.vel-key spacer + .pr-cells.vel-cells with min-width: 24px on .vel-stalk
+  const gridAreaIndex = html.indexOf('<div class="grid-area">');
+  const velocityStalksIndex = html.indexOf('class="velocity-stalks"');
+  const editorContainerCloseIndex = html.lastIndexOf(
+    "</div>\n        </div>\n      </div>",
+  );
+  assert.ok(gridAreaIndex !== -1, ".grid-area must exist");
+  assert.ok(
+    velocityStalksIndex > gridAreaIndex,
+    ".velocity-stalks must be inside .grid-area",
+  );
+  assert.ok(
+    velocityStalksIndex < editorContainerCloseIndex,
+    ".velocity-stalks must be inside .grid-area, not outside .editor-container",
+  );
+  assert.match(
+    html,
+    /class="pr-key vel-key"/,
+    ".velocity-stalks must include a sticky 48px .pr-key.vel-key column to align with note rows",
+  );
+  assert.match(
+    html,
+    /class="pr-cells vel-cells"/,
+    ".velocity-stalks must wrap stalks in .pr-cells.vel-cells to match .pr-row flex geometry",
+  );
+  assert.match(
+    html,
+    /\.vel-stalk\s*\{[^}]*min-width:\s*24px/s,
+    ".vel-stalk CSS must specify min-width: 24px matching .pr-cell",
+  );
+
+  // 3. Interactive velocity adjustment via pointerdown on .vel-stalk
+  assert.equal(
+    typeof stalkHandlers.pointerdown,
+    "function",
+    ".vel-stalk must bind pointerdown listener for interactive velocity editing",
+  );
+  stalkHandlers.pointerdown({
+    clientY: 220,
+    preventDefault: () => {},
+  });
+  await new Promise((r) => setTimeout(r, 10));
+
+  const updatedTrack = scdaw
+    .getProject()
+    .tracks.find((t) => t.id === editor._selectedTrackId);
+  const step0Notes = updatedTrack.notes.filter((n) => n.position === 0);
+  assert.ok(step0Notes.length > 0, "Selected track has note(s) at step 0");
+  assert.equal(
+    step0Notes[0].velocity,
+    0.5,
+    "Pointerdown at vertical midpoint of .vel-stalk updates step 0 note velocity to 0.5",
+  );
+});
+
+test("scdaw ground-up responsive toolbar & container queries: flattened sibling toolbar groups, zero view-switcher scrollbar/overlap, @supports-isolated @media fallbacks, and full custom element container query + ARIA compliance", async () => {
+  const [
+    workbenchContent,
+    transportContent,
+    timelineContent,
+    editorContent,
+    browserContent,
+    devicesContent,
+    statusbarContent,
+    sequencerContent,
+    mixerContent,
+    knobContent,
+    stylesContent,
+  ] = await Promise.all([
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-workbench.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-transport.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-timeline.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL("../.agents/scripts/components/scdaw-editor.js", import.meta.url),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-browser.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-devices.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-statusbar.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-sequencer.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL("../.agents/scripts/components/scdaw-mixer.js", import.meta.url),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL("../.agents/scripts/components/scdaw-knob.js", import.meta.url),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL("../.agents/scripts/components/scdaw-styles.js", import.meta.url),
+      "utf-8",
+    ),
+  ]);
+
+  // 1. Shared styles (.btn and .badge) enforce intrinsic non-shrinking single-line pills/buttons
+  assert.match(
+    stylesContent,
+    /\.btn\s*\{[^}]*white-space:\s*nowrap/s,
+    ".btn must enforce white-space: nowrap",
+  );
+  assert.match(
+    stylesContent,
+    /\.btn\s*\{[^}]*flex-shrink:\s*0/s,
+    ".btn must enforce flex-shrink: 0 so buttons never crush or spill out of flex groups",
+  );
+  assert.match(
+    stylesContent,
+    /\.badge\s*\{[^}]*white-space:\s*nowrap/s,
+    ".badge must enforce white-space: nowrap so badges like 'Synth Preset' or '1 Bar (4/4)' never wrap mid-pill",
+  );
+  assert.match(
+    stylesContent,
+    /\.badge\s*\{[^}]*flex-shrink:\s*0/s,
+    ".badge must enforce flex-shrink: 0",
+  );
+
+  // 2. Workbench toolbar groups must be flattened sibling children of .scdaw-workbench__toolbar
+  //    and .scdaw-workbench__view-switcher must NOT use overflow-x: auto (no scrollbar over Bounce WAV)
+  assert.doesNotMatch(
+    workbenchContent,
+    /\.scdaw-workbench__view-switcher\s*\{[^}]*overflow-x:\s*auto/s,
+    ".scdaw-workbench__view-switcher must not use overflow-x: auto which spawns a scrollbar over adjacent buttons",
+  );
+  assert.match(
+    workbenchContent,
+    /scdaw-workbench__toolbar-group--docks/,
+    "Dock toggles should be a dedicated toolbar group (--docks) sibling so Browser/Studio/Mixer flow directly next to Reset",
+  );
+  assert.match(
+    workbenchContent,
+    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?\.scdaw-workbench__toolbar-group\s*\{[^}]*flex:\s*0\s+0\s+auto/,
+    "At >= 640px, .scdaw-workbench__toolbar-group must use flex: 0 0 auto so groups never shrink below content width or overlap Bounce WAV",
+  );
+
+  // 3. @media fallbacks must be isolated inside @supports not (container-type: inline-size)
+  //    so desktop viewports never override narrow docked container queries
+  for (const [name, content] of [
+    ["scdaw-workbench.js", workbenchContent],
+    ["scdaw-transport.js", transportContent],
+    ["scdaw-editor.js", editorContent],
+    ["scdaw-timeline.js", timelineContent],
+    ["scdaw-statusbar.js", statusbarContent],
+  ]) {
+    assert.match(
+      content,
+      /@supports\s+not\s*\(\s*container-type:\s*inline-size\s*\)/,
+      `${name} must isolate @media fallbacks inside @supports not (container-type: inline-size)`,
+    );
+  }
+
+  // 4. All layout custom elements must declare container-type: inline-size on :host
+  //    and strictly use mobile-first min-width @container queries (never desktop-first max-width)
+  for (const [name, content] of [
+    ["scdaw-workbench.js", workbenchContent],
+    ["scdaw-transport.js", transportContent],
+    ["scdaw-timeline.js", timelineContent],
+    ["scdaw-editor.js", editorContent],
+    ["scdaw-browser.js", browserContent],
+    ["scdaw-devices.js", devicesContent],
+    ["scdaw-statusbar.js", statusbarContent],
+    ["scdaw-sequencer.js", sequencerContent],
+    ["scdaw-mixer.js", mixerContent],
+  ]) {
+    assert.match(
+      content,
+      /container-type:\s*inline-size/,
+      `${name} must establish container-type: inline-size`,
+    );
+    assert.doesNotMatch(
+      content,
+      /@container[^{]*\(\s*max-width:/,
+      `${name} must be strictly Mobile-First (min-width @container queries, never max-width)`,
+    );
+  }
+
+  // 5. Transport bar at >= 640px must allow wrapping and maintain gap so 001:1:1 and BPM never collide
+  assert.match(
+    transportContent,
+    /@container scdaw-transport\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?flex-wrap:\s*wrap/,
+    "scdaw-transport must allow flex-wrap: wrap in its >= 640px container rule so playback and tempo groups never collide or clip Panic",
+  );
+
+  // 6. Timeline uses @container scdaw-timeline instead of bare @media for track header width
+  assert.match(
+    timelineContent,
+    /@container scdaw-timeline\s*\(\s*min-width:\s*520px\s*\)/,
+    "scdaw-timeline must use @container scdaw-timeline to expand --track-header-w only when the timeline container itself is wide",
+  );
+
+  // 7. Knob implements WCAG role="slider", keyboard navigation, touch-action: none, and BEM classes
+  assert.match(knobContent, /role=["']slider["']/);
+  assert.match(knobContent, /touch-action:\s*none/);
+  assert.match(knobContent, /scdaw-knob/);
 });

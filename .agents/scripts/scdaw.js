@@ -480,7 +480,7 @@ export function applyCommand(project, name, params = {}) {
     }
 
     case "remove_track": {
-      const trackId = params.trackId;
+      const trackId = params.trackId || params.id;
       const initialLen = next.tracks.length;
       next.tracks = next.tracks.filter((t) => t.id !== trackId);
       if (next.tracks.length === initialLen) {
@@ -490,8 +490,9 @@ export function applyCommand(project, name, params = {}) {
     }
 
     case "set_track": {
-      const track = next.tracks.find((t) => t.id === params.trackId);
-      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const trackId = params.trackId || params.id;
+      const track = next.tracks.find((t) => t.id === trackId);
+      if (!track) throw new Error(`Track not found: ${trackId}`);
 
       if (params.name !== undefined) track.name = String(params.name);
       if (params.volume !== undefined)
@@ -796,6 +797,37 @@ export function applyCommand(project, name, params = {}) {
           },
         };
       }
+    }
+
+    case "set_step_velocity": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const step = Number(params.step ?? 0);
+      const rawVel = Number(params.velocity ?? 0.85);
+      const velocity =
+        Math.round(Math.max(0.05, Math.min(1, rawVel)) * 100) / 100;
+
+      let updated = 0;
+      for (const note of track.notes) {
+        if (ppqnToStep(note.position) === step) {
+          note.velocity = velocity;
+          updated++;
+        }
+      }
+      if (track.stepMemory && track.stepMemory[step]) {
+        track.stepMemory[step].velocity = velocity;
+      }
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          step,
+          velocity,
+          updated,
+        },
+      };
     }
 
     default:

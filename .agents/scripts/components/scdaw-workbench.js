@@ -421,15 +421,8 @@ export class DawWorkbenchElement extends BaseElement {
           width: 100%;
         }
 
-        /* Views group: dock toggles + view switcher */
-        .scdaw-workbench__toolbar-group--views {
-          display: flex;
-          flex-direction: column;
-          gap: 0.35rem;
-          width: 100%;
-          min-width: 0;
-        }
-
+        /* Panel docks: 3 equal columns in mobile grid */
+        .scdaw-workbench__toolbar-group--docks,
         .scdaw-workbench__dock-toggles {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -437,8 +430,19 @@ export class DawWorkbenchElement extends BaseElement {
           width: 100%;
         }
 
+        /* Actions: 2 equal columns on mobile */
+        .scdaw-workbench__toolbar-group--actions {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.35rem;
+          width: 100%;
+        }
+
+        /* Full-width focus views: 3 equal columns on mobile (no scrollbar) */
+        .scdaw-workbench__toolbar-group--views,
         .scdaw-workbench__view-switcher {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
           gap: 4px;
           background: rgba(0, 0, 0, 0.25);
           padding: 3px;
@@ -448,23 +452,6 @@ export class DawWorkbenchElement extends BaseElement {
           max-width: 100%;
           min-width: 0;
           box-sizing: border-box;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          overscroll-behavior-x: contain;
-        }
-
-        .scdaw-workbench__view-switcher .btn {
-          flex: 1 0 auto;
-          white-space: nowrap;
-          width: auto;
-        }
-
-        /* Actions: 2 equal columns on mobile */
-        .scdaw-workbench__toolbar-group--actions {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 0.35rem;
-          width: 100%;
         }
 
         .scdaw-workbench__toolbar .btn {
@@ -481,6 +468,14 @@ export class DawWorkbenchElement extends BaseElement {
           gap: 0.35rem;
           white-space: nowrap;
           width: 100%;
+          min-width: 0;
+        }
+
+        .scdaw-workbench__view-switcher .btn {
+          padding: 0 0.35rem;
+          font-size: 0.72rem;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .scdaw-workbench__dock-grid {
@@ -501,6 +496,8 @@ export class DawWorkbenchElement extends BaseElement {
           width: 100%;
           max-width: 100%;
           box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-center;
         }
 
         .scdaw-workbench__dock-panel {
@@ -512,28 +509,51 @@ export class DawWorkbenchElement extends BaseElement {
 
         .scdaw-workbench__editor-bar {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 0.4rem;
-          flex-wrap: wrap;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 0.35rem;
           padding: 0.35rem 0.5rem;
           background: rgba(0, 0, 0, 0.25);
           border: 1px solid var(--border);
           border-radius: 6px;
+          box-sizing: border-box;
         }
 
         .scdaw-workbench__editor-tabs {
-          display: inline-flex;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           align-items: center;
           gap: 0.35rem;
-          flex-wrap: wrap;
+          width: 100%;
         }
 
         .scdaw-workbench__editor-bar .btn {
           height: 26px;
           min-height: 26px;
-          padding: 0 0.55rem;
-          font-size: 0.75rem;
+          padding: 0 0.5rem;
+          font-size: 0.74rem;
+          width: 100%;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        @container scdaw-center (min-width: 420px) {
+          .scdaw-workbench__editor-bar {
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+          }
+          .scdaw-workbench__editor-tabs {
+            display: inline-flex;
+            width: auto;
+          }
+          .scdaw-workbench__editor-bar .btn {
+            width: auto;
+            flex: 0 0 auto;
+            overflow: visible;
+          }
         }
 
         .hidden,
@@ -551,10 +571,8 @@ export class DawWorkbenchElement extends BaseElement {
         /* 2. Progressive Enhancement: Tablet and Wider (>= 640px) */
         @container scdaw-workbench (min-width: 640px) {
           .scdaw-workbench__header {
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: stretch;
           }
           .scdaw-workbench__title-bar {
             flex-direction: row;
@@ -565,33 +583,35 @@ export class DawWorkbenchElement extends BaseElement {
             flex-direction: row;
             flex-wrap: wrap;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
+            gap: 0.45rem 0.6rem;
           }
-          .scdaw-workbench__toolbar-group {
-            width: auto;
-          }
-          .scdaw-workbench__toolbar-group--project {
-            display: inline-flex;
-            width: auto;
-          }
-          .scdaw-workbench__toolbar-group--views {
-            flex-direction: row;
-            width: auto;
-            align-items: center;
-          }
-          .scdaw-workbench__dock-toggles {
-            display: inline-flex;
-            width: auto;
-          }
+          .scdaw-workbench__toolbar-group,
+          .scdaw-workbench__toolbar-group--project,
+          .scdaw-workbench__toolbar-group--docks,
+          .scdaw-workbench__dock-toggles,
+          .scdaw-workbench__toolbar-group--actions,
+          .scdaw-workbench__toolbar-group--views,
           .scdaw-workbench__view-switcher {
-            width: auto;
-          }
-          .scdaw-workbench__toolbar-group--actions {
             display: inline-flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
             width: auto;
+            min-width: max-content;
+            flex: 0 0 auto;
           }
-          .scdaw-workbench__toolbar .btn {
+          .scdaw-workbench__toolbar-group--views,
+          .scdaw-workbench__view-switcher {
+            margin-inline-start: auto;
+          }
+          .scdaw-workbench__toolbar .btn,
+          .scdaw-workbench__view-switcher .btn {
             width: auto;
+            flex: 0 0 auto;
+            padding: 0 0.55rem;
+            font-size: 0.78rem;
+            overflow: visible;
           }
           .scdaw-workbench__dock-grid {
             display: grid;
@@ -612,16 +632,31 @@ export class DawWorkbenchElement extends BaseElement {
         }
 
         /* Fallback for environments lacking CSS container query evaluation */
-        @media (min-width: 640px) {
-          .scdaw-workbench__title-bar {
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .scdaw-workbench__dock-grid {
-            display: grid;
-            gap: 0;
-            align-items: stretch;
+        @supports not (container-type: inline-size) {
+          @media (min-width: 640px) {
+            .scdaw-workbench__title-bar {
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .scdaw-workbench__toolbar {
+              flex-direction: row;
+              flex-wrap: wrap;
+              align-items: center;
+            }
+            .scdaw-workbench__toolbar-group {
+              display: inline-flex;
+              width: auto;
+              flex: 0 0 auto;
+            }
+            .scdaw-workbench__toolbar .btn {
+              width: auto;
+            }
+            .scdaw-workbench__dock-grid {
+              display: grid;
+              gap: 0;
+              align-items: stretch;
+            }
           }
         }
 
@@ -704,23 +739,21 @@ export class DawWorkbenchElement extends BaseElement {
               <button id="reset-btn" class="scdaw-workbench__btn btn btn-icon" title="Reset the entire project to default starter template">🔄 Reset</button>
             </div>
 
-            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views" role="group" aria-label="Workbench Views">
-              <div class="scdaw-workbench__dock-toggles" role="group" aria-label="Panel Docks">
-                <button id="toggle-browser-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Browser Dock" aria-pressed="true" aria-controls="browser-container">📁 Browser</button>
-                <button id="mode-studio-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Multi-Pane Studio Layout" aria-pressed="true">🎛 Studio</button>
-                <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Mixer Dock" aria-pressed="true" aria-controls="mixer-container">🎛 Mixer</button>
-              </div>
-
-              <div class="scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">
-                <button id="mode-mixer-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
-                <button id="mode-piano-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
-                <button id="mode-seq-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
-              </div>
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--docks scdaw-workbench__dock-toggles" role="group" aria-label="Panel Docks">
+              <button id="toggle-browser-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Browser Dock" aria-pressed="true" aria-controls="browser-container">📁 Browser</button>
+              <button id="mode-studio-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Multi-Pane Studio Layout" aria-pressed="true">🎛 Studio</button>
+              <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Mixer Dock" aria-pressed="true" aria-controls="mixer-container">🎛 Mixer</button>
             </div>
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History and Output">
               <button id="undo-btn" class="scdaw-workbench__btn btn btn-icon" title="Undo last change">↩ Undo</button>
               <button id="bounce-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Export 16-bit WAV audio">💿 Bounce WAV</button>
+            </div>
+
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">
+              <button id="mode-mixer-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
+              <button id="mode-piano-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
+              <button id="mode-seq-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
             </div>
           </nav>
         </header>

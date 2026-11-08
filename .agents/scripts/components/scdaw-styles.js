@@ -77,6 +77,9 @@ export const SHARED_STYLES = `
   justify-content: center;
   gap: 0.35rem;
   line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-inline-size: 100%;
   transition: all 0.12s ease;
   user-select: none;
   touch-action: manipulation;
@@ -129,6 +132,8 @@ export const SHARED_STYLES = `
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .badge-active {

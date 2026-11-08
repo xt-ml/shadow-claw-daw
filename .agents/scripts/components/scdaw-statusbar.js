@@ -88,6 +88,8 @@ export class DawStatusBarElement extends BaseElement {
           width: 100%;
           max-width: 100%;
           box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-statusbar;
         }
 
         /* Mobile First Base Styles (Stacked rows) */
@@ -131,7 +133,7 @@ export class DawStatusBarElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Tablet and Desktop (>= 640px) */
-        @media (min-width: 640px) {
+        @container scdaw-statusbar (min-width: 640px) {
           .scdaw-statusbar,
           .statusbar {
             flex-direction: row;
@@ -143,6 +145,23 @@ export class DawStatusBarElement extends BaseElement {
           .stat-item {
             width: auto;
             flex-wrap: nowrap;
+          }
+        }
+
+        @supports not (container-type: inline-size) {
+          @media (min-width: 640px) {
+            .scdaw-statusbar,
+            .statusbar {
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+              padding: 0.35rem 0.75rem;
+            }
+            .scdaw-statusbar__group,
+            .stat-item {
+              width: auto;
+              flex-wrap: nowrap;
+            }
           }
         }
       </style>

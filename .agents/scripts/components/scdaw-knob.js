@@ -188,6 +188,40 @@ export class DawKnobElement extends BaseElement {
         new CustomEvent("change", { detail: { value: nextVal } }),
       );
     });
+
+    // Keyboard adjustment (WCAG 2.1 AA slider pattern)
+    knob.addEventListener("keydown", (e) => {
+      const norm = mapValueToNormalized(
+        this._value,
+        this.min,
+        this.max,
+        this.scaling,
+      );
+      const step = e.shiftKey ? 0.1 : 0.02;
+      let nextNorm = null;
+      if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+        nextNorm = Math.min(1, norm + step);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+        nextNorm = Math.max(0, norm - step);
+      } else if (e.key === "Home") {
+        nextNorm = 0;
+      } else if (e.key === "End") {
+        nextNorm = 1;
+      }
+      if (nextNorm !== null) {
+        e.preventDefault?.();
+        const nextVal = mapNormalizedToValue(
+          nextNorm,
+          this.min,
+          this.max,
+          this.scaling,
+        );
+        this.value = nextVal;
+        this.dispatchEvent(
+          new CustomEvent("change", { detail: { value: nextVal } }),
+        );
+      }
+    });
   }
 
   _updateVisuals() {
@@ -200,10 +234,16 @@ export class DawKnobElement extends BaseElement {
     );
     // Angle: from -135deg to +135deg (total 270 degrees)
     const angle = -135 + norm * 270;
+    const knob = this.shadowRoot.getElementById("knob");
     const indicator = this.shadowRoot.getElementById("indicator");
     const arc = this.shadowRoot.getElementById("val-arc");
     const valText = this.shadowRoot.getElementById("val-text");
+    const formatted = formatValueWithUnit(this._value, this.unit);
 
+    if (knob) {
+      knob.setAttribute("aria-valuenow", String(this._value));
+      knob.setAttribute("aria-valuetext", formatted);
+    }
     if (indicator) {
       indicator.setAttribute("transform", `rotate(${angle} 20 20)`);
     }
@@ -213,12 +253,13 @@ export class DawKnobElement extends BaseElement {
       arc.style.strokeDasharray = `${dashLength} ${circumference}`;
     }
     if (valText) {
-      valText.textContent = formatValueWithUnit(this._value, this.unit);
+      valText.textContent = formatted;
     }
   }
 
   render() {
     if (!this.shadowRoot) return;
+    const formatted = formatValueWithUnit(this._value, this.unit);
     this.shadowRoot.innerHTML = `
       <style>
         ${SHARED_STYLES}
@@ -229,38 +270,47 @@ export class DawKnobElement extends BaseElement {
           gap: 2px;
           user-select: none;
         }
+        .scdaw-knob__control,
         .knob-container {
           width: 40px;
           height: 40px;
           cursor: ns-resize;
           position: relative;
+          touch-action: none;
+          border-radius: 50%;
         }
+        .scdaw-knob__svg,
         .knob-svg {
           width: 40px;
           height: 40px;
+          display: block;
         }
+        .scdaw-knob__label,
         .knob-label {
           font-size: 0.68rem;
           color: var(--shadow-claw-text-secondary, #94a3b8);
           font-weight: 600;
           text-transform: uppercase;
+          white-space: nowrap;
         }
+        .scdaw-knob__value,
         .knob-value {
           font-size: 0.68rem;
           font-family: var(--mono);
           color: var(--accent);
+          white-space: nowrap;
         }
       </style>
-      <span class="knob-label">${this.label}</span>
-      <div class="knob-container" id="knob" title="${this.label} (Double-click to reset)">
-        <svg class="knob-svg" viewBox="0 0 40 40">
+      <span class="scdaw-knob__label knob-label">${this.label}</span>
+      <div class="scdaw-knob scdaw-knob__control knob-container" id="knob" role="slider" tabindex="0" aria-label="${this.label || "Parameter"}" aria-valuemin="${this.min}" aria-valuemax="${this.max}" aria-valuenow="${this._value}" aria-valuetext="${formatted}" title="${this.label} (Double-click to reset)">
+        <svg class="scdaw-knob__svg knob-svg" viewBox="0 0 40 40" aria-hidden="true">
           <circle cx="20" cy="20" r="14" fill="var(--bg-elevated)" stroke="var(--border)" stroke-width="2" />
           <circle id="val-arc" cx="20" cy="20" r="14" fill="none" stroke="var(--accent)" stroke-width="2.5"
             stroke-dasharray="0 100" transform="rotate(135 20 20)" stroke-linecap="round" />
           <line id="indicator" x1="20" y1="20" x2="20" y2="8" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
         </svg>
       </div>
-      <span class="knob-value" id="val-text">${formatValueWithUnit(this._value, this.unit)}</span>
+      <span class="scdaw-knob__value knob-value" id="val-text" aria-hidden="true">${formatted}</span>
     `;
     this._updateVisuals();
   }

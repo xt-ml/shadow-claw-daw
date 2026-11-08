@@ -36,6 +36,106 @@ export function calculateTransportWheelValue({
   return Math.max(min, Math.min(max, nextVal));
 }
 
+export function calculateBpmDragValue({
+  startY,
+  currentY,
+  startValue = 120,
+  min = 40,
+  max = 240,
+  pixelsPerUnit = 2,
+  shiftKey = false,
+  shiftMultiplier = 0.2,
+}) {
+  if (typeof startY !== "number" || typeof currentY !== "number") {
+    return Math.max(min, Math.min(max, Math.round(startValue)));
+  }
+  const deltaY = startY - currentY;
+  const rate = shiftKey
+    ? (1 / pixelsPerUnit) * shiftMultiplier
+    : 1 / pixelsPerUnit;
+  const deltaValue = Math.round(deltaY * rate);
+  const nextVal = Math.round(startValue + deltaValue);
+  return Math.max(min, Math.min(max, nextVal));
+}
+
+export function setupBpmDragControl({
+  bpmInput,
+  bpmContainer,
+  onBpmChange,
+  pixelsPerUnit = 2,
+}) {
+  if (!bpmInput) return () => {};
+  const target = bpmContainer || bpmInput;
+
+  let isDragging = false;
+  let startY = 0;
+  let startBpm = Number(bpmInput.value || 120);
+  let hasMoved = false;
+
+  const handlePointerDown = (e) => {
+    isDragging = true;
+    hasMoved = false;
+    startY = e.clientY;
+    startBpm = Number(bpmInput.value || 120);
+    try {
+      target.setPointerCapture?.(e.pointerId);
+    } catch {}
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    const deltaY = startY - e.clientY;
+    if (Math.abs(deltaY) >= 2) {
+      hasMoved = true;
+    }
+    if (hasMoved) {
+      e.preventDefault?.();
+      const min = Number(bpmInput.min || 40);
+      const max = Number(bpmInput.max || 240);
+      const nextBpm = calculateBpmDragValue({
+        startY,
+        currentY: e.clientY,
+        startValue: startBpm,
+        min,
+        max,
+        pixelsPerUnit,
+        shiftKey: Boolean(e.shiftKey),
+      });
+      if (Number(bpmInput.value) !== nextBpm) {
+        bpmInput.value = String(nextBpm);
+        onBpmChange?.(nextBpm);
+      }
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    try {
+      target.releasePointerCapture?.(e.pointerId);
+    } catch {}
+    if (hasMoved) {
+      e.preventDefault?.();
+      bpmInput.blur?.();
+    } else {
+      bpmInput.focus?.();
+      bpmInput.select?.();
+    }
+  };
+
+  target.addEventListener("pointerdown", handlePointerDown);
+  target.addEventListener("pointermove", handlePointerMove);
+  target.addEventListener("pointerup", handlePointerUp);
+  target.addEventListener("pointercancel", handlePointerUp);
+
+  return () => {
+    target.removeEventListener("pointerdown", handlePointerDown);
+    target.removeEventListener("pointermove", handlePointerMove);
+    target.removeEventListener("pointerup", handlePointerUp);
+    target.removeEventListener("pointercancel", handlePointerUp);
+  };
+}
+
 export function setupTransportWheelControls({
   bpmInput,
   swingInput,
@@ -269,12 +369,17 @@ export class DawTransportElement extends BaseElement {
 
         .scdaw-transport__item--bpm {
           flex: 0 0 auto;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .scdaw-transport__label {
           font-weight: 600;
           color: var(--shadow-claw-text-secondary, #94a3b8);
           font-size: 0.75rem;
+          cursor: ns-resize;
+          user-select: none;
         }
 
         .scdaw-transport__input {
@@ -287,6 +392,16 @@ export class DawTransportElement extends BaseElement {
           font-family: var(--mono);
           font-size: 0.78rem;
           box-sizing: border-box;
+          cursor: ns-resize;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+        }
+
+        .scdaw-transport__input:focus {
+          cursor: text;
+          user-select: text;
+          -webkit-user-select: text;
         }
 
         .scdaw-transport__item--swing {
@@ -332,17 +447,20 @@ export class DawTransportElement extends BaseElement {
           .scdaw-transport,
           .transport-bar {
             flex-direction: row;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 0.5rem 0.75rem;
             padding: 0.5rem 0.75rem;
           }
           .scdaw-transport__group,
           .transport-group {
             width: auto;
+            flex: 0 0 auto;
           }
           .scdaw-transport__group--playback {
             justify-content: flex-start;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
           }
           .scdaw-transport__btn--play,
           .scdaw-transport__btn--audio,
@@ -351,27 +469,33 @@ export class DawTransportElement extends BaseElement {
           }
           .scdaw-transport__group--tempo {
             justify-content: flex-end;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             gap: 0.6rem;
             width: auto;
+            margin-inline-start: auto;
           }
           .scdaw-transport__item--swing {
             max-width: 160px;
           }
         }
 
-        @media (min-width: 640px) {
-          .scdaw-transport,
-          .transport-bar {
-            flex-direction: row;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .scdaw-transport__group--tempo {
-            justify-content: flex-end;
-            flex-wrap: nowrap;
-            gap: 0.6rem;
-            width: auto;
+        @supports not (container-type: inline-size) {
+          @media (min-width: 640px) {
+            .scdaw-transport,
+            .transport-bar {
+              flex-direction: row;
+              flex-wrap: wrap;
+              justify-content: space-between;
+              align-items: center;
+              gap: 0.5rem 0.75rem;
+            }
+            .scdaw-transport__group--tempo {
+              justify-content: flex-end;
+              flex-wrap: wrap;
+              gap: 0.6rem;
+              width: auto;
+              margin-inline-start: auto;
+            }
           }
         }
       </style>
@@ -389,9 +513,9 @@ export class DawTransportElement extends BaseElement {
         </div>
 
         <div class="scdaw-transport__group scdaw-transport__group--tempo transport-group" role="group" aria-label="Tempo, Groove and Transport Settings">
-          <div class="scdaw-transport__item scdaw-transport__item--bpm">
-            <label for="bpm-input" class="scdaw-transport__label">BPM:</label>
-            <input id="bpm-input" class="scdaw-transport__input" type="number" min="40" max="240" value="${p.bpm}" title="Mouse wheel to adjust (Shift for +/-5 BPM). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
+          <div class="scdaw-transport__item scdaw-transport__item--bpm" title="Touch & drag up/down or mouse wheel to adjust BPM (Shift for fine control). Double-click to reset to 120">
+            <label for="bpm-input" class="scdaw-transport__label" title="Touch & drag up/down to adjust BPM">BPM:</label>
+            <input id="bpm-input" class="scdaw-transport__input" type="number" min="40" max="240" value="${p.bpm}" title="Touch & drag up/down or mouse wheel to adjust (Shift for fine control). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
           </div>
 
           <div class="scdaw-transport__item scdaw-transport__item--swing">
@@ -460,6 +584,17 @@ export class DawTransportElement extends BaseElement {
         const swingVal = this.shadowRoot.getElementById("swing-val");
         if (swingVal) swingVal.textContent = `${val}%`;
         scdaw.sendCommand("set_transport", { swing: val / 100 });
+      },
+    });
+
+    const bpmContainer = this.shadowRoot.querySelector(
+      ".scdaw-transport__item--bpm",
+    );
+    setupBpmDragControl({
+      bpmInput,
+      bpmContainer,
+      onBpmChange: (bpm) => {
+        scdaw.sendCommand("set_transport", { bpm });
       },
     });
 

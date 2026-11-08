@@ -287,11 +287,13 @@ export class DawMixerElement extends BaseElement {
       const muteBtn = strip.querySelector(".mute-btn");
       if (muteBtn) {
         muteBtn.classList.toggle("btn-danger", Boolean(t.mute));
+        muteBtn.setAttribute?.("aria-pressed", String(Boolean(t.mute)));
       }
 
       const soloBtn = strip.querySelector(".solo-btn");
       if (soloBtn) {
         soloBtn.classList.toggle("btn-primary", Boolean(t.solo));
+        soloBtn.setAttribute?.("aria-pressed", String(Boolean(t.solo)));
       }
     }
 
@@ -327,29 +329,34 @@ export class DawMixerElement extends BaseElement {
           container-type: inline-size;
           container-name: scdaw-mixer;
         }
+        /* Mobile-First Base Styles (Compact Dock & Mobile Viewports) */
+        .scdaw-mixer__channels,
         .mixer-container {
           display: flex;
-          gap: 0.75rem;
+          gap: 0.4rem;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x;
           overscroll-behavior-x: contain;
-          padding: 0.75rem;
+          padding: 0.5rem;
           align-items: stretch;
           background: rgba(0, 0, 0, 0.2);
           box-sizing: border-box;
         }
+        .scdaw-mixer__strip,
         .strip {
-          width: 105px;
-          min-width: 95px;
+          flex: 1 0 76px;
+          width: 76px;
+          min-width: 72px;
+          max-width: 110px;
           background: var(--bg-card);
           border: 1px solid var(--border);
           border-radius: 6px;
-          padding: 0.5rem;
+          padding: 0.4rem 0.3rem;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.4rem;
+          gap: 0.35rem;
           box-sizing: border-box;
           cursor: pointer;
           transition: border-color 0.12s ease;
@@ -358,47 +365,70 @@ export class DawMixerElement extends BaseElement {
           border-color: var(--accent);
           box-shadow: 0 0 0 1px rgba(128, 212, 219, 0.35);
         }
+        .scdaw-mixer__strip-name,
         .strip-name {
-          font-size: 0.72rem;
+          font-size: 0.7rem;
           font-weight: 700;
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
-          max-width: 90px;
+          max-width: 100%;
         }
         .meter-fader-row {
           display: flex;
-          gap: 8px;
+          gap: 6px;
           align-items: center;
-          height: 130px;
+          height: 124px;
         }
         .vol-slider {
           writing-mode: vertical-lr;
           direction: rtl;
-          height: 120px;
-          width: 32px;
+          height: 114px;
+          width: 28px;
           cursor: ns-resize;
           touch-action: none;
           user-select: none;
           -webkit-user-select: none;
         }
         .meter-canvas {
-          width: 14px;
-          height: 120px;
+          width: 12px;
+          height: 114px;
           background: #090e10;
           border-radius: 2px;
           border: 1px solid var(--border-subtle);
         }
 
-        @container scdaw-mixer (max-width: 480px) {
+        /* Progressive Enhancement: Wide Mixer Console / Full View (>= 420px) */
+        @container scdaw-mixer (min-width: 420px) {
+          .scdaw-mixer__channels,
           .mixer-container {
-            gap: 0.5rem;
-            padding: 0.5rem;
+            gap: 0.75rem;
+            padding: 0.75rem;
           }
+          .scdaw-mixer__strip,
           .strip {
-            width: 88px;
-            min-width: 88px;
-            padding: 0.4rem;
+            flex: 0 0 105px;
+            width: 105px;
+            min-width: 95px;
+            padding: 0.5rem;
+            gap: 0.4rem;
+          }
+          .scdaw-mixer__strip-name,
+          .strip-name {
+            font-size: 0.72rem;
+            max-width: 90px;
+          }
+          .meter-fader-row {
+            gap: 8px;
+            height: 130px;
+          }
+          .vol-slider {
+            height: 120px;
+            width: 32px;
+          }
+          .meter-canvas {
+            width: 14px;
+            height: 120px;
           }
         }
       </style>
@@ -420,9 +450,9 @@ export class DawMixerElement extends BaseElement {
                 <input type="range" class="vol-slider track-vol" data-track="${t.id}" min="0" max="150" value="${Math.round(t.volume * 100)}" title="Volume (Double-click to reset)" />
               </div>
               <div style="display:flex; gap:3px;">
-                <button class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}">M</button>
-                <button class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}">S</button>
-                <button class="btn btn-icon reset-track-btn" data-track="${t.id}" title="Reset Strip">🔄</button>
+                <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}">M</button>
+                <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}">S</button>
+                <button type="button" class="btn btn-icon reset-track-btn" data-track="${t.id}" title="Reset Strip">🔄</button>
               </div>
             </div>
           `;
@@ -489,8 +519,10 @@ export class DawMixerElement extends BaseElement {
     // Mute/Solo/Reset
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((b) => {
       b.addEventListener("click", (e) => {
-        const id = e.target.dataset.track;
-        const trk = p.tracks.find((t) => t.id === id);
+        e.stopPropagation?.();
+        const id = b.dataset.track || e.target?.dataset?.track;
+        const currentProj = scdaw.getProject();
+        const trk = currentProj.tracks.find((t) => t.id === id);
         if (trk)
           scdaw.sendCommand("set_track", { trackId: id, mute: !trk.mute });
       });
@@ -498,8 +530,10 @@ export class DawMixerElement extends BaseElement {
 
     this.shadowRoot.querySelectorAll(".solo-btn").forEach((b) => {
       b.addEventListener("click", (e) => {
-        const id = e.target.dataset.track;
-        const trk = p.tracks.find((t) => t.id === id);
+        e.stopPropagation?.();
+        const id = b.dataset.track || e.target?.dataset?.track;
+        const currentProj = scdaw.getProject();
+        const trk = currentProj.tracks.find((t) => t.id === id);
         if (trk)
           scdaw.sendCommand("set_track", { trackId: id, solo: !trk.solo });
       });
@@ -507,7 +541,8 @@ export class DawMixerElement extends BaseElement {
 
     this.shadowRoot.querySelectorAll(".reset-track-btn").forEach((b) => {
       b.addEventListener("click", (e) => {
-        const id = e.target.dataset.track;
+        e.stopPropagation?.();
+        const id = b.dataset.track || e.target?.dataset?.track;
         scdaw.sendCommand("reset_track", { trackId: id, mode: "mixer" });
       });
     });

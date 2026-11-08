@@ -90,12 +90,22 @@ export class DawTimelineElement extends BaseElement {
           width: 100%;
           max-width: 100%;
           box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-timeline;
           --track-header-w: 120px;
         }
 
-        @media (min-width: 640px) {
+        @container scdaw-timeline (min-width: 520px) {
           :host {
             --track-header-w: 180px;
+          }
+        }
+
+        @supports not (container-type: inline-size) {
+          @media (min-width: 640px) {
+            :host {
+              --track-header-w: 180px;
+            }
           }
         }
 
@@ -120,14 +130,17 @@ export class DawTimelineElement extends BaseElement {
         }
 
         .scdaw-timeline__title-group {
-          display: flex;
+          display: inline-flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.45rem;
+          flex-wrap: nowrap;
+          white-space: nowrap;
         }
 
         .scdaw-timeline__actions {
-          display: flex;
+          display: inline-flex;
           gap: 0.35rem;
+          flex-shrink: 0;
         }
 
         .scdaw-timeline__scroll {
@@ -245,6 +258,13 @@ export class DawTimelineElement extends BaseElement {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+          transition: opacity 0.12s ease;
+        }
+
+        .scdaw-timeline__clip--muted {
+          opacity: 0.38;
+          border-style: dashed;
+          background: rgba(148, 163, 184, 0.12);
         }
 
         .scdaw-timeline__playhead,
@@ -285,28 +305,32 @@ export class DawTimelineElement extends BaseElement {
           </div>
 
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
-            ${p.tracks
-              .map((t) => {
-                const isSelected = scdaw.selectedTrackId?.get() === t.id;
-                return `
+            ${(() => {
+              const hasSolo = p.tracks.some((trk) => trk.solo);
+              return p.tracks
+                .map((t) => {
+                  const isSelected = scdaw.selectedTrackId?.get() === t.id;
+                  const isSilenced = Boolean(t.mute || (hasSolo && !t.solo));
+                  return `
                 <div class="scdaw-timeline__track track-row ${isSelected ? "scdaw-timeline__track--selected track-row--selected" : ""}" data-track="${t.id}" role="listitem" aria-current="${isSelected ? "true" : "false"}">
                   <div class="scdaw-timeline__track-header track-header">
                     <div class="scdaw-timeline__track-name track-name" title="${t.name}">${t.kind === "drums" ? "🥁" : "🎹"} ${t.name}</div>
                     <div style="display:flex; gap:4px; align-items:center;">
-                      <button class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}">M</button>
-                      <button class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}">S</button>
+                      <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
+                      <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
                       <span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${t.notes.length} notes</span>
                     </div>
                   </div>
                   <div class="scdaw-timeline__lane lane-area">
-                    <div class="scdaw-timeline__clip clip-block" style="left:0%; width:100%;">
-                      <span>${t.name} Pattern</span>
+                    <div class="scdaw-timeline__clip clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}" style="left:0%; width:100%;">
+                      <span>${t.name} Pattern${t.mute ? " (Muted)" : ""}</span>
                     </div>
                   </div>
                 </div>
               `;
-              })
-              .join("")}
+                })
+                .join("");
+            })()}
           </div>
         </div>
       </div>
@@ -338,18 +362,22 @@ export class DawTimelineElement extends BaseElement {
 
     // Mute & Solo
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
         const id = btn.dataset.track;
-        const t = p.tracks.find((x) => x.id === id);
-        if (t) scdaw.sendCommand("set_track", { id, mute: !t.mute });
+        const currentProj = scdaw.getProject();
+        const t = currentProj.tracks.find((x) => x.id === id);
+        if (t) scdaw.sendCommand("set_track", { trackId: id, mute: !t.mute });
       });
     });
 
     this.shadowRoot.querySelectorAll(".solo-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
         const id = btn.dataset.track;
-        const t = p.tracks.find((x) => x.id === id);
-        if (t) scdaw.sendCommand("set_track", { id, solo: !t.solo });
+        const currentProj = scdaw.getProject();
+        const t = currentProj.tracks.find((x) => x.id === id);
+        if (t) scdaw.sendCommand("set_track", { trackId: id, solo: !t.solo });
       });
     });
   }

@@ -119,24 +119,28 @@ export class DawSequencerElement extends BaseElement {
           container-type: inline-size;
           container-name: scdaw-sequencer;
         }
+        /* Mobile-First Base Styles */
+        .scdaw-sequencer__grid,
         .grid-container {
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x;
           overscroll-behavior-x: contain;
-          padding: 0.75rem;
+          padding: 0.6rem;
           background: rgba(0, 0, 0, 0.2);
           box-sizing: border-box;
         }
+        .scdaw-sequencer__row,
         .seq-row {
           display: flex;
           align-items: center;
           margin-bottom: 6px;
         }
+        .scdaw-sequencer__label,
         .seq-label {
-          width: 90px;
-          min-width: 90px;
-          font-size: 0.75rem;
+          width: 72px;
+          min-width: 72px;
+          font-size: 0.68rem;
           font-family: var(--mono);
           text-overflow: ellipsis;
           overflow: hidden;
@@ -148,15 +152,17 @@ export class DawSequencerElement extends BaseElement {
           border-radius: 3px;
           z-index: 2;
         }
+        .scdaw-sequencer__cells,
         .seq-cells {
           display: flex;
           gap: 4px;
         }
+        .scdaw-sequencer__cell,
         .seq-cell {
-          width: 30px;
-          height: 30px;
-          min-width: 30px;
-          min-height: 30px;
+          width: 32px;
+          height: 32px;
+          min-width: 32px;
+          min-height: 32px;
           background: var(--bg-elevated);
           border: 1px solid var(--border);
           border-radius: 4px;
@@ -179,17 +185,24 @@ export class DawSequencerElement extends BaseElement {
           outline: 2px solid #ffffff;
         }
 
-        @container scdaw-sequencer (max-width: 600px) {
-          .seq-label {
-            width: 72px;
-            min-width: 72px;
-            font-size: 0.68rem;
+        /* Progressive Enhancement: Wide Sequencer (>= 601px) */
+        @container scdaw-sequencer (min-width: 601px) {
+          .scdaw-sequencer__grid,
+          .grid-container {
+            padding: 0.75rem;
           }
+          .scdaw-sequencer__label,
+          .seq-label {
+            width: 90px;
+            min-width: 90px;
+            font-size: 0.75rem;
+          }
+          .scdaw-sequencer__cell,
           .seq-cell {
-            width: 34px;
-            height: 34px;
-            min-width: 34px;
-            min-height: 34px;
+            width: 30px;
+            height: 30px;
+            min-width: 30px;
+            min-height: 30px;
           }
         }
       </style>

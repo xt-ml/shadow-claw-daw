@@ -36,6 +36,25 @@ export function computeCellActiveMap(notes = []) {
   return map;
 }
 
+export function computeStepVelocity(notes = [], step = 0) {
+  if (!Array.isArray(notes) || notes.length === 0) return 0;
+  let maxVel = 0;
+  for (const n of notes) {
+    if (n && n.position !== undefined && ppqnToStep(n.position) === step) {
+      const v = typeof n.velocity === "number" ? n.velocity : 0.85;
+      if (v > maxVel) maxVel = v;
+    }
+  }
+  return maxVel;
+}
+
+export function calculateVelocityFromPointer({ clientY, rect } = {}) {
+  if (!rect || !rect.height || rect.height <= 0) return 0.85;
+  const raw = 1 - (clientY - rect.top) / rect.height;
+  const clamped = Math.max(0.05, Math.min(1, raw));
+  return Math.round(clamped * 100) / 100;
+}
+
 export function shouldPreserveEditorDom({
   renderedTrackId = null,
   targetTrackId = null,
@@ -212,15 +231,21 @@ export class DawEditorElement extends BaseElement {
     });
 
     // Update velocity stalks
-    const stalks = this.shadowRoot.querySelectorAll(".vel-bar");
-    for (let step = 0; step < numSteps && step < stalks.length; step++) {
-      const note = currentTrack?.notes.find(
-        (n) => ppqnToStep(n.position) === step,
-      );
-      const velPct = note ? Math.round(note.velocity * 100) : 0;
+    const stalks = this.shadowRoot.querySelectorAll(".vel-stalk");
+    const bars = this.shadowRoot.querySelectorAll(".vel-bar");
+    for (let step = 0; step < numSteps && step < bars.length; step++) {
+      const vel = computeStepVelocity(currentTrack?.notes, step);
+      const hasNote = vel > 0;
+      const velPct = hasNote ? Math.round(vel * 100) : 0;
+      if (bars[step]) {
+        bars[step].style.height = `${velPct}%`;
+        bars[step].style.opacity = hasNote ? "1" : "0.1";
+      }
       if (stalks[step]) {
-        stalks[step].style.height = `${velPct}%`;
-        stalks[step].style.opacity = note ? "1" : "0.1";
+        stalks[step].classList.toggle("has-note", hasNote);
+        stalks[step].title = hasNote
+          ? `Step ${step + 1}: Velocity ${velPct}% (drag to adjust)`
+          : `Step ${step + 1}: Empty`;
       }
     }
   }
@@ -293,11 +318,16 @@ export class DawEditorElement extends BaseElement {
         .pr-row {
           display: flex;
           height: 22px;
+          min-height: 22px;
+          flex-shrink: 0;
+          min-width: max-content;
+          width: 100%;
           border-bottom: 1px solid var(--border-subtle);
         }
         .pr-key {
           width: 48px;
           min-width: 48px;
+          box-sizing: border-box;
           background: var(--bg-card);
           border-right: 1px solid var(--border);
           font-size: 0.65rem;
@@ -323,6 +353,7 @@ export class DawEditorElement extends BaseElement {
           flex: 1;
           min-width: 24px;
           min-height: 22px;
+          box-sizing: border-box;
           border-right: 1px solid var(--border-subtle);
           cursor: pointer;
           touch-action: manipulation;
@@ -363,46 +394,79 @@ export class DawEditorElement extends BaseElement {
           }
         }
 
-        @media (min-width: 601px) {
-          .scdaw-editor__container,
-          .editor-container {
-            flex-direction: row;
-            height: 340px;
-          }
-          .scdaw-editor__inspector,
-          .inspector {
-            width: 170px;
-            min-width: 140px;
-            border-right: 1px solid var(--border);
-            border-bottom: none;
-            flex-direction: column;
-            flex-wrap: nowrap;
-          }
-          .scdaw-editor__grid,
-          .grid-area {
-            flex: 1;
-            height: auto;
-            max-height: none;
+        @supports not (container-type: inline-size) {
+          @media (min-width: 601px) {
+            .scdaw-editor__container,
+            .editor-container {
+              flex-direction: row;
+              height: 340px;
+            }
+            .scdaw-editor__inspector,
+            .inspector {
+              width: 170px;
+              min-width: 140px;
+              border-right: 1px solid var(--border);
+              border-bottom: none;
+              flex-direction: column;
+              flex-wrap: nowrap;
+            }
+            .scdaw-editor__grid,
+            .grid-area {
+              flex: 1;
+              height: auto;
+              max-height: none;
+            }
           }
         }
         .velocity-stalks {
-          height: 40px;
-          border-top: 1px solid var(--border);
           display: flex;
+          height: 40px;
+          min-height: 40px;
+          flex-shrink: 0;
+          min-width: max-content;
+          width: 100%;
+          border-top: 1px solid var(--border);
           background: var(--bg-card);
-          padding-left: 48px;
+          position: sticky;
+          bottom: 0;
+          z-index: 4;
+        }
+        .vel-key {
+          z-index: 5;
+          font-size: 0.6rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          color: var(--accent);
+        }
+        .vel-cells {
+          display: flex;
+          flex: 1;
         }
         .vel-stalk {
           flex: 1;
+          min-width: 24px;
+          box-sizing: border-box;
+          border-right: 1px solid var(--border-subtle);
           display: flex;
           align-items: flex-end;
-          padding: 2px;
+          justify-content: center;
+          padding: 3px 0;
+          cursor: ns-resize;
+          touch-action: none;
+          user-select: none;
+        }
+        .vel-stalk.beat-start {
+          border-left: 1px solid rgba(128, 212, 219, 0.25);
+        }
+        .vel-stalk:hover {
+          background: rgba(128, 212, 219, 0.06);
         }
         .vel-bar {
           width: 4px;
           background: var(--accent);
           border-radius: 2px;
           margin: 0 auto;
+          pointer-events: none;
         }
       </style>
       <div class="daw-panel">
@@ -449,20 +513,26 @@ export class DawEditorElement extends BaseElement {
             `,
               )
               .join("")}
-          </div>
-        </div>
-        <div class="velocity-stalks">
-          ${Array.from({ length: numSteps }, (_, step) => {
-            const note = currentTrack?.notes.find(
-              (n) => ppqnToStep(n.position) === step,
-            );
-            const velPct = note ? Math.round(note.velocity * 100) : 0;
-            return `
-              <div class="vel-stalk">
-                <div class="vel-bar" style="height:${velPct}%; opacity:${note ? 1 : 0.1};"></div>
+            <div class="velocity-stalks" role="group" aria-label="Note Velocity Lane">
+              <div class="pr-key vel-key" title="Note Velocity (drag stalks vertically to adjust)">VEL</div>
+              <div class="pr-cells vel-cells">
+                ${Array.from({ length: numSteps }, (_, step) => {
+                  const vel = computeStepVelocity(currentTrack?.notes, step);
+                  const hasNote = vel > 0;
+                  const velPct = hasNote ? Math.round(vel * 100) : 0;
+                  const isBeatStart = step % 4 === 0;
+                  const title = hasNote
+                    ? `Step ${step + 1}: Velocity ${velPct}% (drag to adjust)`
+                    : `Step ${step + 1}: Empty`;
+                  return `
+                    <div class="vel-stalk ${isBeatStart ? "beat-start" : ""} ${hasNote ? "has-note" : ""}" data-step="${step}" title="${title}">
+                      <div class="vel-bar" style="height:${velPct}%; opacity:${hasNote ? 1 : 0.1};"></div>
+                    </div>
+                  `;
+                }).join("")}
               </div>
-            `;
-          }).join("")}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -522,6 +592,44 @@ export class DawEditorElement extends BaseElement {
           step,
           pitch,
         });
+      });
+    });
+
+    // Velocity stalk click / vertical drag
+    this.shadowRoot.querySelectorAll(".vel-stalk").forEach((stalk) => {
+      const applyVelocityFromEvent = (e) => {
+        if (!this._selectedTrackId) return;
+        const step = Number(stalk.dataset.step);
+        const rect =
+          typeof stalk.getBoundingClientRect === "function"
+            ? stalk.getBoundingClientRect()
+            : null;
+        const velocity = calculateVelocityFromPointer({
+          clientY: e.clientY,
+          rect,
+        });
+        scdaw.sendCommand("set_step_velocity", {
+          trackId: this._selectedTrackId,
+          step,
+          velocity,
+        });
+      };
+
+      stalk.addEventListener("pointerdown", (e) => {
+        if (typeof e.preventDefault === "function") e.preventDefault();
+        applyVelocityFromEvent(e);
+
+        if (typeof window !== "undefined") {
+          const onMove = (moveEvent) => applyVelocityFromEvent(moveEvent);
+          const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            window.removeEventListener("pointercancel", onUp);
+          };
+          window.addEventListener("pointermove", onMove);
+          window.addEventListener("pointerup", onUp);
+          window.addEventListener("pointercancel", onUp);
+        }
       });
     });
   }

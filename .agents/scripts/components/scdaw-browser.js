@@ -189,10 +189,13 @@ export class DawBrowserElement extends BaseElement {
           width: 100%;
           max-width: 100%;
           box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-browser;
         }
         .scdaw-browser__header,
         .browser-header {
-          display: flex;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 4px;
           margin-bottom: 0.5rem;
           border-bottom: 1px solid var(--border);
@@ -202,7 +205,8 @@ export class DawBrowserElement extends BaseElement {
         }
         .scdaw-browser__tab-btn,
         .tab-btn {
-          flex: 1;
+          width: 100%;
+          min-width: 0;
           padding: 0.35rem 0.2rem;
           font-size: 0.72rem;
           text-align: center;
@@ -212,6 +216,9 @@ export class DawBrowserElement extends BaseElement {
           cursor: pointer;
           border-radius: 4px;
           font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
           transition: all 0.12s ease;
         }
         .scdaw-browser__tab-btn.active,

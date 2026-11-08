@@ -97,59 +97,74 @@ export class DawDevicesElement extends BaseElement {
         ${SHARED_STYLES}
         :host {
           display: block;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-devices;
         }
+        .scdaw-devices__rack,
         .rack-container {
           display: flex;
+          flex-wrap: wrap;
           gap: 0.75rem;
           padding: 0.75rem;
           overflow-x: auto;
           background: rgba(0, 0, 0, 0.2);
-          min-height: 140px;
+          min-height: 120px;
+          box-sizing: border-box;
         }
+        .scdaw-devices__card,
         .device-card {
           background: var(--bg-card);
           border: 1px solid var(--border);
           border-radius: 6px;
           padding: 0.6rem;
-          min-width: 280px;
+          min-width: min(240px, 100%);
+          flex: 1 1 240px;
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
+          box-sizing: border-box;
         }
+        .scdaw-devices__card-header,
         .device-card-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-bottom: 1px solid var(--border-subtle);
           padding-bottom: 4px;
+          gap: 0.4rem;
         }
+        .scdaw-devices__controls,
         .controls-row {
           display: flex;
           align-items: center;
-          gap: 0.6rem;
+          justify-content: space-around;
+          gap: 0.5rem;
           flex-wrap: wrap;
         }
       </style>
-      <div class="daw-panel">
-        <div class="daw-panel-header">
-          <div style="display:flex; align-items:center; gap:0.6rem;">
+      <div class="scdaw-devices daw-panel" role="region" aria-label="Track Device Rack">
+        <div class="scdaw-devices__header daw-panel-header">
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
             <span>🎛️ Device Rack: <strong>${track?.name || "None"}</strong></span>
             <span class="badge">${chain.length} Devices</span>
           </div>
-          <div style="display:flex; gap:4px;">
+          <div style="display:flex; gap:4px; flex-shrink:0;">
             <button id="reset-device-btn" class="btn btn-icon" title="Reset instrument parameters to factory defaults">🔄 Reset Device</button>
           </div>
         </div>
-        <div class="rack-container">
+        <div class="scdaw-devices__rack rack-container">
           ${chain
             .map(
               (dev) => `
-            <div class="device-card" data-role="${dev.role}">
-              <div class="device-card-header">
+            <div class="scdaw-devices__card device-card" data-role="${dev.role}">
+              <div class="scdaw-devices__card-header device-card-header">
                 <span style="font-weight:700; font-size:0.78rem; color:var(--accent);">${dev.name}</span>
                 <span class="badge" style="font-size:0.65rem;">${dev.role}</span>
               </div>
-              <div class="controls-row">
+              <div class="scdaw-devices__controls controls-row">
                 ${
                   dev.type === "synth"
                     ? `
