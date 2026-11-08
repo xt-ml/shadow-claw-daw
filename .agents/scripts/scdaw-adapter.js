@@ -126,6 +126,12 @@ export async function handleToolDispatch(name, params) {
     }
 
     case "scdaw_load_project": {
+      if (params.filename) {
+        return await scdaw.loadProjectFromFs({
+          conversationId: params.conversationId || "br:main",
+          filename: params.filename,
+        });
+      }
       return await scdaw.sendCommand("load_project", params);
     }
 
@@ -198,7 +204,13 @@ export async function handleToolDispatch(name, params) {
     }
 
     case "scdaw_import_project": {
-      let content = params.data;
+      if (params.filename && !params.data && !params.content) {
+        return await scdaw.loadProjectFromFs({
+          conversationId: params.conversationId || "br:main",
+          filename: params.filename,
+        });
+      }
+      let content = params.data || params.content;
       if (
         typeof content === "string" &&
         !content.trim().startsWith("{") &&

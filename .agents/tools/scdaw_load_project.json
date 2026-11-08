@@ -1,16 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_load_project",
-  "description": "Validate and load a complete DAW project schema into the active workbench session.",
+  "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from ShadowClaw FS / OPFS conversation storage.",
   "input_schema": {
     "type": "object",
     "properties": {
       "project": {
         "type": "object",
         "description": "Valid DAW project object"
+      },
+      "filename": {
+        "type": "string",
+        "description": "Project filename to load from conversation files (.scdaw.json, .dawproject, .mid)"
+      },
+      "conversationId": {
+        "type": "string",
+        "description": "Conversation ID to load from (defaults to 'br:main' / Main)"
       }
     },
-    "required": ["project"],
     "additionalProperties": false
   },
   "annotations": {

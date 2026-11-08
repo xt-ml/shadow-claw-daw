@@ -10,6 +10,12 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
+import {
+  DEFAULT_GROUP_ID,
+  formatFileSize,
+  getFileIcon,
+  classifyFile,
+} from "../scdaw-fs.js";
 
 import "./scdaw-transport.js";
 import "./scdaw-browser.js";
@@ -594,29 +600,56 @@ export class DawWorkbenchElement extends BaseElement {
           </form>
         </shadow-claw-dialog>
 
-        <!-- Hidden file input for project & MIDI import -->
+        <!-- Hidden file input for project & MIDI import fallback -->
         <input type="file" id="import-file-input" style="display:none;" accept=".scdaw.json,.json,.dawproject,.mid,.midi" aria-hidden="true"/>
 
         <!-- Save & Export Modal Dialog -->
-        <dialog id="export-modal" class="scdaw-dialog" aria-labelledby="export-modal-title" style="padding:1.4rem; max-width:440px; width:92%; border-radius:8px; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+        <dialog id="export-modal" class="scdaw-dialog" aria-labelledby="export-modal-title" style="padding:1.4rem; max-width:480px; width:92%; border-radius:8px; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
           <form method="dialog" id="export-form" style="display:flex; flex-direction:column; gap:0.9rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h3 id="export-modal-title" style="margin:0; font-size:1.1rem; color:var(--text, #f8fafc);">💾 Save & Export</h3>
               <button type="button" id="export-modal-close" class="btn btn-icon" aria-label="Close export dialog" style="padding:2px 8px; font-size:1rem;">✕</button>
             </div>
 
+            <!-- Destination Conversation Selection -->
             <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <label for="export-format-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Format</label>
-              <select id="export-format-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
-                <option value="wav">WAV Audio Mixdown (.wav)</option>
-                <option value="stems">Consolidated Stems Bundle (.zip)</option>
-                <option value="midi">Standard MIDI File (.mid)</option>
-                <option value="dawproject">DAWproject Interchange (.dawproject)</option>
-                <option value="json">Native Project (.scdaw.json)</option>
+              <label for="export-conversation-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Destination Conversation</label>
+              <select id="export-conversation-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+                <option value="br:main" selected>Main (Default)</option>
               </select>
             </div>
 
-            <div id="export-opt-wav" style="display:flex; flex-direction:column; gap:0.6rem;">
+            <!-- Filename Input -->
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+              <label for="export-filename-input" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">File Name</label>
+              <input type="text" id="export-filename-input" value="${p.name || "daw"}" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px; box-sizing:border-box;"/>
+            </div>
+
+            <!-- Format Selector -->
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+              <label for="export-format-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Format</label>
+              <select id="export-format-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+                <option value="json" selected>Native Project (.scdaw.json)</option>
+                <option value="dawproject">DAWproject Interchange (.dawproject)</option>
+                <option value="wav">WAV Audio Mixdown (.wav)</option>
+                <option value="stems">Consolidated Stems Bundle (.zip)</option>
+                <option value="midi">Standard MIDI File (.mid)</option>
+              </select>
+            </div>
+
+            <!-- Save Target Options -->
+            <div style="display:flex; flex-direction:column; gap:0.4rem; padding:0.2rem 0;">
+              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--text, #f8fafc);">
+                <input type="checkbox" id="export-save-to-fs" checked />
+                <span>Save to Conversation Files (ShadowClaw FS / OPFS)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--shadow-claw-text-secondary, #94a3b8);">
+                <input type="checkbox" id="export-download-copy" />
+                <span>Also download copy to computer</span>
+              </label>
+            </div>
+
+            <div id="export-opt-wav" style="display:none; flex-direction:column; gap:0.6rem;">
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
                 <div>
                   <label for="export-bitdepth" style="font-size:0.75rem; color:var(--shadow-claw-text-secondary, #94a3b8);">Bit Depth</label>
@@ -646,7 +679,45 @@ export class DawWorkbenchElement extends BaseElement {
 
             <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem;">
               <button type="button" id="export-modal-cancel" class="btn">Cancel</button>
-              <button type="button" id="export-modal-submit" class="btn btn-primary">Export</button>
+              <button type="button" id="export-modal-submit" class="btn btn-primary">Save & Export</button>
+            </div>
+          </form>
+        </dialog>
+
+        <!-- Open / Load Project Modal Dialog -->
+        <dialog id="import-modal" class="scdaw-dialog" aria-labelledby="import-modal-title" style="padding:1.4rem; max-width:480px; width:92%; border-radius:8px; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+          <form method="dialog" id="import-form" style="display:flex; flex-direction:column; gap:0.9rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 id="import-modal-title" style="margin:0; font-size:1.1rem; color:var(--text, #f8fafc);">📂 Open Project</h3>
+              <button type="button" id="import-modal-close" class="btn btn-icon" aria-label="Close open dialog" style="padding:2px 8px; font-size:1rem;">✕</button>
+            </div>
+
+            <!-- Source Conversation Selector -->
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+              <label for="import-conversation-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Conversation</label>
+              <select id="import-conversation-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+                <option value="br:main" selected>Main (Default)</option>
+              </select>
+            </div>
+
+            <!-- Files in selected conversation -->
+            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label for="import-file-list" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Files in Conversation</label>
+                <button type="button" id="import-refresh-btn" class="btn btn-icon" title="Refresh files" style="padding:2px 6px; font-size:0.75rem;">🔄 Refresh</button>
+              </div>
+              <div id="import-file-list" class="scdaw-file-list" role="listbox" aria-label="Available project files" tabindex="0" style="min-height:160px; max-height:220px; overflow-y:auto; border:1px solid var(--border, #334155); border-radius:4px; padding:0.4rem; background:var(--background, #0f172a); display:flex; flex-direction:column; gap:4px;">
+                <div style="padding:1rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.8rem;">Loading files...</div>
+              </div>
+            </div>
+
+            <!-- Actions footer -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.6rem;">
+              <button type="button" id="import-from-disk-btn" class="btn" title="Open file from your computer">💻 From Computer...</button>
+              <div style="display:flex; gap:0.6rem;">
+                <button type="button" id="import-modal-cancel" class="btn">Cancel</button>
+                <button type="button" id="import-modal-submit" class="btn btn-primary" disabled>Open Project</button>
+              </div>
             </div>
           </form>
         </dialog>
@@ -763,14 +834,162 @@ export class DawWorkbenchElement extends BaseElement {
         }
       });
 
-    // Import Button & File Input Handling
+    // Helper to populate conversation dropdowns
+    const populateConversations = async (
+      selectEl,
+      defaultId = DEFAULT_GROUP_ID,
+    ) => {
+      if (!selectEl) return;
+      try {
+        const conversations = await scdaw.listConversations();
+        selectEl.innerHTML = conversations
+          .map(
+            (c) =>
+              `<option value="${c.groupId}" ${c.groupId === defaultId ? "selected" : ""}>${c.name}${c.isDefault ? " (Default)" : ""}</option>`,
+          )
+          .join("");
+      } catch (_) {}
+    };
+
+    // Import / Open Dialog Elements
+    const importModal = this.shadowRoot.getElementById("import-modal");
+    const importConvSelect = this.shadowRoot.getElementById(
+      "import-conversation-select",
+    );
+    const importFileList = this.shadowRoot.getElementById("import-file-list");
+    const importSubmitBtn = this.shadowRoot.getElementById(
+      "import-modal-submit",
+    );
+    const importFromDiskBtn = this.shadowRoot.getElementById(
+      "import-from-disk-btn",
+    );
+    const importRefreshBtn =
+      this.shadowRoot.getElementById("import-refresh-btn");
     const fileInput = this.shadowRoot.getElementById("import-file-input");
+
+    const loadImportFiles = async (groupId) => {
+      if (!importFileList) return;
+      importFileList.innerHTML = `<div style="padding:1rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.8rem;">Loading files...</div>`;
+      if (importSubmitBtn) importSubmitBtn.disabled = true;
+      this._selectedImportFile = null;
+
+      try {
+        const files = await scdaw.listConversationFiles(groupId);
+        if (!files || files.length === 0) {
+          importFileList.innerHTML = `
+            <div style="padding:1.2rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.8rem;">
+              No files found in this conversation.<br/>
+              <span style="font-size:0.7rem; opacity:0.8;">Save a project to this conversation or load from your computer.</span>
+            </div>
+          `;
+          return;
+        }
+
+        importFileList.innerHTML = files
+          .map(
+            (f) => `
+            <div class="scdaw-file-item" role="option" aria-selected="false" tabindex="0" data-filename="${f.name}" data-format="${f.format}" style="padding:0.45rem 0.6rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:0.8rem; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid transparent; transition:border-color 0.15s, background 0.15s;">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span aria-hidden="true">${getFileIcon(f.name)}</span>
+                <span style="font-weight:500;">${f.name}</span>
+              </span>
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span class="badge" style="font-size:0.65rem;">${f.format}</span>
+                <span style="font-size:0.7rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${formatFileSize(f.size)}</span>
+              </span>
+            </div>
+          `,
+          )
+          .join("");
+
+        importFileList.querySelectorAll(".scdaw-file-item").forEach((item) => {
+          item.addEventListener("click", () => {
+            importFileList
+              .querySelectorAll(".scdaw-file-item")
+              .forEach((el) => {
+                el.style.borderColor = "transparent";
+                el.style.background = "var(--surface, #1e293b)";
+                el.setAttribute("aria-selected", "false");
+              });
+            item.style.borderColor = "var(--accent, #38bdf8)";
+            item.style.background = "var(--bg-elevated, #334155)";
+            item.setAttribute("aria-selected", "true");
+            this._selectedImportFile = item.dataset.filename;
+            if (importSubmitBtn) importSubmitBtn.disabled = false;
+          });
+
+          item.addEventListener("dblclick", async () => {
+            this._selectedImportFile = item.dataset.filename;
+            await executeOpenSelectedFile();
+          });
+        });
+      } catch (err) {
+        importFileList.innerHTML = `<div style="padding:1rem; text-align:center; color:#f87171; font-size:0.8rem;">Error loading files: ${err.message}</div>`;
+      }
+    };
+
+    const executeOpenSelectedFile = async () => {
+      if (!this._selectedImportFile) return;
+      const conversationId = importConvSelect?.value || DEFAULT_GROUP_ID;
+      const filename = this._selectedImportFile;
+      if (importSubmitBtn) importSubmitBtn.textContent = "Loading...";
+
+      try {
+        await scdaw.loadProjectFromFs({ conversationId, filename });
+        importModal?.close();
+      } catch (err) {
+        console.error("Failed to load project from conversation:", err);
+      } finally {
+        if (importSubmitBtn) importSubmitBtn.textContent = "Open Project";
+      }
+    };
+
+    // Open Button -> Show Import Modal
     this.shadowRoot
       .getElementById("import-btn")
-      ?.addEventListener("click", () => {
-        fileInput?.click();
+      ?.addEventListener("click", async () => {
+        if (importModal && typeof importModal.showModal === "function") {
+          importModal.showModal();
+          const targetGid = importConvSelect?.value || DEFAULT_GROUP_ID;
+          await populateConversations(importConvSelect, targetGid);
+          await loadImportFiles(importConvSelect?.value || targetGid);
+        } else {
+          fileInput?.click();
+        }
       });
 
+    importConvSelect?.addEventListener("change", (e) => {
+      loadImportFiles(e.target.value);
+    });
+
+    importRefreshBtn?.addEventListener("click", async () => {
+      const targetGid = importConvSelect?.value || DEFAULT_GROUP_ID;
+      await populateConversations(importConvSelect, targetGid);
+      await loadImportFiles(importConvSelect?.value || targetGid);
+    });
+
+    importFromDiskBtn?.addEventListener("click", () => {
+      importModal?.close();
+      fileInput?.click();
+    });
+
+    importSubmitBtn?.addEventListener("click", async () => {
+      await executeOpenSelectedFile();
+    });
+
+    this.shadowRoot
+      .getElementById("import-modal-close")
+      ?.addEventListener("click", () => {
+        importModal?.close();
+      });
+
+    this.shadowRoot
+      .getElementById("import-modal-cancel")
+      ?.addEventListener("click", () => {
+        importModal?.close();
+      });
+
+    // Hidden File Input for fallback OS file import
     fileInput?.addEventListener("change", async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -790,13 +1009,29 @@ export class DawWorkbenchElement extends BaseElement {
 
     // Save & Export Modal Dialog Handling
     const exportModal = this.shadowRoot.getElementById("export-modal");
+    const exportConvSelect = this.shadowRoot.getElementById(
+      "export-conversation-select",
+    );
+    const exportFilenameInput = this.shadowRoot.getElementById(
+      "export-filename-input",
+    );
     const formatSelect = this.shadowRoot.getElementById("export-format-select");
     const stemsOpt = this.shadowRoot.getElementById("export-opt-stems");
+    const wavOpt = this.shadowRoot.getElementById("export-opt-wav");
 
     this.shadowRoot
       .getElementById("export-btn")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
         if (exportModal && typeof exportModal.showModal === "function") {
+          const p = scdaw.getProject();
+          if (exportFilenameInput) {
+            exportFilenameInput.value = (p.name || "daw").replace(
+              /[^a-zA-Z0-9_-]/g,
+              "_",
+            );
+          }
+          const targetGid = exportConvSelect?.value || DEFAULT_GROUP_ID;
+          await populateConversations(exportConvSelect, targetGid);
           exportModal.showModal();
         }
       });
@@ -805,6 +1040,10 @@ export class DawWorkbenchElement extends BaseElement {
       const fmt = e.target.value;
       if (stemsOpt) {
         stemsOpt.style.display = fmt === "stems" ? "flex" : "none";
+      }
+      if (wavOpt) {
+        wavOpt.style.display =
+          fmt === "wav" || fmt === "stems" ? "flex" : "none";
       }
     });
 
@@ -823,7 +1062,21 @@ export class DawWorkbenchElement extends BaseElement {
     this.shadowRoot
       .getElementById("export-modal-submit")
       ?.addEventListener("click", async () => {
-        const fmt = formatSelect?.value || "wav";
+        const fmt = formatSelect?.value || "json";
+        const conversationId = exportConvSelect?.value || DEFAULT_GROUP_ID;
+        const rawName = (
+          exportFilenameInput?.value ||
+          scdaw.getProject()?.name ||
+          "daw"
+        )
+          .trim()
+          .replace(/[^a-zA-Z0-9_.-]/g, "_");
+        const saveToFs =
+          this.shadowRoot.getElementById("export-save-to-fs")?.checked !==
+          false;
+        const downloadCopy =
+          this.shadowRoot.getElementById("export-download-copy")?.checked ===
+          true;
         const bitDepth = parseInt(
           this.shadowRoot.getElementById("export-bitdepth")?.value || "24",
           10,
@@ -837,33 +1090,69 @@ export class DawWorkbenchElement extends BaseElement {
           "post-fader";
 
         const submitBtn = this.shadowRoot.getElementById("export-modal-submit");
-        if (submitBtn) submitBtn.textContent = "Exporting...";
+        if (submitBtn) submitBtn.textContent = "Saving...";
 
         try {
           if (fmt === "wav") {
-            await scdaw.bounce({ loops, bitDepth, saveToWorkspace: true });
+            const fname = rawName.endsWith(".wav") ? rawName : `${rawName}.wav`;
+            await scdaw.bounce({
+              loops,
+              bitDepth,
+              conversationId,
+              filename: fname,
+              saveToOpfs: saveToFs,
+              saveToWorkspace: downloadCopy,
+            });
           } else if (fmt === "stems") {
+            const fname = rawName.endsWith(".zip")
+              ? rawName
+              : `${rawName}-stems.zip`;
             await scdaw.bounceStems({
               loops,
               bitDepth,
               tap,
-              saveToWorkspace: true,
+              conversationId,
+              filename: fname,
+              saveToOpfs: saveToFs,
+              saveToWorkspace: downloadCopy,
             });
           } else if (fmt === "midi") {
-            scdaw.exportMidi({ loops, saveToWorkspace: true });
+            const fname = rawName.endsWith(".mid") ? rawName : `${rawName}.mid`;
+            scdaw.exportMidi({
+              loops,
+              conversationId,
+              filename: fname,
+              saveToOpfs: saveToFs,
+              saveToWorkspace: downloadCopy,
+            });
           } else if (fmt === "dawproject") {
-            scdaw.exportProject({
+            const fname = rawName.endsWith(".dawproject")
+              ? rawName
+              : `${rawName}.dawproject`;
+            await scdaw.saveProject({
+              conversationId,
+              filename: fname,
               format: "dawproject",
-              saveToWorkspace: true,
+              saveToOpfs: saveToFs,
+              download: downloadCopy,
             });
           } else if (fmt === "json") {
-            scdaw.exportProject({ format: "json", saveToWorkspace: true });
+            const fname = rawName.endsWith(".scdaw.json")
+              ? rawName
+              : `${rawName}.scdaw.json`;
+            await scdaw.saveProject({
+              conversationId,
+              filename: fname,
+              format: "json",
+              saveToOpfs: saveToFs,
+              download: downloadCopy,
+            });
           }
           exportModal?.close();
         } catch (err) {
-          console.error("Export error:", err);
+          console.error("Save/Export error:", err);
         } finally {
-          if (submitBtn) submitBtn.textContent = "Export";
+          if (submitBtn) submitBtn.textContent = "Save & Export";
         }
       });
 

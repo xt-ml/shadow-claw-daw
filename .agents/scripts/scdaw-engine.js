@@ -29,6 +29,13 @@ import { encodeZip } from "./scdaw-zip.js";
 import { encodeMidiFile, midiToProject } from "./scdaw-midi.js";
 import { encodeDawProject, decodeDawProject } from "./scdaw-dawproject.js";
 import { triggerInstrumentVoice } from "./scdaw-instruments.js";
+import {
+  writeConversationFile,
+  readConversationFile,
+  listConversations,
+  listConversationFiles,
+  DEFAULT_GROUP_ID,
+} from "./scdaw-fs.js";
 
 export class DawEngine extends EventTarget {
   constructor(options = {}) {
@@ -395,14 +402,18 @@ export class DawEngine extends EventTarget {
     return { master, tracks };
   }
 
-  async bounce({
-    loops = 1,
-    bitDepth = 24,
-    sampleRate = 44100,
-    tailSeconds = 0.5,
-    trimSilence = true,
-    saveToWorkspace = true,
-  } = {}) {
+  async bounce(options = {}) {
+    const {
+      loops = 1,
+      bitDepth = 24,
+      sampleRate = 44100,
+      tailSeconds = 0.5,
+      trimSilence = true,
+      saveToWorkspace = true,
+      saveToOpfs = true,
+      conversationId = DEFAULT_GROUP_ID,
+      filename = null,
+    } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
     const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
@@ -508,6 +519,17 @@ export class DawEngine extends EventTarget {
 
     const stats = peakAndRms(left);
     const wavBuffer = encodeWav([left, right], sampleRate, { bitDepth });
+    const resolvedFilename = filename || `${p.name || "daw"}-bounce.wav`;
+
+    if (saveToOpfs) {
+      try {
+        await writeConversationFile(
+          conversationId,
+          resolvedFilename,
+          wavBuffer,
+        );
+      } catch (_) {}
+    }
 
     if (
       saveToWorkspace &&
@@ -520,7 +542,7 @@ export class DawEngine extends EventTarget {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${p.name || "daw"}-bounce.wav`;
+        a.download = resolvedFilename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -546,19 +568,23 @@ export class DawEngine extends EventTarget {
     return bounceMeta;
   }
 
-  async bounceStems({
-    loops = 1,
-    tap = "post-fader", // "post-fader" | "pre-fader" | "pre-fx"
-    bitDepth = 24,
-    sampleRate = 44100,
-    tailSeconds = 1.0,
-    trimSilence = true,
-    bundleZip = true,
-    includeMaster = true,
-    includeMidi = true,
-    includeProject = true,
-    saveToWorkspace = true,
-  } = {}) {
+  async bounceStems(options = {}) {
+    const {
+      loops = 1,
+      tap = "post-fader", // "post-fader" | "pre-fader" | "pre-fx"
+      bitDepth = 24,
+      sampleRate = 44100,
+      tailSeconds = 1.0,
+      trimSilence = true,
+      bundleZip = true,
+      includeMaster = true,
+      includeMidi = true,
+      includeProject = true,
+      saveToWorkspace = true,
+      saveToOpfs = true,
+      conversationId = DEFAULT_GROUP_ID,
+      filename = null,
+    } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
     const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
@@ -784,6 +810,17 @@ export class DawEngine extends EventTarget {
       }
 
       zipBuffer = encodeZip(zipFiles);
+      const resolvedZipName = filename || zipName;
+
+      if (saveToOpfs && zipBuffer) {
+        try {
+          await writeConversationFile(
+            conversationId,
+            resolvedZipName,
+            zipBuffer,
+          );
+        } catch (_) {}
+      }
 
       if (
         saveToWorkspace &&
@@ -796,7 +833,7 @@ export class DawEngine extends EventTarget {
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = zipName;
+          a.download = resolvedZipName;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -821,7 +858,14 @@ export class DawEngine extends EventTarget {
     const p = this.project.get();
     const midiBytes = encodeMidiFile(p, options);
     const baseName = (p.name || "daw").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const filename = `${baseName}.mid`;
+    const filename = options.filename || `${baseName}.mid`;
+    const conversationId = options.conversationId || DEFAULT_GROUP_ID;
+
+    if (options.saveToOpfs !== false) {
+      try {
+        writeConversationFile(conversationId, filename, midiBytes);
+      } catch (_) {}
+    }
 
     if (
       options.saveToWorkspace !== false &&
@@ -846,6 +890,7 @@ export class DawEngine extends EventTarget {
       name: filename,
       bytes: midiBytes.byteLength,
       buffer: midiBytes,
+      conversationId,
     };
   }
 
@@ -874,10 +919,17 @@ export class DawEngine extends EventTarget {
   exportProject(options = {}) {
     const p = this.project.get();
     const baseName = (p.name || "daw").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const conversationId = options.conversationId || DEFAULT_GROUP_ID;
 
     if (options.format === "dawproject") {
       const zipBuffer = encodeDawProject(p, options);
-      const filename = `${baseName}.dawproject`;
+      const filename = options.filename || `${baseName}.dawproject`;
+
+      if (options.saveToOpfs !== false) {
+        try {
+          writeConversationFile(conversationId, filename, zipBuffer);
+        } catch (_) {}
+      }
 
       if (
         options.saveToWorkspace !== false &&
@@ -903,11 +955,18 @@ export class DawEngine extends EventTarget {
         buffer: zipBuffer,
         bytes: zipBuffer.byteLength,
         format: "dawproject",
+        conversationId,
       };
     }
 
     const jsonStr = serializeProject(p);
-    const filename = `${baseName}.scdaw.json`;
+    const filename = options.filename || `${baseName}.scdaw.json`;
+
+    if (options.saveToOpfs !== false) {
+      try {
+        writeConversationFile(conversationId, filename, jsonStr);
+      } catch (_) {}
+    }
 
     if (
       options.saveToWorkspace !== false &&
@@ -933,7 +992,92 @@ export class DawEngine extends EventTarget {
       content: jsonStr,
       bytes: new TextEncoder().encode(jsonStr).byteLength,
       format: "json",
+      conversationId,
     };
+  }
+
+  async saveProject(options = {}) {
+    const p = this.project.get();
+    const baseName = (p.name || "daw").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const conversationId = options.conversationId || DEFAULT_GROUP_ID;
+    const format = options.format || "json";
+    const saveToOpfs = options.saveToOpfs !== false;
+    let filename = options.filename;
+    let data;
+    let bytes = 0;
+
+    if (format === "dawproject") {
+      filename = filename || `${baseName}.dawproject`;
+      data = encodeDawProject(p, options);
+      bytes = data.byteLength;
+    } else {
+      filename = filename || `${baseName}.scdaw.json`;
+      data = serializeProject(p);
+      bytes = new TextEncoder().encode(data).byteLength;
+    }
+
+    let fsResult = null;
+    if (saveToOpfs) {
+      fsResult = await writeConversationFile(conversationId, filename, data);
+    }
+
+    if (
+      options.download &&
+      typeof document !== "undefined" &&
+      typeof Blob !== "undefined" &&
+      typeof URL !== "undefined"
+    ) {
+      try {
+        const mime =
+          format === "dawproject" ? "application/zip" : "application/json";
+        const blob = new Blob([data], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } catch (_) {}
+    }
+
+    return {
+      ok: true,
+      name: filename,
+      conversationId,
+      bytes,
+      format,
+      fsResult,
+    };
+  }
+
+  async loadProjectFromFs(options = {}) {
+    const conversationId = options.conversationId || DEFAULT_GROUP_ID;
+    const filename = options.filename;
+    if (!filename) {
+      throw new Error("loadProjectFromFs requires a filename");
+    }
+
+    const fileData = await readConversationFile(conversationId, filename);
+    const lowerName = filename.toLowerCase();
+
+    if (lowerName.endsWith(".mid") || lowerName.endsWith(".midi")) {
+      return this.importMidi(fileData.buffer, options);
+    }
+
+    return await this.importProjectFile(
+      fileData.buffer || fileData.text,
+      options,
+    );
+  }
+
+  async listConversations() {
+    return await listConversations();
+  }
+
+  async listConversationFiles(conversationId = DEFAULT_GROUP_ID) {
+    return await listConversationFiles(conversationId);
   }
 
   async importProjectFile(contentOrBuffer, options = {}) {
@@ -1017,7 +1161,24 @@ export class DawEngine extends EventTarget {
       const projResult = this.exportProject(params);
       return { ok: true, ...projResult };
     }
+    if (name === "save_project") {
+      return await this.saveProject(params);
+    }
+    if (name === "load_project" && params.filename) {
+      return await this.loadProjectFromFs(params);
+    }
+    if (name === "list_conversations") {
+      const conversations = await this.listConversations();
+      return { ok: true, conversations };
+    }
+    if (name === "list_files") {
+      const files = await this.listConversationFiles(params.conversationId);
+      return { ok: true, files };
+    }
     if (name === "import_project") {
+      if (params.filename && !params.content && !params.data) {
+        return await this.loadProjectFromFs(params);
+      }
       return this.importProjectFile(params.content || params.data, params);
     }
     if (name === "undo") {
