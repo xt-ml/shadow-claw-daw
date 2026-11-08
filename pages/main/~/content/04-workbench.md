@@ -5,7 +5,7 @@ updated: "2026-11-05T23:00:00Z"
 slug: "workbench"
 ---
 
-# Interactive Workbench UI
+## Interactive Workbench UI
 
 Accessible at `/pages/main/scdaw.html` (`/main/scdaw/`):
 
@@ -21,7 +21,7 @@ Accessible at `/pages/main/scdaw.html` (`/main/scdaw/`):
 - **Split-Pane Resize Handle (`<scdaw-resize-handle>`)**: Accessible, touch-friendly panel divider supporting mouse/touch pointer dragging (`setPointerCapture`), keyboard adjustment via Arrow keys (Home/End boundaries), and WCAG 2.1 AA `role="separator"` ARIA telemetry.
 - **Status Bar (`<scdaw-statusbar>`)**: Bottom telemetry and diagnostics strip displaying DSP sample rate, buffer size, active audio latency, voice count, and openDAW provenance attribution.
 
-## Responsive Design & CSS Container Queries
+### Responsive Design & CSS Container Queries
 
 All components declare `container-type: inline-size;` and adapt component layouts using `@container`:
 

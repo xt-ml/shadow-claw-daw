@@ -34,6 +34,88 @@ if (
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
+export function resolveDropAction({
+  targetTrackId = null,
+  file = null,
+  plugin = null,
+} = {}) {
+  // 1. If a plugin was dragged from browser (application/x-scdaw-plugin)
+  if (plugin && typeof plugin === "object") {
+    if (plugin.kind === "instrument") {
+      return {
+        action: "load_instrument",
+        trackId: targetTrackId,
+        instrument: plugin.type || plugin.id,
+      };
+    }
+    if (plugin.kind === "preset") {
+      return {
+        action: "apply_preset",
+        trackId: targetTrackId,
+        preset: plugin.id || plugin.name,
+      };
+    }
+    if (
+      plugin.kind === "audio_fx" ||
+      plugin.kind === "midi_fx" ||
+      plugin.kind === "fx"
+    ) {
+      return {
+        action: "add_fx",
+        trackId: targetTrackId,
+        fx: plugin,
+      };
+    }
+    return {
+      action: "apply_plugin",
+      trackId: targetTrackId,
+      plugin,
+    };
+  }
+
+  // 2. If a file was dragged from OS
+  if (file && typeof file === "object") {
+    const name = String(file.name || "").toLowerCase();
+
+    // Check extension
+    if (name.endsWith(".dawproject")) {
+      return { action: "import_session", format: "dawproject" };
+    }
+    if (name.endsWith(".scdaw.json") || name.endsWith(".json")) {
+      return { action: "import_session", format: "scdaw-json" };
+    }
+    if (name.endsWith(".mid") || name.endsWith(".midi")) {
+      if (targetTrackId) {
+        return {
+          action: "import_track_midi",
+          trackId: targetTrackId,
+          format: "midi",
+        };
+      }
+      return { action: "import_session", format: "midi" };
+    }
+    if (
+      name.endsWith(".wav") ||
+      name.endsWith(".wave") ||
+      name.endsWith(".mp3") ||
+      name.endsWith(".ogg")
+    ) {
+      if (targetTrackId) {
+        return {
+          action: "import_track_audio",
+          trackId: targetTrackId,
+          format: "wav",
+        };
+      }
+      return { action: "import_track_audio", trackId: null, format: "wav" };
+    }
+
+    return { action: "import_session", format: "unknown" };
+  }
+
+  return { action: "none" };
+}
+
 export function resolveWorkbenchResponsiveLayout({
   containerWidth = 1200,
   viewMode = "studio", // "studio" | "piano-roll-full" | "sequencer-full" | "mixer-full"
@@ -785,25 +867,116 @@ export class DawWorkbenchElement extends BaseElement {
         }
       });
 
-    // Drag and Drop project/MIDI files onto workbench
+    // PWA LaunchQueue File Handling API (opens files directly from OS file manager)
+    if (
+      typeof window !== "undefined" &&
+      "launchQueue" in window &&
+      window.LaunchParams?.prototype?.files
+    ) {
+      window.launchQueue.setConsumer(async (launchParams) => {
+        if (!launchParams.files?.length) return;
+        for (const fileHandle of launchParams.files) {
+          const file = await fileHandle.getFile();
+          const buffer = await file.arrayBuffer();
+          if (file.name.endsWith(".mid") || file.name.endsWith(".midi")) {
+            await scdaw.importMidi(buffer);
+          } else {
+            await scdaw.importProjectFile(buffer);
+          }
+        }
+      });
+    }
+
+    // Context-Sensitive Drag and Drop
     this.addEventListener("dragover", (e) => {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      const path = e.composedPath ? e.composedPath() : [e.target];
+      const trackEl = path.find(
+        (el) => el?.dataset?.track || el?.dataset?.trackId,
+      );
+      if (trackEl) {
+        trackEl.classList.add("drop-target-active");
+      }
+    });
+
+    this.addEventListener("dragleave", (e) => {
+      const path = e.composedPath ? e.composedPath() : [e.target];
+      const trackEl = path.find(
+        (el) => el?.dataset?.track || el?.dataset?.trackId,
+      );
+      if (trackEl) {
+        trackEl.classList.remove("drop-target-active");
+      }
     });
 
     this.addEventListener("drop", async (e) => {
       e.preventDefault();
-      const file = e.dataTransfer?.files?.[0];
-      if (!file) return;
+      const path = e.composedPath ? e.composedPath() : [e.target];
+      const trackEl = path.find(
+        (el) => el?.dataset?.track || el?.dataset?.trackId,
+      );
+      if (trackEl) {
+        trackEl.classList.remove("drop-target-active");
+      }
+      const targetTrackId =
+        trackEl?.dataset?.track || trackEl?.dataset?.trackId || null;
+
+      // Check for plugin drag payload
+      let plugin = null;
       try {
-        const buffer = await file.arrayBuffer();
-        if (file.name.endsWith(".mid") || file.name.endsWith(".midi")) {
-          await scdaw.importMidi(buffer);
-        } else {
-          await scdaw.importProjectFile(buffer);
+        const rawPlugin = e.dataTransfer?.getData("application/x-scdaw-plugin");
+        if (rawPlugin) plugin = JSON.parse(rawPlugin);
+      } catch {}
+
+      const file = e.dataTransfer?.files?.[0] || null;
+
+      const dropAction = resolveDropAction({
+        targetTrackId,
+        file,
+        plugin,
+      });
+
+      try {
+        if (dropAction.action === "import_session") {
+          const buffer = await file.arrayBuffer();
+          if (dropAction.format === "midi") {
+            await scdaw.importMidi(buffer);
+          } else {
+            await scdaw.importProjectFile(buffer);
+          }
+        } else if (dropAction.action === "import_track_midi") {
+          const buffer = await file.arrayBuffer();
+          await scdaw.importMidi(buffer, { trackId: dropAction.trackId });
+        } else if (dropAction.action === "import_track_audio") {
+          const p = scdaw.getProject();
+          const target = p.tracks.find((t) => t.id === dropAction.trackId);
+          if (target) {
+            target.sample = file.name;
+            await scdaw.sendCommand("set_track", {
+              trackId: target.id,
+              sample: file.name,
+            });
+          }
+        } else if (dropAction.action === "add_fx") {
+          await scdaw.sendCommand("manage_fx", {
+            action: "add",
+            trackId: dropAction.trackId,
+            fx: dropAction.fx,
+          });
+        } else if (dropAction.action === "apply_preset") {
+          await scdaw.sendCommand("apply_preset", {
+            trackId: dropAction.trackId,
+            preset: dropAction.preset,
+          });
+        } else if (dropAction.action === "load_instrument") {
+          await scdaw.sendCommand("set_track", {
+            trackId: dropAction.trackId,
+            kind: dropAction.instrument,
+          });
         }
       } catch (err) {
-        console.error("Drag-and-drop import failed:", err);
+        console.error("Context-sensitive drop handling failed:", err);
       }
     });
   }

@@ -5,11 +5,11 @@ updated: "2026-11-05T23:00:00Z"
 slug: "architecture"
 ---
 
-# Architecture & Audio Pipeline
+## Architecture & Audio Pipeline
 
 Daw is built upon a 4-tier modular architecture designed for maximum performance, offline resilience, and seamless control by AI agents.
 
-## Architectural Layers
+### Architectural Layers
 
 1. **Pure Logic & Math (`scdaw.js`, `scdaw-signals.js`)**:
    - Zero DOM or browser dependencies.

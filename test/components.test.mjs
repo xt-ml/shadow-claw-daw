@@ -34,6 +34,7 @@ import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statu
 import {
   resolveWorkbenchPanels,
   resolveWorkbenchResponsiveLayout,
+  resolveDropAction,
 } from "../.agents/scripts/components/scdaw-workbench.js";
 import {
   clampSize,
@@ -935,4 +936,70 @@ test("scdaw-workbench: Save/Export and Open/Import dialogs adhere to WCAG and AR
   // Drag-and-drop import listeners are attached to the element
   assert.match(workbenchContent, /addEventListener\s*\(\s*["']dragover["']/);
   assert.match(workbenchContent, /addEventListener\s*\(\s*["']drop["']/);
+});
+
+test("scdaw-workbench: resolveDropAction determines context-sensitive action based on target and dragged payload", () => {
+  // 1. Dropping session file anywhere on workbench
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: null,
+      file: { name: "summer.dawproject" },
+    }),
+    { action: "import_session", format: "dawproject" },
+  );
+
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: null,
+      file: { name: "groove.scdaw.json" },
+    }),
+    { action: "import_session", format: "scdaw-json" },
+  );
+
+  // 2. Dropping MIDI file onto a specific track
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: "trk_bass",
+      file: { name: "bassline.mid" },
+    }),
+    { action: "import_track_midi", trackId: "trk_bass", format: "midi" },
+  );
+
+  // 3. Dropping audio WAV file onto a specific track
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: "trk_drums",
+      file: { name: "kick.wav" },
+    }),
+    { action: "import_track_audio", trackId: "trk_drums", format: "wav" },
+  );
+
+  // 4. Dragging plugin from browser onto a specific track
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: "trk_lead",
+      plugin: { kind: "audio_fx", type: "delay", feedback: 0.4 },
+    }),
+    {
+      action: "add_fx",
+      trackId: "trk_lead",
+      fx: { kind: "audio_fx", type: "delay", feedback: 0.4 },
+    },
+  );
+
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: "trk_lead",
+      plugin: { kind: "preset", id: "acid-squelch" },
+    }),
+    { action: "apply_preset", trackId: "trk_lead", preset: "acid-squelch" },
+  );
+
+  assert.deepEqual(
+    resolveDropAction({
+      targetTrackId: "trk_drums",
+      plugin: { kind: "instrument", type: "drums" },
+    }),
+    { action: "load_instrument", trackId: "trk_drums", instrument: "drums" },
+  );
 });

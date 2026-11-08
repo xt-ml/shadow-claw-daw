@@ -1,4 +1,6 @@
-# ShadowClaw DAW
+# [ShadowClaw DAW](https://xt-ml.github.io/shadow-claw-daw/main/)
+
+[![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-xt--ml%2Fshadow--claw--daw-blue.svg)](https://deepwiki.com/xt-ml/shadow-claw-daw)
 
 An in-browser digital audio workstation (DAW) template powered by **ShadowClaw**, featuring a Vanilla JS Web Audio API engine, TC39-shaped reactive Signals, Web Components, and autonomous agent skills.
 
@@ -25,6 +27,4 @@ npx shadow-claw build     # Production static build to dist/public
 
 AGPLv3.
 
-## Attribution & Provenance
-
-This software contains ported concepts and formulas derived from **[openDAW](https://github.com/andremichelle/openDAW)** (commit `10088021dc881adf2aa981686e0e8be9cf3a1cd4`), licensed under **AGPL-3.0-or-later**, copyright © André Michelle and openDAW contributors. Detailed porting records can be found in ["Porting and Attribution"](pages/main/~/content/05-porting-and-attribution.md).
+## [Attribution & Provenance](pages/main/~/content/05-porting-and-attribution.md)

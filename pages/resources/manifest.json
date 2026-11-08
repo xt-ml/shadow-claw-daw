@@ -32,6 +32,26 @@
       ]
     }
   },
+  "file_handlers": [
+    {
+      "action": "./",
+      "name": "Audio and Project Files",
+      "icons": [
+        {
+          "src": "assets/icons/192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ],
+      "accept": {
+        "application/vnd.dawproject+zip": [".dawproject"],
+        "audio/midi": [".mid", ".midi"],
+        "application/json": [".json", ".scdaw.json"],
+        "audio/wav": [".wav"],
+        "audio/x-wav": [".wav"]
+      }
+    }
+  ],
   "icons": [
     {
       "purpose": "any",

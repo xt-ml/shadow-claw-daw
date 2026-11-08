@@ -5,24 +5,24 @@ updated: "2026-11-06T01:43:00Z"
 slug: "porting-and-attribution"
 ---
 
-# Porting & Upstream Attribution
+## Porting & Upstream Attribution
 
 This project derives architecture, DSP formulas, and concepts from **openDAW** and **OpenStudio**, ported into a zero-dependency Vanilla JS, Web Component, and Signal-based architecture for **ShadowClaw**.
 
-## Upstream Provenance
+### Upstream Provenance
 
 - **Repository**: [andremichelle/openDAW](https://github.com/andremichelle/openDAW)
 - **Commit SHA**: `10088021dc881adf2aa981686e0e8be9cf3a1cd4` (Thu Nov 5 18:01:29 2026 +0100)
 - **License**: GNU Affero General Public License v3.0 or later (AGPLv3)
 - **Copyright**: © André Michelle and openDAW contributors
 
-## Secondary UI Reference
+### Secondary UI Reference
 
 - **Repository**: OpenStudio (hybrid DAW reference)
 - **License**: GNU Affero General Public License v3.0 (AGPLv3)
 - **Reference Scope**: Mixer and transport visual layout concepts only.
 
-## Component Porting Mapping
+### Component Porting Mapping
 
 | Upstream Source File (openDAW)                                               | Local File                                          | Ported Concepts / Code                                                                          |
 | ---------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -51,6 +51,6 @@ This project derives architecture, DSP formulas, and concepts from **openDAW** a
 | `packages/lib/dawproject/src/`, `studio/core/dawproject/`                    | `.agents/scripts/scdaw-dawproject.js`               | DAWproject v1.0 XML schema mapping, pure-JS XML tokenizer/parser, Bitwig/openDAW interchange.   |
 | Pure-JS ZIP Container Architecture                                           | `.agents/scripts/scdaw-zip.js`                      | Zero-dependency ZIP reader/writer (STORE and DEFLATE via `DecompressionStream`) & CRC-32.       |
 
-## Reactive Primitives Attribution
+### Reactive Primitives Attribution
 
 - **signal-polyfill**: Vendored under `.agents/scripts/vendor/signal-polyfill.js` from `signal-polyfill@0.2.2` (MIT License, Copyright Google LLC).

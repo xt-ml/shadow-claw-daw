@@ -218,7 +218,7 @@ export class DawBrowserElement extends BaseElement {
           ${filtered
             .map(
               (item) => `
-            <div class="browser-item" data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}">
+            <div class="browser-item" draggable="true" role="button" tabindex="0" aria-label="${item.name} (${item.category}). Drag to track or press Enter to apply." data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}" data-category="${item.category || ""}">
               <span>${item.name}</span>
               <span class="badge" style="font-size:0.65rem;">${item.category}</span>
             </div>
@@ -246,8 +246,47 @@ export class DawBrowserElement extends BaseElement {
       });
     }
 
-    // Item click
+    // Item click and drag handlers
     this.shadowRoot.querySelectorAll(".browser-item").forEach((el) => {
+      // Drag source
+      el.addEventListener("dragstart", (e) => {
+        const type = el.dataset.type;
+        const name = el.dataset.name;
+        const kind =
+          el.dataset.kind ||
+          (el.dataset.category?.includes("FX")
+            ? "audio_fx"
+            : type === "presets"
+              ? "preset"
+              : "instrument");
+        const pluginPayload = {
+          id: el.dataset.id,
+          name,
+          type,
+          kind,
+          category: el.dataset.category,
+        };
+        e.dataTransfer?.setData(
+          "application/x-scdaw-plugin",
+          JSON.stringify(pluginPayload),
+        );
+        e.dataTransfer?.setData("text/plain", JSON.stringify(pluginPayload));
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
+        el.style.opacity = "0.5";
+      });
+
+      el.addEventListener("dragend", () => {
+        el.style.opacity = "1.0";
+      });
+
+      // Keyboard accessibility
+      el.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          el.click();
+        }
+      });
+
       el.addEventListener("click", async () => {
         const type = el.dataset.type;
         const name = el.dataset.name;

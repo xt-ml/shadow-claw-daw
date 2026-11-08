@@ -45,6 +45,24 @@ test("PWA Manifest: start_url and share_target.action are within manifest scope"
   assert.equal(manifest.scope, ".");
   assert.equal(manifest.name, "ShadowClaw DAW");
   assert.equal(manifest.short_name, "ShadowClaw DAW");
+
+  // File Handlers API
+  assert.ok(
+    Array.isArray(manifest.file_handlers),
+    "file_handlers must be an array",
+  );
+  assert.equal(manifest.file_handlers[0].action, "./");
+  assert.ok(manifest.file_handlers[0].accept["audio/midi"].includes(".mid"));
+  assert.ok(
+    manifest.file_handlers[0].accept["application/vnd.dawproject+zip"].includes(
+      ".dawproject",
+    ),
+  );
+  assert.ok(
+    manifest.file_handlers[0].accept["application/json"].includes(
+      ".scdaw.json",
+    ),
+  );
 });
 
 test("Workbench scripts: shadow-claw.config.json declares scdaw custom element scripts", () => {

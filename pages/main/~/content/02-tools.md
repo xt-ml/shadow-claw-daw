@@ -5,7 +5,7 @@ updated: "2026-11-05T23:00:00Z"
 slug: "tools"
 ---
 
-# Declarative WebMCP Tools
+## Declarative WebMCP Tools
 
 Daw provides 25 declarative tools registered in `bin/tool-manifest.mjs` and generated into `.agents/tools/`:
 

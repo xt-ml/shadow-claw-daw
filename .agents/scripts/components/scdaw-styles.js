@@ -116,4 +116,10 @@ export const SHARED_STYLES = `
   color: var(--accent);
   border-color: var(--accent);
 }
+
+.drop-target-active {
+  outline: 2px dashed var(--accent, rgb(128, 212, 219)) !important;
+  outline-offset: -2px;
+  background: rgba(128, 212, 219, 0.12) !important;
+}
 `;
