@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_reset",
+  "description": "Reset parameter, device, track, pattern notes, or entire project to defaults (supports scopes: 'param', 'track', 'pattern', 'project').",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "scope": {
+        "type": "string",
+        "enum": ["param", "track", "pattern", "project"],
+        "description": "Reset target scope"
+      },
+      "trackId": {
+        "type": "string",
+        "description": "Target track ID"
+      },
+      "param": {
+        "type": "string",
+        "description": "Parameter name (if scope is 'param')"
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["mixer", "params", "all"],
+        "description": "Track reset mode (if scope is 'track')"
+      },
+      "template": {
+        "type": "string",
+        "enum": [
+          "basic-beat",
+          "straight-beat",
+          "empty",
+          "techno-bass",
+          "pop",
+          "house",
+          "trap",
+          "synthwave"
+        ],
+        "description": "Starter template (if scope is 'project')"
+      }
+    },
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": true
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_reset. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_reset\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

@@ -28,11 +28,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "24"
+
+      - name: Run Tests & Verification
+        run: |
+          npm test
+          npm run check
 
       - name: Build static site via ShadowClaw CLI
         env:

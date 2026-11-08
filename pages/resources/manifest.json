@@ -1,12 +1,13 @@
 {
-  "background_color": "#000000",
-  "description": "ShadowClaw Template - Browser-native AI agent.",
+  "background_color": "#0e1415",
+  "description": "In-browser Digital Audio Workstation template powered by ShadowClaw.",
   "display": "standalone",
-  "id": "shadow-claw",
-  "name": "ShadowClaw",
-  "short_name": "ShadowClaw",
+  "id": "shadow-claw-daw",
+  "name": "ShadowClaw DAW",
+  "short_name": "ShadowClaw DAW",
   "start_url": ".",
-  "theme_color": "#000000",
+  "scope": ".",
+  "theme_color": "#0e1415",
   "share_target": {
     "action": "share/share-target.html",
     "method": "POST",
@@ -90,14 +91,14 @@
   "screenshots": [
     {
       "form_factor": "wide",
-      "label": "shadow-claw",
+      "label": "shadow-claw-daw",
       "sizes": "1920x1052",
       "src": "assets/screenshots/shadow-claw-screenshot-1920x1052.png",
       "type": "image/png"
     },
     {
       "form_factor": "narrow",
-      "label": "shadow-claw",
+      "label": "shadow-claw-daw",
       "sizes": "731x1045",
       "src": "assets/screenshots/shadow-claw-screenshot-731x1045.png",
       "type": "image/png"

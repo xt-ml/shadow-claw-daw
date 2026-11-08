@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_write_notes",
+  "description": "Write or merge notes into a track. Supports step indices (0-15 per bar), musical beat units, or raw PPQN pulses. Pitch can be MIDI number, note name ('C4'), or drum name ('kick', 'snare', 'hat', 'clap').",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trackId": {
+        "type": "string",
+        "description": "Target track ID"
+      },
+      "units": {
+        "type": "string",
+        "enum": ["steps", "beats", "ppqn"],
+        "description": "Timebase units used in notes array (default 'steps')"
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["replace", "merge"],
+        "description": "'replace' overwrites all notes in track, 'merge' appends to existing notes"
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "number",
+              "description": "16th step index (0-15 per bar)"
+            },
+            "beat": {
+              "type": "number",
+              "description": "Beat position (0, 0.5, 1, 1.25...)"
+            },
+            "position": {
+              "type": "number",
+              "description": "PPQN position"
+            },
+            "pitch": {
+              "description": "Note pitch (MIDI number 0-127, note string 'C4', or drum name 'kick')"
+            },
+            "durationSteps": {
+              "type": "number",
+              "description": "Duration in 16th steps"
+            },
+            "duration": {
+              "type": "number",
+              "description": "Duration in PPQN pulses"
+            },
+            "velocity": {
+              "type": "number",
+              "description": "Velocity (0.0 to 1.0)"
+            }
+          }
+        },
+        "description": "List of notes to write"
+      }
+    },
+    "required": ["trackId", "notes"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": false
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_write_notes. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_write_notes\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

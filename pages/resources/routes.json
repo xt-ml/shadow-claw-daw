@@ -3,8 +3,23 @@
     "/pages/main/index.html": {
       "prettyPath": "/main/"
     },
-    "/pages/main/~/content/01-about.md": {
-      "prettyPath": "/main/about/"
+    "/pages/main/~/content/01-architecture.md": {
+      "prettyPath": "/main/architecture/"
+    },
+    "/pages/main/~/content/02-tools.md": {
+      "prettyPath": "/main/tools/"
+    },
+    "/pages/main/~/content/03-skills.md": {
+      "prettyPath": "/main/skills/"
+    },
+    "/pages/main/~/content/04-workbench.md": {
+      "prettyPath": "/main/workbench/"
+    },
+    "/pages/main/~/content/05-porting-and-attribution.md": {
+      "prettyPath": "/main/porting-and-attribution/"
+    },
+    "/pages/main/~/content/06-troubleshooting.md": {
+      "prettyPath": "/main/troubleshooting/"
     },
     "/pages/main/MEMORY.md": {
       "prettyPath": "/main/memory/"

@@ -1,0 +1,41 @@
+{
+  "name": "shadow-claw-daw",
+  "version": "1.0.0",
+  "description": "In-browser Digital Audio Workstation (DAW) template powered by ShadowClaw.",
+  "type": "module",
+  "homepage": "https://xt-ml.github.io/shadow-claw-daw/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xt-ml/shadow-claw-daw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xt-ml/shadow-claw-daw/issues"
+  },
+  "scripts": {
+    "build": "npx shadow-claw build --prod",
+    "format": "npx prettier -w .",
+    "start": "npx shadow-claw dev --open -y",
+    "dev": "npx shadow-claw dev --open -y",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run check:compat && npm run check:tools",
+    "check:compat": "node bin/check-namespace.mjs",
+    "check:namespace": "node bin/check-namespace.mjs",
+    "check:tools": "node bin/generate-tools.mjs --check",
+    "build:tools": "node bin/generate-tools.mjs",
+    "skills:index": "node bin/generate-skills-index.mjs"
+  },
+  "keywords": [
+    "shadow-claw",
+    "audio",
+    "daw",
+    "web-audio-api",
+    "synth",
+    "sequencer",
+    "mcp",
+    "webmcp"
+  ],
+  "license": "AGPL-3.0",
+  "devDependencies": {
+    "prettier": "^3.9.10"
+  }
+}

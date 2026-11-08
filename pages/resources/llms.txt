@@ -1,18 +1,21 @@
-# [ShadowClaw Template](https://xt-ml.github.io/shadow-claw-template/)
+# [ShadowClaw DAW](https://xt-ml.github.io/shadow-claw-daw/)
 
-> Starter template for publishing a static site with ShadowClaw as the build engine. Content lives in `pages/main/`; the included GitHub Actions workflow builds and deploys to GitHub Pages.
+> In-browser Digital Audio Workstation template powered by ShadowClaw. Features zero-dependency Web Audio API synthesis, TC39 Signals, custom Web Components, declarative WebMCP tools, and autonomous agent composition skills.
 
-## Docs
+## Workbench & Interactive Surface
 
-- [README](https://xt-ml.github.io/shadow-claw-template/README.md): How the template works and local development
-- [AGENTS.md](https://xt-ml.github.io/shadow-claw-template/AGENTS.md): Conventions for AI agents working on a template site
+- [Interactive Workbench](https://xt-ml.github.io/shadow-claw-daw/main/): Real-time Web Audio API synthesis, step sequencer, mixer console with peak meters, and offline WAV bouncing.
 
-## Pages
+## Documentation Guides
 
-- [Home](https://xt-ml.github.io/shadow-claw-template/main)
-- [About](https://xt-ml.github.io/shadow-claw-template/main/about)
-- [Memory](https://xt-ml.github.io/shadow-claw-template/main/memory)
+- [Architecture](https://xt-ml.github.io/shadow-claw-daw/main/architecture/): Four-tier runtime architecture, Web Audio graph, lookahead scheduler, and signal reactivity.
+- [WebMCP Tools](https://xt-ml.github.io/shadow-claw-daw/main/tools/): 16 declarative scdaw_* tools for agentic music production.
+- [Agent Skills](https://xt-ml.github.io/shadow-claw-daw/main/skills/): Autonomous slash skills (/beat, /jam, /mixdown, /bounce, /scdaw-status, /scdaw-doctor).
+- [Workbench UI](https://xt-ml.github.io/shadow-claw-daw/main/workbench/): Custom elements (<scdaw-workbench>, <scdaw-transport>, <scdaw-mixer>, <scdaw-sequencer>).
+- [Porting & Attribution](https://xt-ml.github.io/shadow-claw-daw/main/porting-and-attribution/): Provenance ledger and porting map from openDAW (AGPL-3.0-or-later).
+- [Troubleshooting](https://xt-ml.github.io/shadow-claw-daw/main/troubleshooting/): Browser audio autoplay policy, leader election, and offline bounce tips.
 
 ## Related
 
-- [ShadowClaw](https://xt-ml.github.io/shadow-claw/llms.txt)
+- [ShadowClaw](https://xt-ml.github.io/shadow-claw/llms.txt): Core dual-runtime AI assistant framework.
+- [openDAW](https://github.com/andremichelle/openDAW): Web audio workstation source reference.

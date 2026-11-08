@@ -1,23 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "site": {
-    "title": "ShadowClaw Template",
-    "description": "Published with ShadowClaw",
-    "themeColor": "#121212",
-    "lang": "en"
+    "title": "ShadowClaw DAW",
+    "description": "In-browser Digital Audio Workstation powered by Web Audio API, Web Components, WebMCP and ShadowClaw.",
+    "themeColor": "#0e1415",
+    "lang": "en-US"
   },
   "branding": {
-    "titleText": "ShadowClaw Template",
-    "siteUrl": "https://xt-ml.github.io/shadow-claw-template/",
-    "repoUrl": "https://github.com/xt-ml/shadow-claw-template",
-    "repoLabel": "ShadowClaw Template on GitHub",
+    "titleText": "ShadowClaw DAW",
+    "siteUrl": "https://xt-ml.github.io/shadow-claw-daw/",
+    "repoUrl": "https://github.com/xt-ml/shadow-claw-daw",
+    "repoLabel": "ShadowClaw DAW on GitHub",
     "faviconPath": "assets/icons/favicon.svg",
     "appleTouchIconPath": "assets/icons/favicon.svg",
-    "notFoundPath": "404.html"
+    "notFoundPath": "404.html",
+    "logoSlotHtml": "<svg class=\"header-title-logo\" viewBox=\"0 0 32 32\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"#1a2121\" stroke=\"#3f4849\" stroke-width=\"1.5\"/><circle cx=\"16\" cy=\"16\" r=\"9\" stroke=\"#80d4db\" stroke-width=\"1.2\" stroke-dasharray=\"2 2\" opacity=\"0.6\"/><path d=\"M10 20V12M14 24V8M18 22V10M22 18V14\" stroke=\"#9df0f8\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>"
+  },
+  "theme": {
+    "stylesheet": "pages/main/theme.css"
   },
   "pwa": {
     "manifestPath": "manifest.json"
   },
+  "sitemapPath": "sitemap.xml",
   "assets": ["assets"],
   "sidebar": {
     "pagesHidden": false,
@@ -26,7 +31,95 @@
     "filesHidden": false,
     "defaultPage": "pages"
   },
+  "pages": {
+    "sortOrder": "asc",
+    "defaultPinnedPage": "/pages/main/index.html",
+    "directPages": ["/pages/main/index.html"],
+    "iframe": true
+  },
+  "customElements": {
+    "allowedElements": [
+      "scdaw-workbench",
+      "scdaw-transport",
+      "scdaw-browser",
+      "scdaw-timeline",
+      "scdaw-editor",
+      "scdaw-sequencer",
+      "scdaw-devices",
+      "scdaw-mixer",
+      "scdaw-knob",
+      "scdaw-statusbar",
+      "scdaw-resize-handle"
+    ],
+    "allowedDomains": ["localhost", "127.0.0.1", "cdn.jsdelivr.net", "esm.sh"],
+    "scripts": [
+      {
+        "id": "scdaw-element",
+        "name": "scdaw-workbench",
+        "src": ".agents/scripts/scdaw-element.js",
+        "global": true,
+        "autoload": true,
+        "hasInit": false
+      },
+      {
+        "id": "scdaw-adapter",
+        "name": "scdaw-adapter",
+        "src": ".agents/scripts/scdaw-adapter.js",
+        "global": true,
+        "autoload": true,
+        "hasInit": true
+      }
+    ]
+  },
+  "security": {
+    "iframeSandbox": [
+      "allow-modals",
+      "allow-scripts",
+      "allow-popups",
+      "allow-popups-to-escape-sandbox"
+    ],
+    "workerSrc": ["'self'", "blob:", "data:"],
+    "connectSrc": [
+      "'self'",
+      "blob:",
+      "data:",
+      "https://localhost:3000",
+      "http://localhost:3000",
+      "https://127.0.0.1:3000",
+      "http://127.0.0.1:3000"
+    ]
+  },
   "settings": {
-    "defaultToolsProfile": "__builtin_default"
-  }
+    "assistantName": "ShadowClaw DAW",
+    "defaultToolsProfile": "none",
+    "internetAccess": true,
+    "vm_bash_full_internet_access": true
+  },
+  "enabledTools": [
+    "scdaw_get_status",
+    "scdaw_get_project",
+    "scdaw_new_project",
+    "scdaw_load_project",
+    "scdaw_set_transport",
+    "scdaw_play",
+    "scdaw_stop",
+    "scdaw_add_track",
+    "scdaw_remove_track",
+    "scdaw_set_track",
+    "scdaw_write_notes",
+    "scdaw_clear_notes",
+    "scdaw_get_levels",
+    "scdaw_bounce",
+    "scdaw_export_stems",
+    "scdaw_export_midi",
+    "scdaw_import_midi",
+    "scdaw_export_project",
+    "scdaw_import_project",
+    "scdaw_undo",
+    "scdaw_render_surface",
+    "scdaw_reset",
+    "scdaw_apply_preset",
+    "scdaw_panic",
+    "scdaw_manage_fx"
+  ]
 }

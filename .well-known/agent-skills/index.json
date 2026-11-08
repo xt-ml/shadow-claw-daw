@@ -1,14 +1,247 @@
 {
   "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
-  "name": "ShadowClaw Template",
-  "description": "Published with ShadowClaw",
+  "name": "ShadowClaw DAW",
+  "description": "In-browser Digital Audio Workstation powered by Web Audio API, Web Components, WebMCP and ShadowClaw.",
   "skills": [
+    {
+      "name": "beat",
+      "type": "skill-md",
+      "description": "Program or update a drum and bass rhythm for techno-bass, pop, house, trap, or synthwave styles.",
+      "url": "../../.agents/skills/beat/SKILL.md",
+      "digest": "sha256:b6d21aeeb66f9337ea314a71fdf15fc5dbe2988de3e2f08dd7c4d0f59a454511",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_apply_preset",
+          "url": "../../.agents/tools/scdaw_apply_preset.json",
+          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+        },
+        {
+          "name": "scdaw_clear_notes",
+          "url": "../../.agents/tools/scdaw_clear_notes.json",
+          "digest": "sha256:daaa6b56f6bbd4b9222f9b34353b5f661ffe951981cb4e590136b0e8d593dfff"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_new_project",
+          "url": "../../.agents/tools/scdaw_new_project.json",
+          "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_reset",
+          "url": "../../.agents/tools/scdaw_reset.json",
+          "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_set_transport",
+          "url": "../../.agents/tools/scdaw_set_transport.json",
+          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
+        }
+      ]
+    },
+    {
+      "name": "bounce",
+      "type": "skill-md",
+      "description": "Render the project offline into a broadcast 16/24/32-bit WAV audio file, multi-track stems ZIP, or Standard MIDI file.",
+      "url": "../../.agents/skills/bounce/SKILL.md",
+      "digest": "sha256:5ce09d2f2d0c94e7026bcafb0394889bd98f4973cafc417e9461a07bb6c8b11f",
+      "tools": [
+        {
+          "name": "scdaw_bounce",
+          "url": "../../.agents/tools/scdaw_bounce.json",
+          "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+        },
+        {
+          "name": "scdaw_export_midi",
+          "url": "../../.agents/tools/scdaw_export_midi.json",
+          "digest": "sha256:272f31f1681dc25f8e4366ba91336a7f5c385105c641e108a5e64d6f3584d94e"
+        },
+        {
+          "name": "scdaw_export_project",
+          "url": "../../.agents/tools/scdaw_export_project.json",
+          "digest": "sha256:b636ed0803a5f5bb69146416139f00bdabc171026a8197c78ec838e0bfe8b2c6"
+        },
+        {
+          "name": "scdaw_export_stems",
+          "url": "../../.agents/tools/scdaw_export_stems.json",
+          "digest": "sha256:c805b6edff867e720bf44b4f585d4326fba47410c5d76e4fe07f06cf688fb80d"
+        },
+        {
+          "name": "scdaw_get_status",
+          "url": "../../.agents/tools/scdaw_get_status.json",
+          "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
+        }
+      ]
+    },
+    {
+      "name": "jam",
+      "type": "skill-md",
+      "description": "Compose a musical synthesizer bassline or chord melody in a chosen musical key.",
+      "url": "../../.agents/skills/jam/SKILL.md",
+      "digest": "sha256:2aa3164574e4330f053e368889d84fa3bbd9a140bba433e76c8d205a6380419e",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_apply_preset",
+          "url": "../../.agents/tools/scdaw_apply_preset.json",
+          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_reset",
+          "url": "../../.agents/tools/scdaw_reset.json",
+          "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
+        }
+      ]
+    },
+    {
+      "name": "mixdown",
+      "type": "skill-md",
+      "description": "Analyze audio meter levels and automatically adjust track gains to eliminate clipping and achieve balanced headroom.",
+      "url": "../../.agents/skills/mixdown/SKILL.md",
+      "digest": "sha256:12d20adba5eacbce2b5aaa54db170f79c302a6be96b77a2239872bbbb01544d3",
+      "tools": [
+        {
+          "name": "scdaw_get_levels",
+          "url": "../../.agents/tools/scdaw_get_levels.json",
+          "digest": "sha256:f47a9d496b48f1e3054c5bbc8f307b5273f33d252f8b78ffee09d1ae341780cd"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_reset",
+          "url": "../../.agents/tools/scdaw_reset.json",
+          "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        }
+      ]
+    },
+    {
+      "name": "scdaw-doctor",
+      "type": "skill-md",
+      "description": "Diagnose workbench connectivity, browser audio autoplay unlock state, and leader election.",
+      "url": "../../.agents/skills/scdaw-doctor/SKILL.md",
+      "digest": "sha256:9081a9c5911f9375061765e95b8418a5153c3e84fcf04ef25129dd43244bb4b2",
+      "tools": [
+        {
+          "name": "scdaw_get_levels",
+          "url": "../../.agents/tools/scdaw_get_levels.json",
+          "digest": "sha256:f47a9d496b48f1e3054c5bbc8f307b5273f33d252f8b78ffee09d1ae341780cd"
+        },
+        {
+          "name": "scdaw_get_status",
+          "url": "../../.agents/tools/scdaw_get_status.json",
+          "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "scdaw",
+          "url": "../../.agents/scripts/scdaw.js",
+          "digest": "sha256:7cb4929e6789e1fde81c7ae10b2e532792cd7af3aa0f3bb1b6668f56e5a5085f"
+        }
+      ]
+    },
+    {
+      "name": "scdaw-status",
+      "type": "skill-md",
+      "description": "Check DAW playback state, BPM, current playhead position, and audio engine status.",
+      "url": "../../.agents/skills/scdaw-status/SKILL.md",
+      "digest": "sha256:d8b7b3be9afd515bafc6e201d628d94b408993271106af0e349f14a338f2384e",
+      "tools": [
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_get_status",
+          "url": "../../.agents/tools/scdaw_get_status.json",
+          "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "scdaw-statusbar",
+          "url": "../../.agents/scripts/components/scdaw-statusbar.js",
+          "digest": "sha256:82c88afe286c552a75cdef5a9eada76c64157392003de6971957c6e6b3546103"
+        },
+        {
+          "name": "scdaw",
+          "url": "../../.agents/scripts/scdaw.js",
+          "digest": "sha256:7cb4929e6789e1fde81c7ae10b2e532792cd7af3aa0f3bb1b6668f56e5a5085f"
+        }
+      ]
+    },
     {
       "name": "skill-creator",
       "type": "skill-md",
       "description": "Create, edit, review, and validate ShadowClaw declarative skills and their supporting resources.",
       "url": "../../.agents/skills/skill-creator/SKILL.md",
-      "digest": "sha256:988436fbfa40e2da9e3a56904e4482a2783848feb291037667b26e188625874b",
+      "digest": "sha256:21cdf3af5603edd566c6cca9a02c8ac2489b51ff0d984862fb09804c72bd553a",
       "files": [
         "SKILL.md",
         "references/declarative-pipelines.md",
@@ -37,18 +270,372 @@
       "description": "Generate a random integer within a specified range (min through max, inclusive).",
       "url": "../../.agents/tools/generate_random_number.json",
       "digest": "sha256:daf69f22c7c852b10122ef06812f760d97a31dde098450e41a4b4a65549c030c"
+    },
+    {
+      "name": "scdaw_add_track",
+      "description": "Add a new instrument track ('drums' or 'synth') with custom name and initial synthesis parameters.",
+      "url": "../../.agents/tools/scdaw_add_track.json",
+      "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+    },
+    {
+      "name": "scdaw_apply_preset",
+      "description": "Apply a curated synthesizer preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead') to a synth track.",
+      "url": "../../.agents/tools/scdaw_apply_preset.json",
+      "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+    },
+    {
+      "name": "scdaw_bounce",
+      "description": "Render project offline into a WAV audio file (16-bit, 24-bit, or 32-bit Float) via OfflineAudioContext, initiating browser download and returning audio metadata.",
+      "url": "../../.agents/tools/scdaw_bounce.json",
+      "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+    },
+    {
+      "name": "scdaw_clear_notes",
+      "description": "Clear notes on a specific track, optionally within a specified step range.",
+      "url": "../../.agents/tools/scdaw_clear_notes.json",
+      "digest": "sha256:daaa6b56f6bbd4b9222f9b34353b5f661ffe951981cb4e590136b0e8d593dfff"
+    },
+    {
+      "name": "scdaw_export_midi",
+      "description": "Exports the active song or track notes as a Standard MIDI File (.mid) Format 1 (multi-track) or Format 0 (single track), baking active MIDI FX and swing.",
+      "url": "../../.agents/tools/scdaw_export_midi.json",
+      "digest": "sha256:272f31f1681dc25f8e4366ba91336a7f5c385105c641e108a5e64d6f3584d94e"
+    },
+    {
+      "name": "scdaw_export_project",
+      "description": "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject).",
+      "url": "../../.agents/tools/scdaw_export_project.json",
+      "digest": "sha256:b636ed0803a5f5bb69146416139f00bdabc171026a8197c78ec838e0bfe8b2c6"
+    },
+    {
+      "name": "scdaw_export_stems",
+      "description": "Renders consolidated Bar 1 Beat 1 audio stems across all tracks with multi-tap routing (post-fader, pre-fader, pre-fx), silence-tail trimming, and bundles stems, MIDI, and project into a ZIP archive.",
+      "url": "../../.agents/tools/scdaw_export_stems.json",
+      "digest": "sha256:c805b6edff867e720bf44b4f585d4326fba47410c5d76e4fe07f06cf688fb80d"
+    },
+    {
+      "name": "scdaw_get_levels",
+      "description": "Read real-time peak and RMS audio decibel meter levels for master bus and all active tracks.",
+      "url": "../../.agents/tools/scdaw_get_levels.json",
+      "digest": "sha256:f47a9d496b48f1e3054c5bbc8f307b5273f33d252f8b78ffee09d1ae341780cd"
+    },
+    {
+      "name": "scdaw_get_project",
+      "description": "Return the complete project JSON graph including all tracks, notes, volume, pan, and synthesis parameters.",
+      "url": "../../.agents/tools/scdaw_get_project.json",
+      "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+    },
+    {
+      "name": "scdaw_get_status",
+      "description": "Return current DAW playback position, audio engine state, track count, BPM, and recent bounce metrics.",
+      "url": "../../.agents/tools/scdaw_get_status.json",
+      "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
+    },
+    {
+      "name": "scdaw_import_midi",
+      "description": "Imports a Standard MIDI File (.mid) buffer or base64 data into the DAW project or a target track.",
+      "url": "../../.agents/tools/scdaw_import_midi.json",
+      "digest": "sha256:8694c26908edca78f25323c5e156f7edbcb3e6628bff3ec33e220435cae4f985"
+    },
+    {
+      "name": "scdaw_import_project",
+      "description": "Imports a project from native .scdaw.json or .dawproject archive data (JSON string or Base64 string).",
+      "url": "../../.agents/tools/scdaw_import_project.json",
+      "digest": "sha256:5727f2a4a984d1fce3d46124b48c4f1b2b080ad68bcf220777359dd01a803c57"
+    },
+    {
+      "name": "scdaw_load_project",
+      "description": "Validate and load a complete DAW project schema into the active workbench session.",
+      "url": "../../.agents/tools/scdaw_load_project.json",
+      "digest": "sha256:5140bfb05e5daef3c786b94430e2e7f5167105df878735b0b102f6fa2d5e9946"
+    },
+    {
+      "name": "scdaw_manage_fx",
+      "description": "Add, update, reset, or remove an audio effect ('fold', 'crusher', 'stereoTool', 'delay', 'reverb', 'compressor', 'revamp') or MIDI effect ('arpeggio', 'pitch', 'velocity') on a track.",
+      "url": "../../.agents/tools/scdaw_manage_fx.json",
+      "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+    },
+    {
+      "name": "scdaw_new_project",
+      "description": "Create and initialize a new project from a template ('basic-beat' or 'empty').",
+      "url": "../../.agents/tools/scdaw_new_project.json",
+      "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+    },
+    {
+      "name": "scdaw_panic",
+      "description": "Emergency All Notes Off: immediately silences all active synthesizer voices and stops the transport.",
+      "url": "../../.agents/tools/scdaw_panic.json",
+      "digest": "sha256:c7455766f51cffb984ccb8cd004f3de0e01312d9f847a15a6916933dfb38a27c"
+    },
+    {
+      "name": "scdaw_play",
+      "description": "Start playback of the looping pattern.",
+      "url": "../../.agents/tools/scdaw_play.json",
+      "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+    },
+    {
+      "name": "scdaw_remove_track",
+      "description": "Remove an existing track from the project by track ID.",
+      "url": "../../.agents/tools/scdaw_remove_track.json",
+      "digest": "sha256:4c55ec194f9aa0fb5bc319240d58696010ce5325d471de86c98e844a2b88039d"
+    },
+    {
+      "name": "scdaw_render_surface",
+      "description": "Return custom element HTML tag to embed the live DAW workbench, mixer, transport, or sequencer surface in chat.",
+      "url": "../../.agents/tools/scdaw_render_surface.json",
+      "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+    },
+    {
+      "name": "scdaw_reset",
+      "description": "Reset parameter, device, track, pattern notes, or entire project to defaults (supports scopes: 'param', 'track', 'pattern', 'project').",
+      "url": "../../.agents/tools/scdaw_reset.json",
+      "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
+    },
+    {
+      "name": "scdaw_set_track",
+      "description": "Adjust track mixing parameters (volume, pan, mute, solo) or synthesis parameters (waveform, cutoff, resonance, ADSR).",
+      "url": "../../.agents/tools/scdaw_set_track.json",
+      "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+    },
+    {
+      "name": "scdaw_set_transport",
+      "description": "Update transport properties: BPM (40-240), signature ([4,4] or [3,4]), pattern length in bars (1-4), or swing factor (0-0.5).",
+      "url": "../../.agents/tools/scdaw_set_transport.json",
+      "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+    },
+    {
+      "name": "scdaw_stop",
+      "description": "Stop playback and rewind the transport playhead to the start of the loop.",
+      "url": "../../.agents/tools/scdaw_stop.json",
+      "digest": "sha256:382a85abab961ab9ce9cc7e5b6b764dce35c429d5f52c604699d539801ef4196"
+    },
+    {
+      "name": "scdaw_undo",
+      "description": "Undo the last project edit, restoring the previous snapshot from the undo history stack.",
+      "url": "../../.agents/tools/scdaw_undo.json",
+      "digest": "sha256:c476c8d5b882a4084f883b44fa9c2e1a13a1bbe6e1c69d40a1e7adaed328aa09"
+    },
+    {
+      "name": "scdaw_write_notes",
+      "description": "Write or merge notes into a track. Supports step indices (0-15 per bar), musical beat units, or raw PPQN pulses. Pitch can be MIDI number, note name ('C4'), or drum name ('kick', 'snare', 'hat', 'clap').",
+      "url": "../../.agents/tools/scdaw_write_notes.json",
+      "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
     }
   ],
   "scripts": [
+    {
+      "name": "scdaw-browser",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-browser.",
+      "url": "../../.agents/scripts/components/scdaw-browser.js",
+      "digest": "sha256:e245a55f402416c2e372615eebd2b3421a867fa4323d91311eff2ce27907e3a1"
+    },
+    {
+      "name": "scdaw-devices",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-devices.",
+      "url": "../../.agents/scripts/components/scdaw-devices.js",
+      "digest": "sha256:d5ccd341b3851c18027b73db633187aa58ae86be5ceb125379ea245e313b5138"
+    },
+    {
+      "name": "scdaw-editor",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-editor.",
+      "url": "../../.agents/scripts/components/scdaw-editor.js",
+      "digest": "sha256:65e70c36eb1a351e9cde8d1123c3263758c1f0c96b0881ac08258ec57767e43f"
+    },
+    {
+      "name": "scdaw-knob",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-knob.",
+      "url": "../../.agents/scripts/components/scdaw-knob.js",
+      "digest": "sha256:b0f55d6461685d7c046b22ea0c097fd6b1fff008e81f142e6b1c51c24d2e71a8"
+    },
+    {
+      "name": "scdaw-mixer",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-mixer.",
+      "url": "../../.agents/scripts/components/scdaw-mixer.js",
+      "digest": "sha256:f99d6c36a9967bb27e71baf8d81c30aa75443f3e81f1648b6650503f7e8b3944"
+    },
+    {
+      "name": "scdaw-resize-handle",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-resize-handle.",
+      "url": "../../.agents/scripts/components/scdaw-resize-handle.js",
+      "digest": "sha256:087b4bfe32d5319b0eb3cc7a36884bb3b309326d1d1197e239de20e8b71566aa"
+    },
+    {
+      "name": "scdaw-sequencer",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-sequencer.",
+      "url": "../../.agents/scripts/components/scdaw-sequencer.js",
+      "digest": "sha256:22cbd8d5281a31a801283fdae4e3f14e44309e0b040ee7a0113998314450208f"
+    },
+    {
+      "name": "scdaw-statusbar",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-statusbar.",
+      "url": "../../.agents/scripts/components/scdaw-statusbar.js",
+      "digest": "sha256:82c88afe286c552a75cdef5a9eada76c64157392003de6971957c6e6b3546103"
+    },
+    {
+      "name": "scdaw-styles",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-styles.",
+      "url": "../../.agents/scripts/components/scdaw-styles.js",
+      "digest": "sha256:0e8b6a72a31479544c3e785b4f384dae43160b103d8ad4f13fd5f8be008ea7ac"
+    },
+    {
+      "name": "scdaw-timeline",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
+      "url": "../../.agents/scripts/components/scdaw-timeline.js",
+      "digest": "sha256:e71a0022ebdb9bccd530a2334a72379ce7feaca2d59c9107d0998769a4821e3f"
+    },
+    {
+      "name": "scdaw-transport",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
+      "url": "../../.agents/scripts/components/scdaw-transport.js",
+      "digest": "sha256:e7e3b458adcf34c6024aaf56fa27ca510fb36154e60c0252af2bbcdc35eabc2e"
+    },
+    {
+      "name": "scdaw-workbench",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
+      "url": "../../.agents/scripts/components/scdaw-workbench.js",
+      "digest": "sha256:653276adda0a063a2b7899f4cb4c62bfba25fd5a830a4153f06f795942d7f121"
+    },
+    {
+      "name": "scdaw-adapter",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
+      "url": "../../.agents/scripts/scdaw-adapter.js",
+      "digest": "sha256:8e09a9154ae486243f0a3110f4e434d32625eb074162ef0e9980db9da60c2f1b"
+    },
+    {
+      "name": "scdaw-dawproject",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-dawproject.",
+      "url": "../../.agents/scripts/scdaw-dawproject.js",
+      "digest": "sha256:2daa0e6aeabec1d01067dbf8922ff833b8be153eafbb1c7be6b803e27b2716ca"
+    },
+    {
+      "name": "scdaw-dsp",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-dsp.",
+      "url": "../../.agents/scripts/scdaw-dsp.js",
+      "digest": "sha256:5bef5f5a1f362f8daa2030b52be2e71e40f9be9aea91fafe3bbeba67616eff3d"
+    },
+    {
+      "name": "scdaw-element",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-element.",
+      "url": "../../.agents/scripts/scdaw-element.js",
+      "digest": "sha256:36230eb12feb46c92db10ef79f7f3177fb43db32b32c29a2056f95e1985ee01d"
+    },
+    {
+      "name": "scdaw-engine",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
+      "url": "../../.agents/scripts/scdaw-engine.js",
+      "digest": "sha256:524a44b8ac83ac6831fa83408b5dbde6e5d607836e8ac3112f18f261aacb6c69"
+    },
+    {
+      "name": "scdaw-instruments",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
+      "url": "../../.agents/scripts/scdaw-instruments.js",
+      "digest": "sha256:8408518fffaf26c6224872d9bad5dd3ada494feb0c3eac22ed507bc3f2c78ef8"
+    },
+    {
+      "name": "scdaw-midi",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-midi.",
+      "url": "../../.agents/scripts/scdaw-midi.js",
+      "digest": "sha256:0567542c604fb4d11d78babfd1e1d2006331376dc6a77b9530929274fcca5285"
+    },
+    {
+      "name": "scdaw-presets",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-presets.",
+      "url": "../../.agents/scripts/scdaw-presets.js",
+      "digest": "sha256:901b8f902c7cbe91346e1e6c7310ad3732bc5dd278b44ec50654120ed6c9d4b1"
+    },
+    {
+      "name": "scdaw-schema",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
+      "url": "../../.agents/scripts/scdaw-schema.js",
+      "digest": "sha256:a7496fb494f963b09d3eeccda75a84b08bc55525b0b501e2228aee729804ba37"
+    },
+    {
+      "name": "scdaw-signals",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-signals.",
+      "url": "../../.agents/scripts/scdaw-signals.js",
+      "digest": "sha256:8cb8e4c8b612763b4a33062912ffd50b64fac21bcfd69c43777ed6068e0918a9"
+    },
+    {
+      "name": "scdaw-zip",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-zip.",
+      "url": "../../.agents/scripts/scdaw-zip.js",
+      "digest": "sha256:7caa53828fe2ac7aea6baa0528799df6d30e8217ac73d9317d2165f7d73bec9a"
+    },
+    {
+      "name": "scdaw",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw.",
+      "url": "../../.agents/scripts/scdaw.js",
+      "digest": "sha256:7cb4929e6789e1fde81c7ae10b2e532792cd7af3aa0f3bb1b6668f56e5a5085f"
+    },
     {
       "name": "starter-tools",
       "description": "Portable ESM engine logic and tool execution handler for starter-tools.",
       "url": "../../.agents/scripts/starter-tools.js",
       "digest": "sha256:a31d699969cf4afdb61c5b84b084a51587dad1b0e087ac5d408168756cbf1bc0"
+    },
+    {
+      "name": "signal-polyfill",
+      "description": "Portable ESM engine logic and tool execution handler for signal-polyfill.",
+      "url": "../../.agents/scripts/vendor/signal-polyfill.js",
+      "digest": "sha256:750faabce6cdcb667fa99adf2095db90f46cc2ae83428b905c3fb4f781a7e71a"
     }
   ],
   "dependencies": {
-    "tools": ["../../.agents/tools/generate_random_number.json"],
-    "scripts": ["../../.agents/scripts/starter-tools.js"]
+    "tools": [
+      "../../.agents/tools/generate_random_number.json",
+      "../../.agents/tools/scdaw_add_track.json",
+      "../../.agents/tools/scdaw_apply_preset.json",
+      "../../.agents/tools/scdaw_bounce.json",
+      "../../.agents/tools/scdaw_clear_notes.json",
+      "../../.agents/tools/scdaw_export_midi.json",
+      "../../.agents/tools/scdaw_export_project.json",
+      "../../.agents/tools/scdaw_export_stems.json",
+      "../../.agents/tools/scdaw_get_levels.json",
+      "../../.agents/tools/scdaw_get_project.json",
+      "../../.agents/tools/scdaw_get_status.json",
+      "../../.agents/tools/scdaw_import_midi.json",
+      "../../.agents/tools/scdaw_import_project.json",
+      "../../.agents/tools/scdaw_load_project.json",
+      "../../.agents/tools/scdaw_manage_fx.json",
+      "../../.agents/tools/scdaw_new_project.json",
+      "../../.agents/tools/scdaw_panic.json",
+      "../../.agents/tools/scdaw_play.json",
+      "../../.agents/tools/scdaw_remove_track.json",
+      "../../.agents/tools/scdaw_render_surface.json",
+      "../../.agents/tools/scdaw_reset.json",
+      "../../.agents/tools/scdaw_set_track.json",
+      "../../.agents/tools/scdaw_set_transport.json",
+      "../../.agents/tools/scdaw_stop.json",
+      "../../.agents/tools/scdaw_undo.json",
+      "../../.agents/tools/scdaw_write_notes.json"
+    ],
+    "scripts": [
+      "../../.agents/scripts/components/scdaw-browser.js",
+      "../../.agents/scripts/components/scdaw-devices.js",
+      "../../.agents/scripts/components/scdaw-editor.js",
+      "../../.agents/scripts/components/scdaw-knob.js",
+      "../../.agents/scripts/components/scdaw-mixer.js",
+      "../../.agents/scripts/components/scdaw-resize-handle.js",
+      "../../.agents/scripts/components/scdaw-sequencer.js",
+      "../../.agents/scripts/components/scdaw-statusbar.js",
+      "../../.agents/scripts/components/scdaw-styles.js",
+      "../../.agents/scripts/components/scdaw-timeline.js",
+      "../../.agents/scripts/components/scdaw-transport.js",
+      "../../.agents/scripts/components/scdaw-workbench.js",
+      "../../.agents/scripts/scdaw-adapter.js",
+      "../../.agents/scripts/scdaw-dawproject.js",
+      "../../.agents/scripts/scdaw-dsp.js",
+      "../../.agents/scripts/scdaw-element.js",
+      "../../.agents/scripts/scdaw-engine.js",
+      "../../.agents/scripts/scdaw-instruments.js",
+      "../../.agents/scripts/scdaw-midi.js",
+      "../../.agents/scripts/scdaw-presets.js",
+      "../../.agents/scripts/scdaw-schema.js",
+      "../../.agents/scripts/scdaw-signals.js",
+      "../../.agents/scripts/scdaw-zip.js",
+      "../../.agents/scripts/scdaw.js",
+      "../../.agents/scripts/starter-tools.js",
+      "../../.agents/scripts/vendor/signal-polyfill.js"
+    ]
   }
 }

@@ -1,44 +1,31 @@
 ---
-title: "Agent Memory"
-created: "1970-01-01T00:00:00Z"
-updated: "1970-01-01T00:00:00Z"
+title: "Agent Memory — Daw"
+created: "2026-11-05T23:00:00Z"
+updated: "2026-11-05T23:00:00Z"
 slug: "agent-memory"
 ---
 
-## Memory
+## Agent Memory — Daw
 
-### Workspace Layout & Skills Conventions
-
-- **Skills**: `.agents/skills/<skill-name>/SKILL.md`
-- **Declarative Tools**: `.agents/tools/<tool-name>.json`
-- **Portable Scripts**: `.agents/scripts/<script-name>.js` (Decoupled ESM modules with zero DOM dependencies)
-- **HTTP Discovery Index**: `/.well-known/agent-skills/index.json` (Conforming to Agent Skills Discovery RFC v0.2.0)
-- **Skill Format**: Markdown file with YAML frontmatter AND a Markdown body (frontmatter is metadata only; always include a `# <Skill Title>` heading and human-readable description in the Markdown body so it renders in document previews):
-
-  ```yaml
-  ---
-  name: <skill-name>
-  description: <clear summary for model and slash command>
-  user-invocable: true
-  metadata:
-    allowed-tools: <tool1> <tool2>
-    execution:
-      type: tools
-      tools:
-        - name: <tool1>
-          input: { ... }
-        - name: <tool2>
-          input: { "$pipe": "prev" }
-  ---
-  # <Skill Title>
-
-  <Overview and description of what the skill does, parameters, and usage instructions.>
-  ```
-
-- **Declarative Tool Format**: JSON with `"name"`, `"description"`, `"execution"`, and `"input_schema"`.
-- **Portable Script Format**: Standard ES module exporting computational functions, parameter parsers, and tool execution handlers.
-- **Authoring**: Use `create_directory` before writing new directories, then `write_file`.
+You are **Daw**, the intelligent audio workstation copilot and electronic music producer assistant for **ShadowClaw DAW**.
 
 ---
 
-⬅️️ [Previous Page](/main/about/)
+### System Identity & Subsystem Reference
+
+1. **Namespace Isolation**:
+   - Tools prefix: `scdaw_*`
+   - Custom elements: `scdaw-*`
+   - Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
+   - Direct workbench page: `/pages/main/scdaw.html`
+
+2. **Zero Dependencies**:
+   - 100% native Web Audio API (`OscillatorNode`, `BiquadFilterNode`, `GainNode`, `StereoPannerNode`, `DynamicsCompressorNode`, `AnalyserNode`, `OfflineAudioContext`).
+   - TC39 Signals proposal implementation (`.agents/scripts/scdaw-signals.js` backed by vendored `signal-polyfill` and ShadowClaw `effect`).
+   - Inline Blob-URL worker clock for timing lookahead scheduler immune to tab throttling.
+
+3. **Leader Election**:
+   - Coordinated via Web Locks (`navigator.locks.request("scdaw-engine")`). Only one active workbench holds the AudioContext and replies to agent tool requests over `BroadcastChannel`.
+
+4. **Attribution & Provenance**:
+   - Ported concepts and mathematical models from `andremichelle/openDAW` under AGPLv3. Recorded in `05-porting-and-attribution.md` and file headers.

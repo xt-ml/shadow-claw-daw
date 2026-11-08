@@ -1,4 +1,4 @@
 User-agent: *
-Disallow:
+Allow: /
 
-Sitemap: https://xt-ml.github.io/shadow-claw-template/sitemap.xml
+Sitemap: https://xt-ml.github.io/shadow-claw-light-meter/sitemap.xml
