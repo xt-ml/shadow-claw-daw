@@ -175,6 +175,7 @@ export class DawMixerElement extends BaseElement {
     this._startMeterLoop();
     this._dispose = effect(() => {
       const p = scdaw.project.get();
+      scdaw.selectedTrackId?.get();
       const currentTrackIds = p.tracks.map((t) => t.id);
       const hasContainer = Boolean(
         this.shadowRoot && this.shadowRoot.querySelector(".mixer-container"),
@@ -257,11 +258,13 @@ export class DawMixerElement extends BaseElement {
   _syncProject(p) {
     if (!this.shadowRoot) return;
 
+    const selectedId = scdaw.selectedTrackId?.get();
     for (const t of p.tracks) {
       const strip = this.shadowRoot.querySelector(
         `.strip[data-track="${t.id}"]`,
       );
       if (!strip) continue;
+      strip.classList.toggle("strip--selected", t.id === selectedId);
 
       const nameEl = strip.querySelector(".strip-name");
       if (nameEl && nameEl.textContent !== t.name) {
@@ -348,6 +351,12 @@ export class DawMixerElement extends BaseElement {
           align-items: center;
           gap: 0.4rem;
           box-sizing: border-box;
+          cursor: pointer;
+          transition: border-color 0.12s ease;
+        }
+        .strip--selected {
+          border-color: var(--accent);
+          box-shadow: 0 0 0 1px rgba(128, 212, 219, 0.35);
         }
         .strip-name {
           font-size: 0.72rem;
@@ -400,9 +409,10 @@ export class DawMixerElement extends BaseElement {
         </div>
         <div class="mixer-container">
           ${p.tracks
-            .map(
-              (t) => `
-            <div class="strip" data-track="${t.id}">
+            .map((t) => {
+              const isSelected = scdaw.selectedTrackId?.get() === t.id;
+              return `
+            <div class="strip ${isSelected ? "strip--selected" : ""}" data-track="${t.id}">
               <div class="strip-name">${t.name}</div>
               <scdaw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></scdaw-knob>
               <div class="meter-fader-row">
@@ -415,8 +425,8 @@ export class DawMixerElement extends BaseElement {
                 <button class="btn btn-icon reset-track-btn" data-track="${t.id}" title="Reset Strip">🔄</button>
               </div>
             </div>
-          `,
-            )
+          `;
+            })
             .join("")}
 
           <!-- Master Strip -->
@@ -432,6 +442,17 @@ export class DawMixerElement extends BaseElement {
         </div>
       </div>
     `;
+
+    // Selecting a channel strip updates global selectedTrackId
+    this.shadowRoot.querySelectorAll(".strip[data-track]").forEach((strip) => {
+      strip.addEventListener("click", (e) => {
+        if (e.target.closest?.("button")) return;
+        const id = strip.dataset.track;
+        if (id && typeof scdaw.selectTrack === "function") {
+          scdaw.selectTrack(id);
+        }
+      });
+    });
 
     // Sliders & Knobs
     this.shadowRoot.querySelectorAll(".track-vol").forEach((s) => {

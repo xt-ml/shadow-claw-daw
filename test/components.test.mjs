@@ -1003,3 +1003,219 @@ test("scdaw-workbench: resolveDropAction determines context-sensitive action bas
     { action: "load_instrument", trackId: "trk_drums", instrument: "drums" },
   );
 });
+
+test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degradation, BEM, and ARIA compliance", async () => {
+  const workbenchContent = await fs.readFile(
+    new URL(
+      "../.agents/scripts/components/scdaw-workbench.js",
+      import.meta.url,
+    ),
+    "utf-8",
+  );
+  const transportContent = await fs.readFile(
+    new URL(
+      "../.agents/scripts/components/scdaw-transport.js",
+      import.meta.url,
+    ),
+    "utf-8",
+  );
+  const statusbarContent = await fs.readFile(
+    new URL(
+      "../.agents/scripts/components/scdaw-statusbar.js",
+      import.meta.url,
+    ),
+    "utf-8",
+  );
+  const stylesContent = await fs.readFile(
+    new URL("../.agents/scripts/components/scdaw-styles.js", import.meta.url),
+    "utf-8",
+  );
+
+  // 1. Mobile First Architecture
+  // Workbench base styles must be mobile-first without desktop-first max-width container queries
+  assert.doesNotMatch(
+    workbenchContent,
+    /@container scdaw-workbench\s*\(\s*max-width:\s*680px\s*\)/,
+    "Workbench styles should be mobile-first, not desktop-first with max-width container queries",
+  );
+  assert.match(
+    workbenchContent,
+    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)/,
+    "Workbench should progressively enhance via min-width container queries",
+  );
+  assert.match(
+    workbenchContent,
+    /@container scdaw-workbench\s*\(\s*min-width:\s*1024px\s*\)/,
+    "Workbench should progressively enhance desktop multi-pane grid via min-width container query",
+  );
+
+  // Transport base styles must be mobile-first
+  assert.match(
+    transportContent,
+    /@container scdaw-transport\s*\(\s*min-width:\s*640px\s*\)/,
+    "Transport bar should progressively enhance via min-width container query",
+  );
+
+  // 2. Responsive Design (No horizontal overflow & fluid sizing)
+  assert.match(
+    workbenchContent,
+    /grid-template-columns:\s*repeat\(4,\s*1fr\)/,
+    "Project buttons must use responsive 4-column grid on mobile to prevent overflow",
+  );
+  assert.match(
+    workbenchContent,
+    /grid-template-columns:\s*repeat\(2,\s*1fr\)/,
+    "Actions must use responsive 2-column grid on mobile",
+  );
+  assert.match(
+    workbenchContent,
+    /overflow-x:\s*hidden/,
+    "Workbench root must constrain horizontal overflow",
+  );
+  assert.match(
+    transportContent,
+    /overflow-x:\s*hidden/,
+    "Transport bar must constrain horizontal overflow",
+  );
+
+  // 3. Degrades Gracefully (Fallback media queries)
+  assert.match(
+    workbenchContent,
+    /@media\s*\(\s*min-width:\s*640px\s*\)/,
+    "Workbench should provide fallback media queries for graceful degradation",
+  );
+  assert.match(
+    transportContent,
+    /@media\s*\(\s*min-width:\s*640px\s*\)/,
+    "Transport should provide fallback media queries for graceful degradation",
+  );
+
+  // 4. Strict BEM Naming Conventions
+  // Workbench BEM classes
+  assert.match(workbenchContent, /class=["'][^"']*scdaw-workbench__header/);
+  assert.match(workbenchContent, /class=["'][^"']*scdaw-workbench__title-bar/);
+  assert.match(workbenchContent, /class=["'][^"']*scdaw-workbench__toolbar/);
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__toolbar-group--project/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__toolbar-group--views/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__dock-toggles/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__view-switcher/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__toolbar-group--actions/,
+  );
+  assert.match(workbenchContent, /class=["'][^"']*scdaw-workbench__dock-grid/);
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__center-stack/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__dock-panel--browser/,
+  );
+  assert.match(
+    workbenchContent,
+    /class=["'][^"']*scdaw-workbench__dock-panel--mixer/,
+  );
+
+  // Transport BEM classes
+  assert.match(
+    transportContent,
+    /class=["'][^"']*scdaw-transport__group--playback/,
+  );
+  assert.match(
+    transportContent,
+    /class=["'][^"']*scdaw-transport__group--tempo/,
+  );
+  assert.match(transportContent, /class=["'][^"']*scdaw-transport__pos/);
+  assert.match(transportContent, /class=["'][^"']*scdaw-transport__item--bpm/);
+  assert.match(
+    transportContent,
+    /class=["'][^"']*scdaw-transport__item--swing/,
+  );
+  assert.match(
+    transportContent,
+    /class=["'][^"']*scdaw-transport__item--panic/,
+  );
+
+  // Statusbar BEM classes
+  assert.match(statusbarContent, /class=["'][^"']*scdaw-statusbar__group/);
+  assert.match(
+    statusbarContent,
+    /class=["'][^"']*scdaw-statusbar__stat--audio/,
+  );
+  assert.match(
+    statusbarContent,
+    /class=["'][^"']*scdaw-statusbar__stat--project/,
+  );
+
+  // 5. Accessible (ARIA Compliant)
+  // Landmarks
+  assert.match(workbenchContent, /role=["']banner["']/);
+  assert.match(workbenchContent, /role=["']toolbar["']/);
+  assert.match(workbenchContent, /role=["']tablist["']/);
+  assert.match(workbenchContent, /role=["']tab["']/);
+  assert.match(workbenchContent, /role=["']main["']/);
+  assert.match(workbenchContent, /role=["']region["']/);
+  assert.match(workbenchContent, /role=["']contentinfo["']/);
+  assert.match(transportContent, /role=["']status["']/);
+  assert.match(statusbarContent, /role=["']status["']/);
+
+  // Controls & States
+  assert.match(workbenchContent, /aria-controls=["']browser-container["']/);
+  assert.match(workbenchContent, /aria-controls=["']mixer-container["']/);
+  assert.match(workbenchContent, /aria-pressed=/);
+  assert.match(workbenchContent, /aria-selected=/);
+  assert.match(transportContent, /aria-label=["']Audio Transport Controls["']/);
+  assert.match(
+    transportContent,
+    /aria-label=["']Tempo in beats per minute["']/,
+  );
+  assert.match(transportContent, /aria-label=["']Groove swing percentage["']/);
+
+  // Focus visible styles
+  assert.match(stylesContent, /:focus-visible/);
+  assert.match(stylesContent, /outline-offset:\s*2px/);
+  assert.match(
+    stylesContent,
+    /\.hidden,\s*\[hidden\]\s*\{\s*display:\s*none\s*!important/,
+  );
+});
+
+test("scdaw-engine & components: selectTrack synchronizes selectedTrackId across Timeline, Editor, Device Rack, and Mixer", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const p = scdaw.getProject();
+  assert.ok(p.tracks.length >= 2);
+  assert.ok(scdaw.selectedTrackId, "scdaw must expose selectedTrackId signal");
+  assert.equal(
+    typeof scdaw.selectTrack,
+    "function",
+    "scdaw must expose selectTrack(trackId)",
+  );
+
+  const firstTrackId = p.tracks[0].id;
+  const secondTrackId = p.tracks[1].id;
+
+  scdaw.selectTrack(firstTrackId);
+  assert.equal(scdaw.selectedTrackId.get(), firstTrackId);
+  assert.equal(scdaw.getState().selectedTrackId, firstTrackId);
+
+  scdaw.selectTrack(secondTrackId);
+  assert.equal(scdaw.selectedTrackId.get(), secondTrackId);
+  assert.equal(scdaw.getState().selectedTrackId, secondTrackId);
+
+  // Ignoring non-existent track ID preserves current selection
+  scdaw.selectTrack("non_existent_track_999");
+  assert.equal(scdaw.selectedTrackId.get(), secondTrackId);
+});

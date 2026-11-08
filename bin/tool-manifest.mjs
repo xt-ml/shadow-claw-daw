@@ -120,7 +120,7 @@ export const TOOLS = [
   {
     name: "scdaw_load_project",
     description:
-      "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from ShadowClaw FS / OPFS conversation storage.",
+      "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from OPFS conversation storage.",
     input_schema: {
       type: "object",
       properties: {
@@ -600,7 +600,7 @@ export const TOOLS = [
   {
     name: "scdaw_export_project",
     description:
-      "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject) to ShadowClaw FS / OPFS conversation storage and/or browser download.",
+      "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject) to OPFS conversation storage and/or browser download.",
     input_schema: {
       type: "object",
       properties: {
@@ -617,12 +617,12 @@ export const TOOLS = [
         conversationId: {
           type: "string",
           description:
-            "Destination conversation ID in ShadowClaw FS / OPFS (defaults to 'br:main' / Main)",
+            "Destination conversation ID in OPFS (defaults to 'br:main' / Main)",
         },
         saveToOpfs: {
           type: "boolean",
           description:
-            "Whether to save to ShadowClaw FS / OPFS conversation storage (default: true)",
+            "Whether to save to OPFS conversation storage (default: true)",
         },
         saveToWorkspace: {
           type: "boolean",

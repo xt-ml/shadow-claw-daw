@@ -152,49 +152,33 @@ export function resolveWorkbenchResponsiveLayout({
       isFullWidth,
       activeFocus,
       showResizeHandles: false,
+      showBrowserHandle: false,
+      showMixerHandle: false,
       gridTemplateColumns: "1fr",
-      showBrowser: isMobile ? false : showBrowser && !isFullWidth,
-      showMixer: isMobile ? false : showMixer && !isFullWidth,
+      showBrowser: false,
+      showMixer: false,
     };
   }
 
-  // Tablet: 2-column or adaptable
-  if (isTablet) {
-    const showSide = showBrowser && !showMixer;
-    const showMix = showMixer && !showBrowser;
-    const cols = showSide
-      ? `${browserWidth}px 8px 1fr`
-      : showMix
-        ? `1fr 8px ${mixerWidth}px`
-        : "1fr";
-    return {
-      isMobile,
-      isTablet,
-      isDesktop,
-      isFullWidth: false,
-      activeFocus: "studio",
-      showResizeHandles: showSide || showMix,
-      gridTemplateColumns: cols,
-      showBrowser: showSide,
-      showMixer: showMix,
-    };
-  }
-
-  // Desktop (>= 1024px)
+  // Multi-pane Studio layout (>= 640px: Tablet & Desktop)
+  const visibleBrowser = Boolean(showBrowser);
+  const visibleMixer = Boolean(showMixer);
   let cols;
-  let showHandles = false;
-  if (showBrowser && showMixer) {
+  let showBrowserHandle = false;
+  let showMixerHandle = false;
+
+  if (visibleBrowser && visibleMixer) {
     cols = `${browserWidth}px 8px 1fr 8px ${mixerWidth}px`;
-    showHandles = true;
-  } else if (showBrowser) {
+    showBrowserHandle = true;
+    showMixerHandle = true;
+  } else if (visibleBrowser) {
     cols = `${browserWidth}px 8px 1fr`;
-    showHandles = true;
-  } else if (showMixer) {
+    showBrowserHandle = true;
+  } else if (visibleMixer) {
     cols = `1fr 8px ${mixerWidth}px`;
-    showHandles = true;
+    showMixerHandle = true;
   } else {
     cols = "1fr";
-    showHandles = false;
   }
 
   return {
@@ -203,10 +187,12 @@ export function resolveWorkbenchResponsiveLayout({
     isDesktop,
     isFullWidth: false,
     activeFocus: "studio",
-    showResizeHandles: showHandles,
+    showResizeHandles: showBrowserHandle || showMixerHandle,
+    showBrowserHandle,
+    showMixerHandle,
     gridTemplateColumns: cols,
-    showBrowser,
-    showMixer,
+    showBrowser: visibleBrowser,
+    showMixer: visibleMixer,
   };
 }
 
@@ -277,6 +263,7 @@ export class DawWorkbenchElement extends BaseElement {
     }
     this._showBrowser = true;
     this._showMixer = true;
+    this._showDevices = true;
     this._editorMode = "piano-roll"; // "piano-roll" | "step-sequencer"
     this._viewMode = "studio"; // "studio" | "piano-roll-full" | "sequencer-full" | "mixer-full"
     this._browserWidth = 230;
@@ -285,7 +272,21 @@ export class DawWorkbenchElement extends BaseElement {
     this._containerWidth = 1200;
   }
 
+  _measureContainerWidth() {
+    if (typeof this.getBoundingClientRect === "function") {
+      const rect = this.getBoundingClientRect();
+      if (rect && rect.width > 0) {
+        this._containerWidth = Math.round(rect.width);
+        return;
+      }
+    }
+    if (typeof window !== "undefined" && window.innerWidth > 0) {
+      this._containerWidth = window.innerWidth;
+    }
+  }
+
   connectedCallback() {
+    this._measureContainerWidth();
     this._renderSkeleton();
     this._updatePanels();
     this._dispose = effect(() => {
@@ -300,9 +301,9 @@ export class DawWorkbenchElement extends BaseElement {
           if (
             cr &&
             cr.width > 0 &&
-            Math.abs(cr.width - this._containerWidth) > 20
+            Math.round(cr.width) !== this._containerWidth
           ) {
-            this._containerWidth = cr.width;
+            this._containerWidth = Math.round(cr.width);
             this._updatePanels();
           }
         }
@@ -330,60 +331,112 @@ export class DawWorkbenchElement extends BaseElement {
         :host {
           display: block;
           width: 100%;
+          max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
           container-name: scdaw-workbench;
           --browser-w: ${this._browserWidth}px;
           --mixer-w: ${this._mixerWidth}px;
         }
+
+        /* 1. Mobile First Base Styles (Default for all viewports) */
         .scdaw-workbench {
           width: 100%;
+          max-width: 100%;
           box-sizing: border-box;
           padding: 0.5rem;
+          overflow-x: hidden;
         }
+
         .scdaw-workbench__header {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.75rem;
+          flex-direction: column;
+          gap: 0.5rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          margin-bottom: 0.6rem;
           border-bottom: 1px solid var(--border);
           padding-bottom: 0.6rem;
-          flex-wrap: wrap;
-          gap: 0.6rem;
         }
-        .scdaw-workbench__title-area {
+
+        .scdaw-workbench__title-bar {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-workbench__title-group {
           display: flex;
           align-items: center;
-          gap: 0.6rem;
+          gap: 0.4rem;
           flex-wrap: wrap;
         }
+
         .scdaw-workbench__title {
           margin: 0;
-          font-size: 1.3rem;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-        .scdaw-workbench__toolbar {
-          display: flex;
-          gap: 0.4rem;
-          align-items: center;
-          flex-wrap: wrap;
-        }
-        .scdaw-workbench__toolbar .btn {
-          height: 30px;
-          min-height: 30px;
-          max-height: 30px;
-          box-sizing: border-box;
-          padding: 0 0.6rem;
-          font-size: 0.78rem;
-          line-height: 1;
+          font-size: 1.15rem;
+          font-weight: 700;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          gap: 0.35rem;
-          white-space: nowrap;
+          gap: 0.4rem;
         }
+
+        .scdaw-workbench__meta {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.78rem;
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+          flex-wrap: wrap;
+        }
+
+        .scdaw-workbench__toolbar {
+          display: flex;
+          flex-direction: column;
+          gap: 0.45rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-workbench__toolbar-group {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
+        }
+
+        /* Project operations: 4 equal columns in mobile grid */
+        .scdaw-workbench__toolbar-group--project {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.35rem;
+          width: 100%;
+        }
+
+        /* Views group: dock toggles + view switcher */
+        .scdaw-workbench__toolbar-group--views {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .scdaw-workbench__dock-toggles {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.35rem;
+          width: 100%;
+        }
+
         .scdaw-workbench__view-switcher {
           display: flex;
           gap: 4px;
@@ -391,62 +444,184 @@ export class DawWorkbenchElement extends BaseElement {
           padding: 3px;
           border-radius: 6px;
           align-items: center;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
+          overscroll-behavior-x: contain;
         }
-        .scdaw-workbench__toolbar-sep {
-          color: var(--border, #3f4849);
-          opacity: 0.6;
-          user-select: none;
-          font-size: 0.85rem;
-          padding: 0 2px;
+
+        .scdaw-workbench__view-switcher .btn {
+          flex: 1 0 auto;
+          white-space: nowrap;
+          width: auto;
         }
-        .scdaw-workbench__dock-grid {
+
+        /* Actions: 2 equal columns on mobile */
+        .scdaw-workbench__toolbar-group--actions {
           display: grid;
-          gap: 0;
-          align-items: start;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.35rem;
           width: 100%;
-          box-sizing: border-box;
-          transition: grid-template-columns 0.1s ease;
         }
+
+        .scdaw-workbench__toolbar .btn {
+          height: 30px;
+          min-height: 30px;
+          max-height: 30px;
+          box-sizing: border-box;
+          padding: 0 0.5rem;
+          font-size: 0.78rem;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.35rem;
+          white-space: nowrap;
+          width: 100%;
+        }
+
+        .scdaw-workbench__dock-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
+        }
+
         .scdaw-workbench__center-stack {
           display: flex;
           flex-direction: column;
           gap: 0.6rem;
           min-width: 0;
           width: 100%;
+          max-width: 100%;
           box-sizing: border-box;
         }
+
         .scdaw-workbench__dock-panel {
+          min-width: 0;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-workbench__editor-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.4rem;
+          flex-wrap: wrap;
+          padding: 0.35rem 0.5rem;
+          background: rgba(0, 0, 0, 0.25);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+        }
+
+        .scdaw-workbench__editor-tabs {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          flex-wrap: wrap;
+        }
+
+        .scdaw-workbench__editor-bar .btn {
+          height: 26px;
+          min-height: 26px;
+          padding: 0 0.55rem;
+          font-size: 0.75rem;
+        }
+
+        .hidden,
+        [hidden] {
+          display: none !important;
+        }
+
+        #browser-container,
+        #mixer-container {
+          width: 100%;
           min-width: 0;
           box-sizing: border-box;
         }
 
-        /* Container Queries: Mobile First & Component Sizing */
-        @container scdaw-workbench (max-width: 680px) {
+        /* 2. Progressive Enhancement: Tablet and Wider (>= 640px) */
+        @container scdaw-workbench (min-width: 640px) {
           .scdaw-workbench__header {
-            flex-direction: column;
-            align-items: stretch;
-            gap: 0.6rem;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+          .scdaw-workbench__title-bar {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
           }
           .scdaw-workbench__toolbar {
+            flex-direction: row;
+            flex-wrap: wrap;
+            align-items: center;
             justify-content: space-between;
           }
+          .scdaw-workbench__toolbar-group {
+            width: auto;
+          }
+          .scdaw-workbench__toolbar-group--project {
+            display: inline-flex;
+            width: auto;
+          }
+          .scdaw-workbench__toolbar-group--views {
+            flex-direction: row;
+            width: auto;
+            align-items: center;
+          }
+          .scdaw-workbench__dock-toggles {
+            display: inline-flex;
+            width: auto;
+          }
           .scdaw-workbench__view-switcher {
-            width: 100%;
-            justify-content: flex-start;
+            width: auto;
+          }
+          .scdaw-workbench__toolbar-group--actions {
+            display: inline-flex;
+            width: auto;
+          }
+          .scdaw-workbench__toolbar .btn {
+            width: auto;
           }
           .scdaw-workbench__dock-grid {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 0.75rem !important;
+            display: grid;
+            gap: 0;
+            align-items: stretch;
+            grid-template-columns: var(--browser-w, 230px) 8px minmax(0, 1fr) 8px var(--mixer-w, 320px);
           }
-          scdaw-resize-handle {
-            display: none !important;
+        }
+
+        /* 3. Progressive Enhancement: Desktop Multi-Pane Grid (>= 1024px) */
+        @container scdaw-workbench (min-width: 1024px) {
+          .scdaw-workbench__dock-grid {
+            display: grid;
+            gap: 0;
+            align-items: stretch;
+            grid-template-columns: var(--browser-w, 230px) 8px minmax(0, 1fr) 8px var(--mixer-w, 320px);
           }
-          #browser-container,
-          #mixer-container {
-            width: 100% !important;
+        }
+
+        /* Fallback for environments lacking CSS container query evaluation */
+        @media (min-width: 640px) {
+          .scdaw-workbench__title-bar {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .scdaw-workbench__dock-grid {
+            display: grid;
+            gap: 0;
+            align-items: stretch;
           }
         }
 
@@ -505,45 +680,52 @@ export class DawWorkbenchElement extends BaseElement {
       </style>
       <div class="scdaw-workbench">
         <header class="scdaw-workbench__header" role="banner">
-          <div class="scdaw-workbench__title-area">
-            <h1 class="scdaw-workbench__title">
-              <span>🎚️ ShadowClaw DAW</span>
-              <span class="badge" style="color:var(--accent);">Studio Workbench</span>
-            </h1>
-            <span id="proj-header-info" style="font-size:0.78rem; color:var(--shadow-claw-text-secondary, #94a3b8);" aria-live="polite">
-              Project: <strong id="proj-header-name">${p.name || "Untitled"}</strong>
-            </span>
-            <span id="proj-bpm" class="badge" style="color:var(--accent);">${p.bpm} BPM</span>
+          <div class="scdaw-workbench__title-bar">
+            <div class="scdaw-workbench__title-group">
+              <h1 class="scdaw-workbench__title">
+                <span class="scdaw-workbench__title-icon" aria-hidden="true">🎚️</span>
+                <span class="scdaw-workbench__title-text">ShadowClaw DAW</span>
+              </h1>
+              <span class="scdaw-workbench__badge badge" style="color:var(--accent);">Studio Workbench</span>
+            </div>
+            <div class="scdaw-workbench__meta">
+              <span id="proj-header-info" class="scdaw-workbench__project-info" aria-live="polite">
+                Project: <strong id="proj-header-name">${p.name || "Untitled"}</strong>
+              </span>
+              <span id="proj-bpm" class="scdaw-workbench__bpm-badge badge" style="color:var(--accent);">${p.bpm} BPM</span>
+            </div>
           </div>
 
-          <div class="scdaw-workbench__toolbar" role="toolbar" aria-label="Workbench View Controls">
-            <button id="new-btn" class="btn btn-icon" title="New project (reset to default starter template)">📄 New</button>
-            <button id="import-btn" class="btn btn-icon" title="Open or import project (.scdaw.json, .dawproject, .mid)">📂 Open</button>
-            <button id="export-btn" class="btn btn-icon btn-primary" title="Save or export audio mixdown, stems ZIP, MIDI, or DAWproject">💾 Export</button>
-            <button id="reset-btn" class="btn btn-icon" title="Reset the entire project to default starter template">🔄 Reset</button>
-            <span class="scdaw-workbench__toolbar-sep" aria-hidden="true">|</span>
-            <div style="display:flex; gap:3px;">
-              <button id="toggle-browser-btn" class="btn btn-icon" title="Toggle Browser Dock" aria-pressed="true">📁 Browser</button>
+          <nav class="scdaw-workbench__toolbar" role="toolbar" aria-label="Workbench View Controls">
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--project" role="group" aria-label="Project Operations">
+              <button id="new-btn" class="scdaw-workbench__btn btn btn-icon" title="New project (reset to default starter template)">📄 New</button>
+              <button id="import-btn" class="scdaw-workbench__btn btn btn-icon" title="Open or import project (.scdaw.json, .dawproject, .mid)">📂 Open</button>
+              <button id="export-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Save or export audio mixdown, stems ZIP, MIDI, or DAWproject">💾 Export</button>
+              <button id="reset-btn" class="scdaw-workbench__btn btn btn-icon" title="Reset the entire project to default starter template">🔄 Reset</button>
             </div>
-            <div style="display:flex; gap:3px;">
-              <button id="mode-studio-btn" class="btn btn-icon btn-primary" title="Multi-Pane Studio Layout" aria-pressed="true">🎛 Studio</button>
+
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views" role="group" aria-label="Workbench Views">
+              <div class="scdaw-workbench__dock-toggles" role="group" aria-label="Panel Docks">
+                <button id="toggle-browser-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Browser Dock" aria-pressed="true" aria-controls="browser-container">📁 Browser</button>
+                <button id="mode-studio-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Multi-Pane Studio Layout" aria-pressed="true">🎛 Studio</button>
+                <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Mixer Dock" aria-pressed="true" aria-controls="mixer-container">🎛 Mixer</button>
+              </div>
+
+              <div class="scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">
+                <button id="mode-mixer-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
+                <button id="mode-piano-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
+                <button id="mode-seq-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
+              </div>
             </div>
-            <div style="display:flex; gap:3px;">
-              <button id="toggle-mixer-btn" class="btn btn-icon" title="Toggle Mixer Dock" aria-pressed="true">🎛 Mixer</button>
+
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History and Output">
+              <button id="undo-btn" class="scdaw-workbench__btn btn btn-icon" title="Undo last change">↩ Undo</button>
+              <button id="bounce-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Export 16-bit WAV audio">💿 Bounce WAV</button>
             </div>
-            <span class="scdaw-workbench__toolbar-sep" aria-hidden="true">|</span>
-            <div class="scdaw-workbench__view-switcher">
-              <button id="mode-mixer-full-btn" class="btn btn-icon" title="Full Width Mixer Console" aria-pressed="false">🎚 Mixer (Full)</button>
-              <button id="mode-piano-full-btn" class="btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false">🎹 Piano Roll (Full)</button>
-              <button id="mode-seq-full-btn" class="btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false">🥁 Drum Matrix (Full)</button>
-            </div>
-            <span class="scdaw-workbench__toolbar-sep" aria-hidden="true">|</span>
-            <button id="undo-btn" class="btn btn-icon" title="Undo last change">↩ Undo</button>
-            <button id="bounce-btn" class="btn btn-icon btn-primary" title="Export 16-bit WAV audio">💿 Bounce WAV</button>
-          </div>
+          </nav>
         </header>
 
-        <section style="margin-bottom:0.6rem;" aria-label="Audio Transport">
+        <section class="scdaw-workbench__transport" style="margin-bottom:0.6rem;" aria-label="Audio Transport">
           <scdaw-transport></scdaw-transport>
         </section>
 
@@ -554,26 +736,33 @@ export class DawWorkbenchElement extends BaseElement {
           </div>
 
           <!-- Browser Resize Handle -->
-          <scdaw-resize-handle id="browser-handle" orientation="vertical" value="${this._browserWidth}" min="150" max="420" label="Resize Browser panel"></scdaw-resize-handle>
+          <scdaw-resize-handle id="browser-handle" class="scdaw-workbench__handle scdaw-workbench__handle--browser" orientation="vertical" value="${this._browserWidth}" min="150" max="420" label="Resize Browser panel"></scdaw-resize-handle>
 
-          <!-- Center Stack: Timeline + Editor/Sequencer + Device Rack -->
+          <!-- Center Stack: Timeline + Editor Switcher + Editor/Sequencer + Device Rack -->
           <div id="center-stack" class="scdaw-workbench__center-stack" role="region" aria-label="Arrangement and Track Editing">
-            <div id="timeline-container">
+            <div id="timeline-container" class="scdaw-workbench__section scdaw-workbench__section--timeline">
               <scdaw-timeline></scdaw-timeline>
             </div>
-            <div id="editor-container">
+            <div id="editor-bar" class="scdaw-workbench__editor-bar" role="toolbar" aria-label="Detail Editor Switcher">
+              <div class="scdaw-workbench__editor-tabs" role="group" aria-label="Active Detail View">
+                <button id="center-editor-piano-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Show Piano Roll Note Editor in Studio">🎹 Piano Roll</button>
+                <button id="center-editor-seq-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show 16-Step Drum Matrix in Studio">🥁 Step Sequencer</button>
+              </div>
+              <button id="center-toggle-devices-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Toggle Track Device Chain Rack">🎛️ Device Rack</button>
+            </div>
+            <div id="editor-container" class="scdaw-workbench__section scdaw-workbench__section--editor">
               <scdaw-editor></scdaw-editor>
             </div>
-            <div id="seq-container">
+            <div id="seq-container" class="scdaw-workbench__section scdaw-workbench__section--sequencer hidden" hidden>
               <scdaw-sequencer></scdaw-sequencer>
             </div>
-            <div id="devices-container">
+            <div id="devices-container" class="scdaw-workbench__section scdaw-workbench__section--devices">
               <scdaw-devices></scdaw-devices>
             </div>
           </div>
 
           <!-- Mixer Resize Handle -->
-          <scdaw-resize-handle id="mixer-handle" orientation="vertical" value="${this._mixerWidth}" min="180" max="520" label="Resize Mixer panel"></scdaw-resize-handle>
+          <scdaw-resize-handle id="mixer-handle" class="scdaw-workbench__handle scdaw-workbench__handle--mixer" orientation="vertical" invert value="${this._mixerWidth}" min="180" max="520" label="Resize Mixer panel"></scdaw-resize-handle>
 
           <!-- Right: Mixer Panel -->
           <div id="mixer-container" class="scdaw-workbench__dock-panel scdaw-workbench__dock-panel--mixer" role="region" aria-label="Mixer Console">
@@ -581,7 +770,7 @@ export class DawWorkbenchElement extends BaseElement {
           </div>
         </main>
 
-        <footer style="margin-top:0.6rem;" role="contentinfo">
+        <footer class="scdaw-workbench__footer" style="margin-top:0.6rem;" role="contentinfo">
           <scdaw-statusbar></scdaw-statusbar>
         </footer>
 
@@ -641,7 +830,7 @@ export class DawWorkbenchElement extends BaseElement {
             <div style="display:flex; flex-direction:column; gap:0.4rem; padding:0.2rem 0;">
               <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--text, #f8fafc);">
                 <input type="checkbox" id="export-save-to-fs" checked />
-                <span>Save to Conversation Files (ShadowClaw FS / OPFS)</span>
+                <span>Save to Conversation Files (OPFS)</span>
               </label>
               <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--shadow-claw-text-secondary, #94a3b8);">
                 <input type="checkbox" id="export-download-copy" />
@@ -770,6 +959,26 @@ export class DawWorkbenchElement extends BaseElement {
       ?.addEventListener("click", () => {
         if (this._viewMode !== "studio") return;
         this._showMixer = !this._showMixer;
+        this._updatePanels();
+      });
+
+    // Center Stack Detail Editor Switcher (Piano Roll / Step Sequencer / Device Rack)
+    this.shadowRoot
+      .getElementById("center-editor-piano-btn")
+      ?.addEventListener("click", () => {
+        this._editorMode = "piano-roll";
+        this._updatePanels();
+      });
+    this.shadowRoot
+      .getElementById("center-editor-seq-btn")
+      ?.addEventListener("click", () => {
+        this._editorMode = "step-sequencer";
+        this._updatePanels();
+      });
+    this.shadowRoot
+      .getElementById("center-toggle-devices-btn")
+      ?.addEventListener("click", () => {
+        this._showDevices = !this._showDevices;
         this._updatePanels();
       });
 
@@ -1157,117 +1366,128 @@ export class DawWorkbenchElement extends BaseElement {
       });
 
     // PWA LaunchQueue File Handling API (opens files directly from OS file manager)
-    if (
-      typeof window !== "undefined" &&
-      "launchQueue" in window &&
-      window.LaunchParams?.prototype?.files
-    ) {
-      window.launchQueue.setConsumer(async (launchParams) => {
-        if (!launchParams.files?.length) return;
-        for (const fileHandle of launchParams.files) {
-          const file = await fileHandle.getFile();
-          const buffer = await file.arrayBuffer();
-          if (file.name.endsWith(".mid") || file.name.endsWith(".midi")) {
-            await scdaw.importMidi(buffer);
-          } else {
-            await scdaw.importProjectFile(buffer);
+    // Note: Check property existence via "in" operator on prototype instead of invoking Web IDL getter
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "launchQueue" in window &&
+        "LaunchParams" in window &&
+        window.LaunchParams?.prototype &&
+        "files" in window.LaunchParams.prototype
+      ) {
+        window.launchQueue.setConsumer(async (launchParams) => {
+          if (!launchParams.files?.length) return;
+          for (const fileHandle of launchParams.files) {
+            const file = await fileHandle.getFile();
+            const buffer = await file.arrayBuffer();
+            if (file.name.endsWith(".mid") || file.name.endsWith(".midi")) {
+              await scdaw.importMidi(buffer);
+            } else {
+              await scdaw.importProjectFile(buffer);
+            }
           }
-        }
-      });
+        });
+      }
+    } catch (_) {
+      // Ignore Web IDL prototype inspection restrictions in non-standard environments
     }
 
     // Context-Sensitive Drag and Drop
-    this.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-      const path = e.composedPath ? e.composedPath() : [e.target];
-      const trackEl = path.find(
-        (el) => el?.dataset?.track || el?.dataset?.trackId,
-      );
-      if (trackEl) {
-        trackEl.classList.add("drop-target-active");
-      }
-    });
-
-    this.addEventListener("dragleave", (e) => {
-      const path = e.composedPath ? e.composedPath() : [e.target];
-      const trackEl = path.find(
-        (el) => el?.dataset?.track || el?.dataset?.trackId,
-      );
-      if (trackEl) {
-        trackEl.classList.remove("drop-target-active");
-      }
-    });
-
-    this.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      const path = e.composedPath ? e.composedPath() : [e.target];
-      const trackEl = path.find(
-        (el) => el?.dataset?.track || el?.dataset?.trackId,
-      );
-      if (trackEl) {
-        trackEl.classList.remove("drop-target-active");
-      }
-      const targetTrackId =
-        trackEl?.dataset?.track || trackEl?.dataset?.trackId || null;
-
-      // Check for plugin drag payload
-      let plugin = null;
-      try {
-        const rawPlugin = e.dataTransfer?.getData("application/x-scdaw-plugin");
-        if (rawPlugin) plugin = JSON.parse(rawPlugin);
-      } catch {}
-
-      const file = e.dataTransfer?.files?.[0] || null;
-
-      const dropAction = resolveDropAction({
-        targetTrackId,
-        file,
-        plugin,
+    if (typeof this.addEventListener === "function") {
+      this.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+        const path = e.composedPath ? e.composedPath() : [e.target];
+        const trackEl = path.find(
+          (el) => el?.dataset?.track || el?.dataset?.trackId,
+        );
+        if (trackEl) {
+          trackEl.classList.add("drop-target-active");
+        }
       });
 
-      try {
-        if (dropAction.action === "import_session") {
-          const buffer = await file.arrayBuffer();
-          if (dropAction.format === "midi") {
-            await scdaw.importMidi(buffer);
-          } else {
-            await scdaw.importProjectFile(buffer);
-          }
-        } else if (dropAction.action === "import_track_midi") {
-          const buffer = await file.arrayBuffer();
-          await scdaw.importMidi(buffer, { trackId: dropAction.trackId });
-        } else if (dropAction.action === "import_track_audio") {
-          const p = scdaw.getProject();
-          const target = p.tracks.find((t) => t.id === dropAction.trackId);
-          if (target) {
-            target.sample = file.name;
+      this.addEventListener("dragleave", (e) => {
+        const path = e.composedPath ? e.composedPath() : [e.target];
+        const trackEl = path.find(
+          (el) => el?.dataset?.track || el?.dataset?.trackId,
+        );
+        if (trackEl) {
+          trackEl.classList.remove("drop-target-active");
+        }
+      });
+
+      this.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        const path = e.composedPath ? e.composedPath() : [e.target];
+        const trackEl = path.find(
+          (el) => el?.dataset?.track || el?.dataset?.trackId,
+        );
+        if (trackEl) {
+          trackEl.classList.remove("drop-target-active");
+        }
+        const targetTrackId =
+          trackEl?.dataset?.track || trackEl?.dataset?.trackId || null;
+
+        // Check for plugin drag payload
+        let plugin = null;
+        try {
+          const rawPlugin = e.dataTransfer?.getData(
+            "application/x-scdaw-plugin",
+          );
+          if (rawPlugin) plugin = JSON.parse(rawPlugin);
+        } catch {}
+
+        const file = e.dataTransfer?.files?.[0] || null;
+
+        const dropAction = resolveDropAction({
+          targetTrackId,
+          file,
+          plugin,
+        });
+
+        try {
+          if (dropAction.action === "import_session") {
+            const buffer = await file.arrayBuffer();
+            if (dropAction.format === "midi") {
+              await scdaw.importMidi(buffer);
+            } else {
+              await scdaw.importProjectFile(buffer);
+            }
+          } else if (dropAction.action === "import_track_midi") {
+            const buffer = await file.arrayBuffer();
+            await scdaw.importMidi(buffer, { trackId: dropAction.trackId });
+          } else if (dropAction.action === "import_track_audio") {
+            const p = scdaw.getProject();
+            const target = p.tracks.find((t) => t.id === dropAction.trackId);
+            if (target) {
+              target.sample = file.name;
+              await scdaw.sendCommand("set_track", {
+                trackId: target.id,
+                sample: file.name,
+              });
+            }
+          } else if (dropAction.action === "add_fx") {
+            await scdaw.sendCommand("manage_fx", {
+              action: "add",
+              trackId: dropAction.trackId,
+              fx: dropAction.fx,
+            });
+          } else if (dropAction.action === "apply_preset") {
+            await scdaw.sendCommand("apply_preset", {
+              trackId: dropAction.trackId,
+              preset: dropAction.preset,
+            });
+          } else if (dropAction.action === "load_instrument") {
             await scdaw.sendCommand("set_track", {
-              trackId: target.id,
-              sample: file.name,
+              trackId: dropAction.trackId,
+              kind: dropAction.instrument,
             });
           }
-        } else if (dropAction.action === "add_fx") {
-          await scdaw.sendCommand("manage_fx", {
-            action: "add",
-            trackId: dropAction.trackId,
-            fx: dropAction.fx,
-          });
-        } else if (dropAction.action === "apply_preset") {
-          await scdaw.sendCommand("apply_preset", {
-            trackId: dropAction.trackId,
-            preset: dropAction.preset,
-          });
-        } else if (dropAction.action === "load_instrument") {
-          await scdaw.sendCommand("set_track", {
-            trackId: dropAction.trackId,
-            kind: dropAction.instrument,
-          });
+        } catch (err) {
+          console.error("Context-sensitive drop handling failed:", err);
         }
-      } catch (err) {
-        console.error("Context-sensitive drop handling failed:", err);
-      }
-    });
+      });
+    }
   }
 
   /**
@@ -1367,53 +1587,104 @@ export class DawWorkbenchElement extends BaseElement {
     const mHandle = this.shadowRoot.getElementById("mixer-handle");
     const centerStack = this.shadowRoot.getElementById("center-stack");
     const timelineCont = this.shadowRoot.getElementById("timeline-container");
+    const editorBar = this.shadowRoot.getElementById("editor-bar");
     const edCont = this.shadowRoot.getElementById("editor-container");
     const seqCont = this.shadowRoot.getElementById("seq-container");
     const devCont = this.shadowRoot.getElementById("devices-container");
 
+    const setVisible = (el, visible, display = "block") => {
+      if (!el) return;
+      el.classList.toggle("hidden", !visible);
+      if (visible) {
+        el.removeAttribute("hidden");
+        el.style.display = display;
+      } else {
+        el.setAttribute("hidden", "");
+        el.style.display = "none";
+      }
+    };
+
+    const isMobile = this._containerWidth < 640;
+    const btnStates = resolveWorkbenchButtonStates({
+      viewMode: this._viewMode,
+      showBrowser: this._showBrowser,
+      showMixer: this._showMixer,
+      isMobile,
+    });
+
     if (this._viewMode === "piano-roll-full") {
-      if (bCont) bCont.style.display = "none";
-      if (bHandle) bHandle.style.display = "none";
-      if (mCont) mCont.style.display = "none";
-      if (mHandle) mHandle.style.display = "none";
-      if (centerStack) centerStack.style.display = "flex";
-      if (timelineCont) timelineCont.style.display = "block";
-      if (edCont) edCont.style.display = "block";
-      if (seqCont) seqCont.style.display = "none";
-      if (devCont) devCont.style.display = "none";
+      setVisible(bCont, false);
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, false);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, true, "flex");
+      setVisible(timelineCont, true);
+      setVisible(editorBar, false, "flex");
+      setVisible(edCont, true);
+      setVisible(seqCont, false);
+      setVisible(devCont, false);
     } else if (this._viewMode === "sequencer-full") {
-      if (bCont) bCont.style.display = "none";
-      if (bHandle) bHandle.style.display = "none";
-      if (mCont) mCont.style.display = "none";
-      if (mHandle) mHandle.style.display = "none";
-      if (centerStack) centerStack.style.display = "flex";
-      if (timelineCont) timelineCont.style.display = "block";
-      if (edCont) edCont.style.display = "none";
-      if (seqCont) seqCont.style.display = "block";
-      if (devCont) devCont.style.display = "none";
+      setVisible(bCont, false);
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, false);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, true, "flex");
+      setVisible(timelineCont, true);
+      setVisible(editorBar, false, "flex");
+      setVisible(edCont, false);
+      setVisible(seqCont, true);
+      setVisible(devCont, false);
     } else if (this._viewMode === "mixer-full") {
-      if (bCont) bCont.style.display = "none";
-      if (bHandle) bHandle.style.display = "none";
-      if (mCont) mCont.style.display = "block";
-      if (mHandle) mHandle.style.display = "none";
-      if (centerStack) centerStack.style.display = "none";
+      setVisible(bCont, false);
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, true);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, false, "flex");
     } else {
-      // Studio layout
-      if (bCont) bCont.style.display = this._showBrowser ? "block" : "none";
-      if (bHandle)
-        bHandle.style.display = this._showBrowser ? "inline-block" : "none";
-      if (mCont) mCont.style.display = this._showMixer ? "block" : "none";
-      if (mHandle)
-        mHandle.style.display = this._showMixer ? "inline-block" : "none";
-      if (centerStack) centerStack.style.display = "flex";
-      if (timelineCont) timelineCont.style.display = "block";
-      if (edCont)
-        edCont.style.display =
-          this._editorMode === "piano-roll" ? "block" : "none";
-      if (seqCont)
-        seqCont.style.display =
-          this._editorMode === "step-sequencer" ? "block" : "none";
-      if (devCont) devCont.style.display = "block";
+      // Studio layout: On mobile, side docks are hidden by default to prioritize workspace
+      const showBrowser = btnStates.browser.visible;
+      const showMixer = btnStates.mixer.visible;
+      setVisible(bCont, showBrowser);
+      setVisible(bHandle, layout.showBrowserHandle, "inline-flex");
+      setVisible(mCont, showMixer);
+      setVisible(mHandle, layout.showMixerHandle, "inline-flex");
+      setVisible(centerStack, true, "flex");
+      setVisible(timelineCont, true);
+      setVisible(editorBar, true, "flex");
+      setVisible(edCont, this._editorMode === "piano-roll");
+      setVisible(seqCont, this._editorMode === "step-sequencer");
+      setVisible(devCont, this._showDevices);
+    }
+
+    // Update Center Editor Switcher active states
+    const centerPianoBtn = this.shadowRoot.getElementById(
+      "center-editor-piano-btn",
+    );
+    const centerSeqBtn = this.shadowRoot.getElementById(
+      "center-editor-seq-btn",
+    );
+    const centerDevBtn = this.shadowRoot.getElementById(
+      "center-toggle-devices-btn",
+    );
+    if (centerPianoBtn) {
+      const isPiano = this._editorMode === "piano-roll";
+      centerPianoBtn.classList.toggle("btn-primary", isPiano);
+      centerPianoBtn.classList.toggle("scdaw-workbench__btn--active", isPiano);
+      centerPianoBtn.setAttribute("aria-pressed", String(isPiano));
+    }
+    if (centerSeqBtn) {
+      const isSeq = this._editorMode === "step-sequencer";
+      centerSeqBtn.classList.toggle("btn-primary", isSeq);
+      centerSeqBtn.classList.toggle("scdaw-workbench__btn--active", isSeq);
+      centerSeqBtn.setAttribute("aria-pressed", String(isSeq));
+    }
+    if (centerDevBtn) {
+      centerDevBtn.classList.toggle("btn-primary", this._showDevices);
+      centerDevBtn.classList.toggle(
+        "scdaw-workbench__btn--active",
+        this._showDevices,
+      );
+      centerDevBtn.setAttribute("aria-pressed", String(this._showDevices));
     }
 
     // Update active button states & ARIA pressed attributes
@@ -1424,14 +1695,6 @@ export class DawWorkbenchElement extends BaseElement {
     const bBtn = this.shadowRoot.getElementById("toggle-browser-btn");
     const mBtn = this.shadowRoot.getElementById("toggle-mixer-btn");
 
-    const isMobile = this._containerWidth < 640;
-    const btnStates = resolveWorkbenchButtonStates({
-      viewMode: this._viewMode,
-      showBrowser: this._showBrowser,
-      showMixer: this._showMixer,
-      isMobile,
-    });
-
     if (modeStudio) {
       modeStudio.disabled = btnStates.studio.disabled;
       modeStudio.setAttribute(
@@ -1439,6 +1702,10 @@ export class DawWorkbenchElement extends BaseElement {
         String(btnStates.studio.disabled),
       );
       modeStudio.classList.toggle("btn-primary", btnStates.studio.active);
+      modeStudio.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.studio.active,
+      );
       modeStudio.setAttribute("aria-pressed", String(btnStates.studio.active));
     }
     if (modePiano) {
@@ -1448,8 +1715,16 @@ export class DawWorkbenchElement extends BaseElement {
         String(btnStates.pianoRollFull.disabled),
       );
       modePiano.classList.toggle("btn-primary", btnStates.pianoRollFull.active);
+      modePiano.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.pianoRollFull.active,
+      );
       modePiano.setAttribute(
         "aria-pressed",
+        String(btnStates.pianoRollFull.active),
+      );
+      modePiano.setAttribute(
+        "aria-selected",
         String(btnStates.pianoRollFull.active),
       );
     }
@@ -1460,8 +1735,16 @@ export class DawWorkbenchElement extends BaseElement {
         String(btnStates.sequencerFull.disabled),
       );
       modeSeq.classList.toggle("btn-primary", btnStates.sequencerFull.active);
+      modeSeq.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.sequencerFull.active,
+      );
       modeSeq.setAttribute(
         "aria-pressed",
+        String(btnStates.sequencerFull.active),
+      );
+      modeSeq.setAttribute(
+        "aria-selected",
         String(btnStates.sequencerFull.active),
       );
     }
@@ -1472,8 +1755,16 @@ export class DawWorkbenchElement extends BaseElement {
         String(btnStates.mixerFull.disabled),
       );
       modeMixer.classList.toggle("btn-primary", btnStates.mixerFull.active);
+      modeMixer.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.mixerFull.active,
+      );
       modeMixer.setAttribute(
         "aria-pressed",
+        String(btnStates.mixerFull.active),
+      );
+      modeMixer.setAttribute(
+        "aria-selected",
         String(btnStates.mixerFull.active),
       );
     }
@@ -1481,6 +1772,10 @@ export class DawWorkbenchElement extends BaseElement {
       bBtn.disabled = btnStates.browser.disabled;
       bBtn.setAttribute("aria-disabled", String(btnStates.browser.disabled));
       bBtn.classList.toggle("btn-primary", btnStates.browser.active);
+      bBtn.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.browser.active,
+      );
       bBtn.setAttribute("aria-pressed", String(btnStates.browser.active));
       bBtn.title = btnStates.browser.disabled
         ? isMobile
@@ -1492,6 +1787,10 @@ export class DawWorkbenchElement extends BaseElement {
       mBtn.disabled = btnStates.mixer.disabled;
       mBtn.setAttribute("aria-disabled", String(btnStates.mixer.disabled));
       mBtn.classList.toggle("btn-primary", btnStates.mixer.active);
+      mBtn.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.mixer.active,
+      );
       mBtn.setAttribute("aria-pressed", String(btnStates.mixer.active));
       mBtn.title = btnStates.mixer.disabled
         ? isMobile

@@ -186,18 +186,24 @@ export class DawBrowserElement extends BaseElement {
           display: flex;
           flex-direction: column;
           height: 100%;
-          min-width: 220px;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
+        .scdaw-browser__header,
         .browser-header {
           display: flex;
           gap: 4px;
           margin-bottom: 0.5rem;
           border-bottom: 1px solid var(--border);
           padding-bottom: 0.4rem;
+          width: 100%;
+          box-sizing: border-box;
         }
+        .scdaw-browser__tab-btn,
         .tab-btn {
           flex: 1;
-          padding: 0.3rem 0.2rem;
+          padding: 0.35rem 0.2rem;
           font-size: 0.72rem;
           text-align: center;
           background: transparent;
@@ -206,11 +212,14 @@ export class DawBrowserElement extends BaseElement {
           cursor: pointer;
           border-radius: 4px;
           font-weight: 600;
+          transition: all 0.12s ease;
         }
+        .scdaw-browser__tab-btn.active,
         .tab-btn.active {
           background: var(--bg-elevated);
           color: var(--accent);
         }
+        .scdaw-browser__search,
         .search-box {
           width: 100%;
           background: var(--bg-elevated);
@@ -220,14 +229,19 @@ export class DawBrowserElement extends BaseElement {
           border-radius: 4px;
           font-size: 0.75rem;
           margin-bottom: 0.5rem;
+          box-sizing: border-box;
         }
+        .scdaw-browser__list,
         .item-list {
           flex: 1;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
           gap: 2px;
+          width: 100%;
+          box-sizing: border-box;
         }
+        .scdaw-browser__item,
         .browser-item {
           padding: 0.4rem 0.6rem;
           border-radius: 4px;
@@ -237,18 +251,20 @@ export class DawBrowserElement extends BaseElement {
           justify-content: space-between;
           font-size: 0.75rem;
           transition: background 0.1s;
+          box-sizing: border-box;
         }
+        .scdaw-browser__item:hover,
         .browser-item:hover {
           background: var(--bg-elevated);
           color: var(--accent);
         }
       </style>
-      <div class="daw-panel" style="padding:0.75rem; height:100%; display:flex; flex-direction:column;">
-        <div class="browser-header">
-          <button class="tab-btn ${this._activeTab === "presets" ? "active" : ""}" data-tab="presets">Presets</button>
-          <button class="tab-btn ${this._activeTab === "devices" ? "active" : ""}" data-tab="devices">Devices</button>
-          <button class="tab-btn ${this._activeTab === "files" ? "active" : ""}" data-tab="files">Files</button>
-          <button class="tab-btn ${this._activeTab === "all" ? "active" : ""}" data-tab="all">All</button>
+      <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; display:flex; flex-direction:column; box-sizing:border-box; width:100%;">
+        <div class="scdaw-browser__header browser-header" role="tablist" aria-label="Library Categories">
+          <button role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
+          <button role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>
+          <button role="tab" aria-selected="${this._activeTab === "files"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "files" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="files">Files</button>
+          <button role="tab" aria-selected="${this._activeTab === "all"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "all" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="all">All</button>
         </div>
 
         ${

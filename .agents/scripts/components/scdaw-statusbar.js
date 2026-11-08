@@ -3,6 +3,7 @@
  *
  * Bottom Telemetry & Status Bar Web Component (<scdaw-statusbar>).
  * Ported concepts from openDAW Footer & PerformanceStats.
+ * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
  */
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
@@ -84,12 +85,18 @@ export class DawStatusBarElement extends BaseElement {
         ${SHARED_STYLES}
         :host {
           display: block;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
+
+        /* Mobile First Base Styles (Stacked rows) */
+        .scdaw-statusbar,
         .statusbar {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.35rem 0.75rem;
+          flex-direction: column;
+          gap: 0.35rem;
+          padding: 0.4rem 0.6rem;
           background: #080d0e;
           border: 1px solid var(--border);
           border-radius: 6px;
@@ -97,23 +104,58 @@ export class DawStatusBarElement extends BaseElement {
           font-family: var(--mono);
           color: var(--shadow-claw-text-secondary, #94a3b8);
           user-select: none;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
         }
+
+        .scdaw-statusbar__group,
         .stat-item {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.4rem;
+          flex-wrap: wrap;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-statusbar__stat {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .scdaw-statusbar__sep {
+          opacity: 0.5;
+        }
+
+        /* Progressive Enhancement: Tablet and Desktop (>= 640px) */
+        @media (min-width: 640px) {
+          .scdaw-statusbar,
+          .statusbar {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0.75rem;
+          }
+          .scdaw-statusbar__group,
+          .stat-item {
+            width: auto;
+            flex-wrap: nowrap;
+          }
         }
       </style>
-      <div class="statusbar">
-        <div class="stat-item">
-          <span id="audio-stat" style="color:var(--warning); font-weight:700;">Audio: ${s.audio}</span>
-          <span>|</span>
-          <span id="proj-stat">${p.name} · ${p.bpm} BPM</span>
+      <div class="scdaw-statusbar statusbar" role="status" aria-label="Audio telemetry and project status" aria-live="polite">
+        <div class="scdaw-statusbar__group stat-item">
+          <span id="audio-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--audio" style="color:var(--warning); font-weight:700;">Audio: ${s.audio}</span>
+          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+          <span id="proj-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--project">${p.name} · ${p.bpm} BPM</span>
         </div>
-        <div class="stat-item">
-          <span id="bounce-stat">${s.lastBounce ? `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s` : "No Bounces"}</span>
-          <span>|</span>
-          <span style="color:var(--accent);">Leader Lock OK</span>
+        <div class="scdaw-statusbar__group stat-item">
+          <span id="bounce-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--bounce">${s.lastBounce ? `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s` : "No Bounces"}</span>
+          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+          <span class="scdaw-statusbar__stat scdaw-statusbar__stat--lock" style="color:var(--accent);">Leader Lock OK</span>
         </div>
       </div>
     `;

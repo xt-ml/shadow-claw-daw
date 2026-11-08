@@ -87,7 +87,7 @@
         {
           "name": "scdaw_export_project",
           "url": "../../.agents/tools/scdaw_export_project.json",
-          "digest": "sha256:8d076e8afede5c62a4a338c6018ba55e2fcc93e9198b71604088cac26bed7c8f"
+          "digest": "sha256:c8b68f00e64b5b01d072496894929eb413358b99c163eaceb3879ab16cb236ba"
         },
         {
           "name": "scdaw_export_stems",
@@ -227,7 +227,7 @@
         {
           "name": "scdaw-statusbar",
           "url": "../../.agents/scripts/components/scdaw-statusbar.js",
-          "digest": "sha256:82c88afe286c552a75cdef5a9eada76c64157392003de6971957c6e6b3546103"
+          "digest": "sha256:332e3696179bc04f9271955bf1a22646fc3cd0dc9e69a04c91276f1b48b13f66"
         },
         {
           "name": "scdaw",
@@ -303,9 +303,9 @@
     },
     {
       "name": "scdaw_export_project",
-      "description": "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject) to ShadowClaw FS / OPFS conversation storage and/or browser download.",
+      "description": "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject) to OPFS conversation storage and/or browser download.",
       "url": "../../.agents/tools/scdaw_export_project.json",
-      "digest": "sha256:8d076e8afede5c62a4a338c6018ba55e2fcc93e9198b71604088cac26bed7c8f"
+      "digest": "sha256:c8b68f00e64b5b01d072496894929eb413358b99c163eaceb3879ab16cb236ba"
     },
     {
       "name": "scdaw_export_stems",
@@ -345,9 +345,9 @@
     },
     {
       "name": "scdaw_load_project",
-      "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from ShadowClaw FS / OPFS conversation storage.",
+      "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from OPFS conversation storage.",
       "url": "../../.agents/tools/scdaw_load_project.json",
-      "digest": "sha256:de74db6e5862b24ce024b398cefe358b6f6f4dd05980dd9c55a68471b1077b77"
+      "digest": "sha256:fad65fdb072f1cddf3350f4d20c2581038a4828dc05fad9d9a8e7a5b29c3f13f"
     },
     {
       "name": "scdaw_manage_fx",
@@ -427,19 +427,19 @@
       "name": "scdaw-browser",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-browser.",
       "url": "../../.agents/scripts/components/scdaw-browser.js",
-      "digest": "sha256:bd61fa0c043df8d488edc622459a414649dc89aa97542da2515004565369fcc3"
+      "digest": "sha256:0e879d1475d2c6a11f1734e8b8998faa0cce4dc61c6aebb656fa8e5c35ad9776"
     },
     {
       "name": "scdaw-devices",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-devices.",
       "url": "../../.agents/scripts/components/scdaw-devices.js",
-      "digest": "sha256:d5ccd341b3851c18027b73db633187aa58ae86be5ceb125379ea245e313b5138"
+      "digest": "sha256:4547c93dc9cd2b11b18bc24e06733770b70c902cba8cddcdfdb59f6b5c0e8167"
     },
     {
       "name": "scdaw-editor",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-editor.",
       "url": "../../.agents/scripts/components/scdaw-editor.js",
-      "digest": "sha256:65e70c36eb1a351e9cde8d1123c3263758c1f0c96b0881ac08258ec57767e43f"
+      "digest": "sha256:656a48710d6733c4f0c482371ab8ec7ee1b7726f57e18032d6dad4384574ec66"
     },
     {
       "name": "scdaw-knob",
@@ -451,13 +451,13 @@
       "name": "scdaw-mixer",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-mixer.",
       "url": "../../.agents/scripts/components/scdaw-mixer.js",
-      "digest": "sha256:f99d6c36a9967bb27e71baf8d81c30aa75443f3e81f1648b6650503f7e8b3944"
+      "digest": "sha256:d4ad9234e125b7a6bca1b3884b62d0dc878ae3e85ef38383cd077204a6a2d0ca"
     },
     {
       "name": "scdaw-resize-handle",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-resize-handle.",
       "url": "../../.agents/scripts/components/scdaw-resize-handle.js",
-      "digest": "sha256:087b4bfe32d5319b0eb3cc7a36884bb3b309326d1d1197e239de20e8b71566aa"
+      "digest": "sha256:0943bf0d6229450b51beca901d1b58a782862fc3a845a256927f733bdd8bf3e9"
     },
     {
       "name": "scdaw-sequencer",
@@ -469,31 +469,31 @@
       "name": "scdaw-statusbar",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-statusbar.",
       "url": "../../.agents/scripts/components/scdaw-statusbar.js",
-      "digest": "sha256:82c88afe286c552a75cdef5a9eada76c64157392003de6971957c6e6b3546103"
+      "digest": "sha256:332e3696179bc04f9271955bf1a22646fc3cd0dc9e69a04c91276f1b48b13f66"
     },
     {
       "name": "scdaw-styles",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-styles.",
       "url": "../../.agents/scripts/components/scdaw-styles.js",
-      "digest": "sha256:bafd9502167deb827aef405333510399eb00398356b5e49146296cfd425709c6"
+      "digest": "sha256:0f73b2614bcda5567e2c85dae6c2491ffe7efa196fa68a80e9f815480b6b7a32"
     },
     {
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:e71a0022ebdb9bccd530a2334a72379ce7feaca2d59c9107d0998769a4821e3f"
+      "digest": "sha256:4d3bc09be695f9898e0fbc385ab712bf69aa2ac2737dc668a9803bfaf56c4f8c"
     },
     {
       "name": "scdaw-transport",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
       "url": "../../.agents/scripts/components/scdaw-transport.js",
-      "digest": "sha256:e7e3b458adcf34c6024aaf56fa27ca510fb36154e60c0252af2bbcdc35eabc2e"
+      "digest": "sha256:d46b1f19d3b60ba98ba43683507e3932c583f4869452fff762044276646f6752"
     },
     {
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:eb6d4250ee8e451eeaa89ac3deff12f032b77aac97af0aceeee4460f1377ae44"
+      "digest": "sha256:891895ee53eaf5587eee72183fa30edc88ac9117ceaa511f49ae279e8afcee7f"
     },
     {
       "name": "scdaw-adapter",
@@ -523,13 +523,13 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:b43f6868d49668a3000ebed2e96237a98f9895bb21dcba670c54891e5750d53e"
+      "digest": "sha256:8c826b9ebbc2430d76ebbcc44d01a06e0a3d0cf01c69769bd603239267ee73e9"
     },
     {
       "name": "scdaw-fs",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-fs.",
       "url": "../../.agents/scripts/scdaw-fs.js",
-      "digest": "sha256:b2a2a45dc1502e4cb152421f85aaf9cd93540a5b7dcd8905b9b1ce0b75f2ef8f"
+      "digest": "sha256:ba080f0e277f6431f84ccd22648a3f9596767a694f09c29a4cf18170b3448a08"
     },
     {
       "name": "scdaw-instruments",

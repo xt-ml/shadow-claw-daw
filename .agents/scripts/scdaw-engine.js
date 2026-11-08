@@ -45,8 +45,10 @@ export class DawEngine extends EventTarget {
 
     const initialProject =
       this._restoreSavedProject() || createProject("basic-beat");
+    const initialTrackId = initialProject.tracks[0]?.id || null;
 
     this.project = new State(initialProject);
+    this.selectedTrackId = new State(initialTrackId);
     this.state = new State({
       audio: "locked",
       isLeader: false,
@@ -57,6 +59,7 @@ export class DawEngine extends EventTarget {
       step: 0,
       bpm: initialProject.bpm,
       trackCount: initialProject.tracks.length,
+      selectedTrackId: initialTrackId,
       lastBounce: null,
       lastError: null,
     });
@@ -249,6 +252,26 @@ export class DawEngine extends EventTarget {
 
   getProject() {
     return structuredClone(this.project.get());
+  }
+
+  selectTrack(trackId) {
+    if (!trackId) return this.selectedTrackId.get();
+    const p = this.project.get();
+    const exists = p.tracks.some((t) => t.id === trackId);
+    if (!exists) return this.selectedTrackId.get();
+    this.selectedTrackId.set(trackId);
+    this._updateState({ selectedTrackId: trackId });
+    return trackId;
+  }
+
+  _ensureValidSelectedTrack(p) {
+    if (!p || !Array.isArray(p.tracks)) return;
+    const current = this.selectedTrackId.get();
+    if (!current || !p.tracks.some((t) => t.id === current)) {
+      const nextId = p.tracks[0]?.id || null;
+      this.selectedTrackId.set(nextId);
+      this._updateState({ selectedTrackId: nextId });
+    }
   }
 
   async unlockAudio() {
@@ -907,6 +930,7 @@ export class DawEngine extends EventTarget {
 
     this.history.push(this.project.get());
     this.project.set(imported);
+    this._ensureValidSelectedTrack(imported);
     this._updateGraph();
     this._persistProject(imported);
     this._updateState({
@@ -1120,6 +1144,7 @@ export class DawEngine extends EventTarget {
 
     this.history.push(this.project.get());
     this.project.set(imported);
+    this._ensureValidSelectedTrack(imported);
     this._updateGraph();
     this._persistProject(imported);
     this._updateState({
@@ -1185,6 +1210,7 @@ export class DawEngine extends EventTarget {
       const prev = this.history.undo();
       if (!prev) return { ok: false, message: "Nothing to undo" };
       this.project.set(prev);
+      this._ensureValidSelectedTrack(prev);
       this._updateGraph();
       this._persistProject(prev);
       this._updateState({ trackCount: prev.tracks.length });
@@ -1210,6 +1236,7 @@ export class DawEngine extends EventTarget {
         params,
       );
       this.project.set(next);
+      this._ensureValidSelectedTrack(next);
       this._updateGraph();
       this._persistProject(next);
       this._updateState({
@@ -1232,6 +1259,7 @@ export class DawEngine extends EventTarget {
 
     const { project: next, result } = applyCommand(current, name, params);
     this.project.set(next);
+    this._ensureValidSelectedTrack(next);
     this._updateGraph();
     this._persistProject(next);
     this._updateState({ trackCount: next.tracks.length });

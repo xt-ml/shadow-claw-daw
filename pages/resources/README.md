@@ -1,12 +1,17 @@
-# [ShadowClaw Template](https://xt-ml.github.io/shadow-claw-template/)
+# [ShadowClaw DAW](https://xt-ml.github.io/shadow-claw-daw/main/)
 
-Starter template for publishing a static site with [ShadowClaw](https://xt-ml.github.io/shadow-claw/) as the build engine. Write markdown or HTML under `pages/main/`, push to `main`, and the included GitHub Actions workflow builds and deploys to GitHub Pages.
+In-browser Digital Audio Workstation (DAW) powered by [ShadowClaw](https://xt-ml.github.io/shadow-claw/), featuring a zero-dependency Web Audio API engine, TC39 Signals, 11 mobile-first Web Components, 25 declarative WebMCP tools, and autonomous agent skills.
 
 ## Pages
 
-- [Home](https://xt-ml.github.io/shadow-claw-template/main)
-- [About](https://xt-ml.github.io/shadow-claw-template/main/about)
-- [Memory](https://xt-ml.github.io/shadow-claw-template/main/memory)
+- [Studio Workbench](https://xt-ml.github.io/shadow-claw-daw/main/)
+- [Architecture & Audio Pipeline](https://xt-ml.github.io/shadow-claw-daw/main/architecture/)
+- [Declarative WebMCP Tools](https://xt-ml.github.io/shadow-claw-daw/main/tools/)
+- [Autonomous Agent Skills](https://xt-ml.github.io/shadow-claw-daw/main/skills/)
+- [Interactive Workbench UI](https://xt-ml.github.io/shadow-claw-daw/main/workbench/)
+- [Porting & Attribution](https://xt-ml.github.io/shadow-claw-daw/main/porting-and-attribution/)
+- [Troubleshooting Guide](https://xt-ml.github.io/shadow-claw-daw/main/troubleshooting/)
+- [Agent Memory](https://xt-ml.github.io/shadow-claw-daw/main/memory/)
 
 ## For agents and crawlers
 
@@ -16,4 +21,4 @@ Starter template for publishing a static site with [ShadowClaw](https://xt-ml.gi
 
 ## Source
 
-[github.com/xt-ml/shadow-claw-template](https://github.com/xt-ml/shadow-claw-template)
+[github.com/xt-ml/shadow-claw-daw](https://github.com/xt-ml/shadow-claw-daw)

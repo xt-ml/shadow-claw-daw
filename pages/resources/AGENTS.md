@@ -1,20 +1,21 @@
-# AGENTS.md — ShadowClaw Template
+# AGENTS.md — ShadowClaw DAW
 
-> Guidance for AI agents working on a site published from this template.
+> Guidance for AI agents working on ShadowClaw DAW, its WebMCP tools, and autonomous skills.
 
 ## Project Snapshot
 
-Starter template for static sites built with [ShadowClaw](https://xt-ml.github.io/shadow-claw/) as the build engine. There is no ShadowClaw source in the repo, only content and configuration.
+In-browser Digital Audio Workstation built with [ShadowClaw](https://xt-ml.github.io/shadow-claw/), native Web Audio API synthesis, TC39 Signals, 11 mobile-first Web Components (`scdaw-*`), 25 declarative WebMCP tools (`scdaw_*`), and 6 autonomous skills.
 
 ## Layout
 
-- `pages/main/index.html` — home page
-- `pages/main/~/content/NN-*.md` — numbered content pages; the filename slug becomes the URL (`/main/<slug>`)
+- `pages/main/index.html` — direct-rendered pinned Studio Workbench (`<scdaw-workbench>`)
+- `pages/main/~/content/NN-*.md` — numbered documentation pages mapped in `pages/resources/routes.json`
 - `pages/main/MEMORY.md`, `pages/main/RESET.md` — agent memory and reset prompt
+- `pages/main/theme.css` — Material 3 dark/light studio theme tokens and responsive page layout rules
 - `pages/resources/` — files copied to the site root (`robots.txt`, `llms.txt`, `AGENTS.md`, `README.md`, `manifest.json`, `404.html`, `assets/`)
 - `pages/resources/routes.json` — maps source files to pretty URLs and drives `sitemap.xml` generation
-- `shadow-claw.config.json` — site, branding, and security settings
-- `.agents/skills/`, `.agents/tools/`, `.agents/scripts/` — agent skills, declarative tools, and helper scripts
+- `shadow-claw.config.json` — site, branding, custom element scripts, enabled tools, and security settings
+- `.agents/skills/`, `.agents/tools/`, `.agents/scripts/` — autonomous skills, 25 generated declarative tools, and Web Audio / Web Component scripts
 
 ## Conventions
 

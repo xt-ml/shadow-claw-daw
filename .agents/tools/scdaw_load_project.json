@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_load_project",
-  "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from ShadowClaw FS / OPFS conversation storage.",
+  "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from OPFS conversation storage.",
   "input_schema": {
     "type": "object",
     "properties": {

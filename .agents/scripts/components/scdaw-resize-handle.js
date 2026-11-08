@@ -4,6 +4,7 @@
  * Accessible, touch-friendly split-pane resize handle Web Component (<scdaw-resize-handle>).
  * Conforms to WCAG 2.1 AA (role="separator", keyboard navigation, ARIA values)
  * and supports pointer capture for mouse and touch dragging.
+ * Supports directional inversion (invert) for panels positioned on the right/bottom of handles.
  */
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
@@ -23,19 +24,21 @@ export function computeKeyboardResize(
   min,
   max,
   step = 10,
+  invert = false,
 ) {
   const delta = shiftKey ? step * 5 : step;
+  const effectiveDelta = invert ? -delta : delta;
   if (key === "ArrowRight" || key === "ArrowDown") {
-    return clampSize(current + delta, min, max);
+    return clampSize(current + effectiveDelta, min, max);
   }
   if (key === "ArrowLeft" || key === "ArrowUp") {
-    return clampSize(current - delta, min, max);
+    return clampSize(current - effectiveDelta, min, max);
   }
   if (key === "Home") {
-    return min;
+    return invert ? max : min;
   }
   if (key === "End") {
-    return max;
+    return invert ? min : max;
   }
   return current;
 }
@@ -60,7 +63,15 @@ export function getAriaAttributes(
 
 export class DawResizeHandleElement extends BaseElement {
   static get observedAttributes() {
-    return ["orientation", "value", "min", "max", "label"];
+    return [
+      "orientation",
+      "value",
+      "min",
+      "max",
+      "label",
+      "invert",
+      "direction",
+    ];
   }
 
   constructor() {
@@ -73,6 +84,7 @@ export class DawResizeHandleElement extends BaseElement {
     this._min = 150;
     this._max = 500;
     this._label = "Resize panel";
+    this._invert = false;
     this._isDragging = false;
     this._startPos = 0;
     this._startValue = 0;
@@ -103,6 +115,10 @@ export class DawResizeHandleElement extends BaseElement {
     );
     this._label =
       this.getAttribute("label") || `Resize ${this._orientation} panel`;
+    this._invert =
+      (this.hasAttribute("invert") &&
+        this.getAttribute("invert") !== "false") ||
+      this.getAttribute("direction") === "reverse";
   }
 
   _updateAria() {
@@ -141,7 +157,8 @@ export class DawResizeHandleElement extends BaseElement {
       if (!this._isDragging) return;
       const currentPos =
         this._orientation === "vertical" ? e.clientX : e.clientY;
-      const delta = currentPos - this._startPos;
+      const rawDelta = currentPos - this._startPos;
+      const delta = this._invert ? -rawDelta : rawDelta;
       const nextVal = clampSize(this._startValue + delta, this._min, this._max);
       if (nextVal !== this._value) {
         this._value = nextVal;
@@ -151,7 +168,13 @@ export class DawResizeHandleElement extends BaseElement {
           new CustomEvent("scdaw-resize", {
             bubbles: true,
             composed: true,
-            detail: { value: nextVal, delta, orientation: this._orientation },
+            detail: {
+              value: nextVal,
+              delta,
+              rawDelta,
+              orientation: this._orientation,
+              invert: this._invert,
+            },
           }),
         );
       }
@@ -174,7 +197,11 @@ export class DawResizeHandleElement extends BaseElement {
         new CustomEvent("scdaw-resize-end", {
           bubbles: true,
           composed: true,
-          detail: { value: this._value, orientation: this._orientation },
+          detail: {
+            value: this._value,
+            orientation: this._orientation,
+            invert: this._invert,
+          },
         }),
       );
     };
@@ -190,6 +217,8 @@ export class DawResizeHandleElement extends BaseElement {
         this._value,
         this._min,
         this._max,
+        10,
+        this._invert,
       );
       if (next !== this._value) {
         e.preventDefault();
@@ -204,6 +233,7 @@ export class DawResizeHandleElement extends BaseElement {
               value: next,
               delta: next - this._value,
               orientation: this._orientation,
+              invert: this._invert,
             },
           }),
         );
@@ -226,9 +256,14 @@ export class DawResizeHandleElement extends BaseElement {
       <style>
         ${SHARED_STYLES}
         :host {
-          display: inline-block;
+          display: inline-flex;
+          align-self: stretch;
           user-select: none;
           touch-action: none;
+        }
+        :host(.hidden),
+        :host([hidden]) {
+          display: none !important;
         }
         .scdaw-resize-handle {
           position: relative;
@@ -243,41 +278,68 @@ export class DawResizeHandleElement extends BaseElement {
         .scdaw-resize-handle--vertical {
           width: 8px;
           height: 100%;
-          min-height: 80px;
+          min-height: 100%;
         }
         .scdaw-resize-handle--horizontal {
           width: 100%;
           height: 8px;
         }
-        /* Visual indicator line */
+        /* Continuous subtle split line */
+        .scdaw-resize-handle::before {
+          content: "";
+          position: absolute;
+          background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+          transition: background 0.15s ease;
+        }
+        .scdaw-resize-handle--vertical::before {
+          top: 0;
+          bottom: 0;
+          left: 50%;
+          width: 1px;
+          transform: translateX(-50%);
+        }
+        .scdaw-resize-handle--horizontal::before {
+          left: 0;
+          right: 0;
+          top: 50%;
+          height: 1px;
+          transform: translateY(-50%);
+        }
+        /* Visual indicator pill */
         .scdaw-resize-handle__indicator {
-          background: var(--border-subtle, #1e293b);
+          position: relative;
+          z-index: 1;
+          background: var(--border, #3f4849);
           border-radius: 2px;
-          transition: background 0.15s ease, box-shadow 0.15s ease;
+          transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         }
         .scdaw-resize-handle--vertical .scdaw-resize-handle__indicator {
-          width: 2px;
-          height: 32px;
+          width: 3px;
+          height: 36px;
         }
         .scdaw-resize-handle--horizontal .scdaw-resize-handle__indicator {
-          width: 32px;
-          height: 2px;
+          width: 36px;
+          height: 3px;
         }
         /* Expanded touch target hit area (min 44px touch compliant) */
         .scdaw-resize-handle::after {
           content: "";
           position: absolute;
-          inset: ${isVert ? "0 -18px" : "-18px 0"};
+          inset: ${isVert ? "0 -10px" : "-10px 0"};
           z-index: 10;
+        }
+        .scdaw-resize-handle:hover::before,
+        .scdaw-resize-handle--active::before {
+          background: var(--accent, #80d4db);
         }
         .scdaw-resize-handle:hover .scdaw-resize-handle__indicator,
         .scdaw-resize-handle--active .scdaw-resize-handle__indicator {
-          background: var(--accent, #00f2fe);
-          box-shadow: 0 0 8px var(--accent-glow, rgba(0, 242, 254, 0.4));
+          background: var(--accent, #80d4db);
+          box-shadow: 0 0 8px var(--accent-glow, rgba(128, 212, 219, 0.45));
         }
         .scdaw-resize-handle:focus-visible .scdaw-resize-handle__indicator {
-          background: var(--accent, #00f2fe);
-          outline: 2px solid var(--accent, #00f2fe);
+          background: var(--accent, #80d4db);
+          outline: 2px solid var(--accent, #80d4db);
           outline-offset: 2px;
         }
       </style>

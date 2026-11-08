@@ -3,6 +3,7 @@
  *
  * Header Transport Bar Web Component (<scdaw-transport>).
  * Ported concepts from openDAW TransportGroup & OpenStudio TransportBar.
+ * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
  */
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
@@ -132,6 +133,10 @@ export class DawTransportElement extends BaseElement {
     if (playBtn) {
       playBtn.textContent = s.playing ? "⏸ Stop" : "▶ Play";
       playBtn.classList.toggle("btn-primary", s.playing);
+      playBtn.setAttribute(
+        "aria-label",
+        s.playing ? "Stop playback" : "Start playback",
+      );
     }
     if (posBadge) {
       posBadge.textContent = formatPosition(s.bar, s.beat, s.step);
@@ -171,54 +176,239 @@ export class DawTransportElement extends BaseElement {
         ${SHARED_STYLES}
         :host {
           display: block;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          container-type: inline-size;
+          container-name: scdaw-transport;
         }
+
+        /* Base styles: Mobile First (Stacked, fluid, no horizontal overflow) */
+        .scdaw-transport,
         .transport-bar {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.5rem 0.75rem;
+          flex-direction: column;
+          gap: 0.5rem;
+          padding: 0.5rem;
           background: var(--bg-card);
           border: 1px solid var(--border);
           border-radius: 8px;
-          flex-wrap: wrap;
-          gap: 0.75rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
         }
+
+        .scdaw-transport__group,
         .transport-group {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.4rem;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          min-width: 0;
         }
+
+        .scdaw-transport__group--playback {
+          justify-content: space-between;
+          flex-wrap: wrap;
+        }
+
+        .scdaw-transport__btn--play {
+          flex: 1 1 auto;
+          min-width: 75px;
+          justify-content: center;
+          min-height: 32px;
+        }
+
+        .scdaw-transport__btn--audio {
+          flex: 1 1 auto;
+          min-width: 95px;
+          justify-content: center;
+          min-height: 32px;
+        }
+
+        .scdaw-transport__pos,
         .pos-display {
           font-family: var(--mono);
           font-size: 0.85rem;
           font-weight: 700;
           color: var(--accent);
           background: #090e10;
-          padding: 0.25rem 0.6rem;
+          padding: 0.35rem 0.6rem;
           border-radius: 4px;
           border: 1px solid var(--border-subtle);
           letter-spacing: 0.05em;
+          min-height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          flex: 1 1 auto;
+          text-align: center;
+        }
+
+        .scdaw-transport__group--tempo {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.35rem;
+          font-size: 0.78rem;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-transport__item {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          box-sizing: border-box;
+        }
+
+        .scdaw-transport__item--bpm {
+          flex: 0 0 auto;
+        }
+
+        .scdaw-transport__label {
+          font-weight: 600;
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+          font-size: 0.75rem;
+        }
+
+        .scdaw-transport__input {
+          width: 50px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          color: inherit;
+          border-radius: 4px;
+          padding: 3px 5px;
+          font-family: var(--mono);
+          font-size: 0.78rem;
+          box-sizing: border-box;
+        }
+
+        .scdaw-transport__item--swing {
+          flex: 1 1 auto;
+          min-width: 85px;
+          max-width: 130px;
+        }
+
+        .scdaw-transport__slider {
+          width: 100%;
+          min-width: 40px;
+          accent-color: var(--accent);
+          cursor: pointer;
+          box-sizing: border-box;
+        }
+
+        .scdaw-transport__val {
+          font-family: var(--mono);
+          font-size: 0.72rem;
+          min-width: 26px;
+        }
+
+        .scdaw-transport__item--length {
+          flex: 0 0 auto;
+        }
+
+        .scdaw-transport__badge {
+          white-space: nowrap;
+          font-size: 0.7rem;
+        }
+
+        .scdaw-transport__item--panic {
+          flex: 0 0 auto;
+        }
+
+        .scdaw-transport__btn--panic {
+          min-height: 28px;
+          white-space: nowrap;
+        }
+
+        /* Progressive Enhancement: Tablet and Desktop (>= 640px) */
+        @container scdaw-transport (min-width: 640px) {
+          .scdaw-transport,
+          .transport-bar {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+          }
+          .scdaw-transport__group,
+          .transport-group {
+            width: auto;
+          }
+          .scdaw-transport__group--playback {
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+          }
+          .scdaw-transport__btn--play,
+          .scdaw-transport__btn--audio,
+          .scdaw-transport__pos {
+            flex: 0 0 auto;
+          }
+          .scdaw-transport__group--tempo {
+            justify-content: flex-end;
+            flex-wrap: nowrap;
+            gap: 0.6rem;
+            width: auto;
+          }
+          .scdaw-transport__item--swing {
+            max-width: 160px;
+          }
+        }
+
+        @media (min-width: 640px) {
+          .scdaw-transport,
+          .transport-bar {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .scdaw-transport__group--tempo {
+            justify-content: flex-end;
+            flex-wrap: nowrap;
+            gap: 0.6rem;
+            width: auto;
+          }
         }
       </style>
-      <div class="transport-bar">
-        <div class="transport-group">
-          <button id="play-btn" class="btn ${s.playing ? "btn-primary" : ""}">▶ Play</button>
-          <button id="audio-btn" class="btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}">🔊 Start Audio</button>
-          <span id="pos-badge" class="pos-display">001 : 1 : 1</span>
+      <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
+        <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
+          <button id="play-btn" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Stop playback" : "Start playback"}">
+            ${s.playing ? "⏸ Stop" : "▶ Play"}
+          </button>
+          <button id="audio-btn" class="scdaw-transport__btn scdaw-transport__btn--audio btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}" aria-label="Start Audio Processing Engine">
+            🔊 Start Audio
+          </button>
+          <span id="pos-badge" class="scdaw-transport__pos pos-display" role="status" aria-live="off" aria-label="Current musical position (Bar, Beat, Step)">
+            001 : 1 : 1
+          </span>
         </div>
 
-        <div class="transport-group" style="font-size:0.8rem;">
-          <label style="display:flex; align-items:center; gap:0.4rem;">
-            <span>BPM:</span>
-            <input id="bpm-input" type="number" min="40" max="240" value="${p.bpm}" style="width:55px; background:var(--bg-elevated); border:1px solid var(--border); color:inherit; border-radius:4px; padding:2px 4px;" title="Mouse wheel to adjust (Shift for +/-5 BPM). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
-          </label>
-          <label style="display:flex; align-items:center; gap:0.4rem;">
-            <span>Swing:</span>
-            <input id="swing-input" type="range" min="0" max="50" value="${Math.round((p.swing || 0) * 100)}" style="width:65px;" title="Mouse wheel to adjust (Shift for +/-5%). Double-click to reset to 0%" aria-label="Groove swing percentage" />
-            <span id="swing-val">${Math.round((p.swing || 0) * 100)}%</span>
-          </label>
-          <span id="length-badge" class="badge">${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})</span>
-          <button id="panic-btn" class="btn btn-icon btn-danger" title="All Notes Off">⏹ Panic</button>
+        <div class="scdaw-transport__group scdaw-transport__group--tempo transport-group" role="group" aria-label="Tempo, Groove and Transport Settings">
+          <div class="scdaw-transport__item scdaw-transport__item--bpm">
+            <label for="bpm-input" class="scdaw-transport__label">BPM:</label>
+            <input id="bpm-input" class="scdaw-transport__input" type="number" min="40" max="240" value="${p.bpm}" title="Mouse wheel to adjust (Shift for +/-5 BPM). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
+          </div>
+
+          <div class="scdaw-transport__item scdaw-transport__item--swing">
+            <label for="swing-input" class="scdaw-transport__label">Swing:</label>
+            <input id="swing-input" class="scdaw-transport__slider" type="range" min="0" max="50" value="${Math.round((p.swing || 0) * 100)}" title="Mouse wheel to adjust (Shift for +/-5%). Double-click to reset to 0%" aria-label="Groove swing percentage" />
+            <span id="swing-val" class="scdaw-transport__val" aria-hidden="true">${Math.round((p.swing || 0) * 100)}%</span>
+          </div>
+
+          <div class="scdaw-transport__item scdaw-transport__item--length">
+            <span id="length-badge" class="scdaw-transport__badge badge" title="Project length and musical time signature">${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})</span>
+          </div>
+
+          <div class="scdaw-transport__item scdaw-transport__item--panic">
+            <button id="panic-btn" class="scdaw-transport__btn scdaw-transport__btn--panic btn btn-icon btn-danger" title="All Notes Off (Emergency Mute)" aria-label="Panic: stop all playing notes and sounds immediately">
+              ⏹ Panic
+            </button>
+          </div>
         </div>
       </div>
     `;

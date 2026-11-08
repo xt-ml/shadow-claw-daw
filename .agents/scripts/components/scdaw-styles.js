@@ -29,12 +29,24 @@ export const SHARED_STYLES = `
   box-sizing: inherit;
 }
 
+.hidden,
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent, rgb(128, 212, 219)) !important;
+  outline-offset: 2px !important;
+}
+
 .daw-panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25);
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .daw-panel-header {
@@ -46,6 +58,9 @@ export const SHARED_STYLES = `
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .btn {
@@ -59,10 +74,14 @@ export const SHARED_STYLES = `
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   line-height: 1;
   transition: all 0.12s ease;
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 .btn:hover {
@@ -109,6 +128,7 @@ export const SHARED_STYLES = `
   font-family: var(--mono);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  line-height: 1.2;
 }
 
 .badge-active {

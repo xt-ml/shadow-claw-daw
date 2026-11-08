@@ -140,3 +140,48 @@ test("Theme: pages/main/theme.css exists and declares design tokens", () => {
   const themeCss = readFileSync(themePath, "utf8");
   assert.ok(themeCss.includes("--md-sys-color-primary"));
 });
+
+test("Documentation: README.md, AGENTS.md, and pages/main docs are up to date and free of deprecated references", () => {
+  const readme = readFileSync(resolve(ROOT, "README.md"), "utf8");
+  const agents = readFileSync(resolve(ROOT, "AGENTS.md"), "utf8");
+  const memory = readFileSync(resolve(ROOT, "pages/main/MEMORY.md"), "utf8");
+  const workbenchDoc = readFileSync(
+    resolve(ROOT, "pages/main/~/content/04-workbench.md"),
+    "utf8",
+  );
+  const troubleshootingDoc = readFileSync(
+    resolve(ROOT, "pages/main/~/content/06-troubleshooting.md"),
+    "utf8",
+  );
+
+  // Must document 25 declarative tools and 11 custom elements
+  assert.match(readme, /25 declarative `scdaw_\*` WebMCP tools/);
+  assert.match(agents, /25 declarative tools/);
+
+  // Must not reference deprecated scdaw.html or shadow-claw-template
+  for (const [name, text] of [
+    ["README.md", readme],
+    ["AGENTS.md", agents],
+    ["pages/main/MEMORY.md", memory],
+    ["04-workbench.md", workbenchDoc],
+    ["06-troubleshooting.md", troubleshootingDoc],
+  ]) {
+    assert.doesNotMatch(
+      text,
+      /scdaw\.html/,
+      `${name} should reference index.html (/main/), not deprecated scdaw.html`,
+    );
+    assert.doesNotMatch(
+      text,
+      /shadow-claw-template/,
+      `${name} should not contain leftover shadow-claw-template boilerplate`,
+    );
+  }
+
+  // Leftover template 01-about.md must not exist
+  assert.equal(
+    existsSync(resolve(ROOT, "pages/main/~/content/01-about.md")),
+    false,
+    "Boilerplate 01-about.md should be removed",
+  );
+});

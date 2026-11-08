@@ -64,6 +64,10 @@ export class DawDevicesElement extends BaseElement {
     this.render();
     this._dispose = effect(() => {
       scdaw.project.get();
+      const sharedTrackId = scdaw.selectedTrackId?.get();
+      if (sharedTrackId) {
+        this._selectedTrackId = sharedTrackId;
+      }
       this.render();
     });
   }
@@ -75,7 +79,10 @@ export class DawDevicesElement extends BaseElement {
   render() {
     if (!this.shadowRoot) return;
     const p = scdaw.getProject();
-    if (
+    const sharedTrackId = scdaw.selectedTrackId?.get();
+    if (sharedTrackId && p.tracks.some((t) => t.id === sharedTrackId)) {
+      this._selectedTrackId = sharedTrackId;
+    } else if (
       !this._selectedTrackId ||
       !p.tracks.some((t) => t.id === this._selectedTrackId)
     ) {

@@ -845,3 +845,32 @@ a.portal-cta:hover span,
   color: var(--shadow-claw-link-hover);
   gap: 0.55rem;
 }
+
+/* ==========================================================================
+   ShadowClaw DAW Workbench Mobile-First Responsive Page Styles
+   ========================================================================== */
+
+.scdaw-workbench-page {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.scdaw-workbench-page scdaw-workbench {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.pages__rendered:has(.scdaw-workbench-page) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}

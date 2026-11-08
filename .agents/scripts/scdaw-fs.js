@@ -542,7 +542,7 @@ export async function readConversationFile(
 }
 
 /**
- * Write a file to a specified conversation's workspace in ShadowClaw FS / OPFS.
+ * Write a file to a specified conversation's workspace in OPFS.
  */
 export async function writeConversationFile(
   groupId = DEFAULT_GROUP_ID,

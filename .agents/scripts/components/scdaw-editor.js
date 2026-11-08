@@ -104,6 +104,10 @@ export class DawEditorElement extends BaseElement {
     this.render();
     this._dispose = effect(() => {
       scdaw.project.get();
+      const sharedTrackId = scdaw.selectedTrackId?.get();
+      if (sharedTrackId) {
+        this._selectedTrackId = sharedTrackId;
+      }
       this.render();
     });
   }
@@ -115,7 +119,10 @@ export class DawEditorElement extends BaseElement {
   render() {
     if (!this.shadowRoot) return;
     const p = scdaw.getProject();
-    if (
+    const sharedTrackId = scdaw.selectedTrackId?.get();
+    if (sharedTrackId && p.tracks.some((t) => t.id === sharedTrackId)) {
+      this._selectedTrackId = sharedTrackId;
+    } else if (
       !this._selectedTrackId ||
       !p.tracks.some((t) => t.id === this._selectedTrackId)
     ) {
@@ -239,26 +246,39 @@ export class DawEditorElement extends BaseElement {
           container-type: inline-size;
           container-name: scdaw-editor;
         }
+        /* Mobile First Base Styles (Stacked responsive editor) */
+        .scdaw-editor__container,
         .editor-container {
           display: flex;
-          height: 340px;
+          flex-direction: column;
+          height: auto;
           overflow: hidden;
           box-sizing: border-box;
+          width: 100%;
+          max-width: 100%;
         }
+        .scdaw-editor__inspector,
         .inspector {
-          width: 170px;
-          min-width: 140px;
+          width: 100%;
+          min-width: 0;
           background: var(--bg-card);
-          border-right: 1px solid var(--border);
-          padding: 0.6rem;
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+          padding: 0.4rem 0.6rem;
           display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.4rem;
           font-size: 0.75rem;
           box-sizing: border-box;
         }
+        .scdaw-editor__grid,
         .grid-area {
-          flex: 1;
+          height: 260px;
+          max-height: 260px;
+          flex: none;
           display: flex;
           flex-direction: column;
           overflow: auto;
@@ -266,6 +286,9 @@ export class DawEditorElement extends BaseElement {
           -webkit-overflow-scrolling: touch;
           touch-action: pan-x pan-y;
           overscroll-behavior: contain;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
         .pr-row {
           display: flex;
@@ -315,25 +338,51 @@ export class DawEditorElement extends BaseElement {
           box-shadow: inset 0 0 4px rgba(0,0,0,0.4);
         }
 
-        /* Container Query: responsive compact layout when space is limited */
-        @container scdaw-editor (max-width: 600px) {
+        /* Progressive Enhancement: Desktop Side-by-Side Inspector (>= 601px) */
+        @container scdaw-editor (min-width: 601px) {
+          .scdaw-editor__container,
           .editor-container {
-            flex-direction: column;
-            height: auto;
-          }
-          .inspector {
-            width: 100%;
-            border-right: none;
-            border-bottom: 1px solid var(--border);
-            padding: 0.4rem 0.6rem;
             flex-direction: row;
-            flex-wrap: wrap;
-            align-items: center;
+            height: 340px;
           }
+          .scdaw-editor__inspector,
+          .inspector {
+            width: 170px;
+            min-width: 140px;
+            border-right: 1px solid var(--border);
+            border-bottom: none;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            justify-content: flex-start;
+          }
+          .scdaw-editor__grid,
           .grid-area {
-            height: 260px;
-            max-height: 260px;
-            flex: none;
+            flex: 1;
+            height: auto;
+            max-height: none;
+          }
+        }
+
+        @media (min-width: 601px) {
+          .scdaw-editor__container,
+          .editor-container {
+            flex-direction: row;
+            height: 340px;
+          }
+          .scdaw-editor__inspector,
+          .inspector {
+            width: 170px;
+            min-width: 140px;
+            border-right: 1px solid var(--border);
+            border-bottom: none;
+            flex-direction: column;
+            flex-wrap: nowrap;
+          }
+          .scdaw-editor__grid,
+          .grid-area {
+            flex: 1;
+            height: auto;
+            max-height: none;
           }
         }
         .velocity-stalks {
@@ -427,6 +476,9 @@ export class DawEditorElement extends BaseElement {
       .getElementById("track-select")
       ?.addEventListener("change", (e) => {
         this._selectedTrackId = e.target.value;
+        if (typeof scdaw.selectTrack === "function") {
+          scdaw.selectTrack(e.target.value);
+        }
         this.render();
       });
 
