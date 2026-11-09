@@ -137,6 +137,83 @@ export function unsanitizeGroupId(safeId) {
 }
 
 /**
+ * Detect current application base path from <base href> or location.
+ */
+export function getAppBasePath() {
+  const loc =
+    typeof window !== "undefined" && window.location
+      ? window.location
+      : typeof self !== "undefined" && self.location
+        ? self.location
+        : null;
+
+  // 1. Check for explicit <base href="..."> element in the DOM
+  if (
+    typeof document !== "undefined" &&
+    typeof document.querySelector === "function"
+  ) {
+    const baseEl = document.querySelector("base[href]");
+    if (baseEl) {
+      const href = baseEl.getAttribute("href");
+      if (href) {
+        try {
+          const baseUriPath = new URL(
+            href,
+            loc ? loc.origin : "http://localhost",
+          ).pathname;
+          let base = baseUriPath;
+          if (!base.endsWith("/")) {
+            base += "/";
+          }
+          return base;
+        } catch (_) {}
+      }
+    }
+  }
+
+  if (!loc) {
+    return "/";
+  }
+
+  const pathname = loc.pathname || "/";
+  if (pathname === "/") {
+    return "/";
+  }
+
+  const parts = pathname.split("/").filter(Boolean);
+  const VALID_PAGES = new Set([
+    "pages",
+    "chat",
+    "tasks",
+    "files",
+    "settings",
+    "share",
+  ]);
+  const pageIndex = parts.findIndex((part) =>
+    VALID_PAGES.has(part.toLowerCase()),
+  );
+
+  if (pageIndex >= 0) {
+    if (pageIndex === 0) {
+      return "/";
+    }
+    return "/" + parts.slice(0, pageIndex).join("/") + "/";
+  }
+
+  // Check for single-segment subpath deployments (e.g. /shadow-claw-daw/ or /my-app/)
+  if (parts.length === 1 && !pathname.includes(".")) {
+    return "/" + parts[0] + "/";
+  }
+
+  // If first segment does not contain a dot (not a file like index.html), treat as subpath
+  if (parts.length >= 1 && !parts[0].includes(".")) {
+    return "/" + parts[0] + "/";
+  }
+
+  return "/";
+}
+
+/**
  * Detect current deployment namespace from global scope or URL.
  */
 export function getDeploymentNamespace() {
@@ -158,7 +235,13 @@ export function getDeploymentNamespace() {
     if (envId) return envId.replace(/[^a-zA-Z0-9_-]/g, "-");
   }
 
-  return "";
+  const basePath = getAppBasePath();
+  if (!basePath || basePath === "/") {
+    return "";
+  }
+
+  const clean = basePath.replace(/^\/+|\/+$/g, "");
+  return clean.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
 
 /**
@@ -542,6 +625,119 @@ export async function readConversationFile(
 }
 
 /**
+ * Write a file in OPFS by navigating via path segments inside a dedicated Web Worker.
+ * Required for WebKit / Safari / iOS / iPadOS where createSyncAccessHandle is only allowed
+ * inside dedicated workers and createWritable is unsupported on the main thread.
+ */
+export async function writeOpfsPathViaWorker(pathSegments, content) {
+  if (typeof globalThis.Worker !== "function") {
+    throw new Error(
+      "Web Worker is not available for OPFS sync write fallback.",
+    );
+  }
+
+  let u8;
+  if (content instanceof Uint8Array) {
+    u8 = content;
+  } else if (content instanceof ArrayBuffer) {
+    u8 = new Uint8Array(content);
+  } else if (typeof content === "string") {
+    u8 = new TextEncoder().encode(content);
+  } else if (typeof Blob !== "undefined" && content instanceof Blob) {
+    const buf = await content.arrayBuffer();
+    u8 = new Uint8Array(buf);
+  } else {
+    u8 = new Uint8Array(0);
+  }
+
+  return new Promise((resolve, reject) => {
+    let blobUrl = "";
+    let worker = null;
+
+    const cleanup = () => {
+      if (worker) {
+        try {
+          worker.terminate();
+        } catch (_) {}
+        worker = null;
+      }
+      if (
+        blobUrl &&
+        typeof URL !== "undefined" &&
+        typeof URL.revokeObjectURL === "function"
+      ) {
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (_) {}
+        blobUrl = "";
+      }
+    };
+
+    try {
+      const src = [
+        "self.onmessage = async (e) => {",
+        "  try {",
+        "    const { pathSegments, bytes } = e.data;",
+        "    let dir = await navigator.storage.getDirectory();",
+        "    for (let i = 0; i < pathSegments.length - 1; i++) {",
+        "      dir = await dir.getDirectoryHandle(pathSegments[i], { create: true });",
+        "    }",
+        "    const filename = pathSegments[pathSegments.length - 1];",
+        "    const fh = await dir.getFileHandle(filename, { create: true });",
+        "    if (typeof fh.createWritable === 'function') {",
+        "      const w = await fh.createWritable();",
+        "      await w.write(bytes);",
+        "      await w.close();",
+        "    } else {",
+        "      const h = await fh.createSyncAccessHandle();",
+        "      try {",
+        "        h.truncate(0);",
+        "        h.write(bytes, { at: 0 });",
+        "        if (typeof h.flush === 'function') h.flush();",
+        "      } finally {",
+        "        h.close();",
+        "      }",
+        "    }",
+        "    self.postMessage({ ok: true });",
+        "  } catch (err) {",
+        "    self.postMessage({ error: (err && err.message) || String(err) });",
+        "  }",
+        "};",
+      ].join("\n");
+
+      const blob = new Blob([src], { type: "text/javascript" });
+      blobUrl = URL.createObjectURL(blob);
+      worker = new Worker(blobUrl);
+
+      worker.onmessage = (e) => {
+        cleanup();
+        if (e.data && e.data.error) {
+          reject(new Error(e.data.error));
+        } else {
+          resolve({ ok: true });
+        }
+      };
+
+      worker.onerror = (err) => {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+
+      // Clone bytes into independent buffer to avoid detached ArrayBuffer issues on transfer
+      const transferBuf = u8.buffer.slice(
+        u8.byteOffset,
+        u8.byteOffset + u8.byteLength,
+      );
+      const transferBytes = new Uint8Array(transferBuf);
+      worker.postMessage({ pathSegments, bytes: transferBytes }, [transferBuf]);
+    } catch (err) {
+      cleanup();
+      reject(err);
+    }
+  });
+}
+
+/**
  * Write a file to a specified conversation's workspace in OPFS.
  */
 export async function writeConversationFile(
@@ -596,27 +792,62 @@ export async function writeConversationFile(
     );
   }
 
-  const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+  let writeSucceeded = false;
+  let writeError = null;
 
-  if (typeof fileHandle.createWritable === "function") {
-    const writable = await fileHandle.createWritable();
-    await writable.write(u8);
-    await writable.close();
-  } else if (typeof fileHandle.createSyncAccessHandle === "function") {
-    const syncHandle = await fileHandle.createSyncAccessHandle();
-    try {
-      syncHandle.truncate(0);
-      syncHandle.write(u8, { at: 0 });
-      if (typeof syncHandle.flush === "function") {
-        syncHandle.flush();
+  try {
+    const fileHandle = await dirHandle.getFileHandle(filename, {
+      create: true,
+    });
+    if (typeof fileHandle.createWritable === "function") {
+      const writable = await fileHandle.createWritable();
+      await writable.write(u8);
+      await writable.close();
+      writeSucceeded = true;
+    } else if (typeof fileHandle.createSyncAccessHandle === "function") {
+      const syncHandle = await fileHandle.createSyncAccessHandle();
+      try {
+        syncHandle.truncate(0);
+        syncHandle.write(u8, { at: 0 });
+        if (typeof syncHandle.flush === "function") {
+          syncHandle.flush();
+        }
+        writeSucceeded = true;
+      } finally {
+        syncHandle.close();
       }
-    } finally {
-      syncHandle.close();
     }
-  } else {
-    throw new Error(
-      "No writable stream or sync handle available on file handle.",
-    );
+  } catch (err) {
+    writeError = err;
+  }
+
+  // Fallback to worker sync access handle write (crucial for iOS / iPadOS Safari)
+  if (!writeSucceeded) {
+    if (typeof globalThis.Worker === "function") {
+      const rootName = getOpfsRootName();
+      const pathSegments = [rootName, "groups", safeId, filename];
+      await writeOpfsPathViaWorker(pathSegments, u8);
+      writeSucceeded = true;
+    } else if (writeError) {
+      throw writeError;
+    } else {
+      throw new Error(
+        "No writable stream or sync handle available on file handle.",
+      );
+    }
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    typeof window.dispatchEvent === "function"
+  ) {
+    try {
+      window.dispatchEvent(
+        new CustomEvent("scdaw-file-saved", {
+          detail: { groupId, filename, path: `groups/${safeId}/${filename}` },
+        }),
+      );
+    } catch (_) {}
   }
 
   return {

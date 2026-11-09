@@ -493,7 +493,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:c9f1bdc39e5f1938eb4e5c978d27121dde221a3d2930506f463324c2613c4e59"
+      "digest": "sha256:12046757e069c14e5d384332f2b9f26be6d93582bd4842ee8a5f04f1cb6b0939"
     },
     {
       "name": "scdaw-adapter",
@@ -523,13 +523,13 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:8c826b9ebbc2430d76ebbcc44d01a06e0a3d0cf01c69769bd603239267ee73e9"
+      "digest": "sha256:93227495e4af02c5a09f317f8171fe1863f1b1914d378bd7b5fd2a60b4e1b91e"
     },
     {
       "name": "scdaw-fs",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-fs.",
       "url": "../../.agents/scripts/scdaw-fs.js",
-      "digest": "sha256:ba080f0e277f6431f84ccd22648a3f9596767a694f09c29a4cf18170b3448a08"
+      "digest": "sha256:d90f89f9554171a96c6121b65fa06d5830042c04807f8c4c29e2e85f593bdd9a"
     },
     {
       "name": "scdaw-instruments",

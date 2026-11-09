@@ -551,7 +551,10 @@ export class DawEngine extends EventTarget {
           resolvedFilename,
           wavBuffer,
         );
-      } catch (_) {}
+      } catch (err) {
+        console.warn("Failed to write bounce to conversation files:", err);
+        throw err;
+      }
     }
 
     if (
@@ -842,7 +845,10 @@ export class DawEngine extends EventTarget {
             resolvedZipName,
             zipBuffer,
           );
-        } catch (_) {}
+        } catch (err) {
+          console.warn("Failed to write stems to conversation files:", err);
+          throw err;
+        }
       }
 
       if (
@@ -887,7 +893,9 @@ export class DawEngine extends EventTarget {
     if (options.saveToOpfs !== false) {
       try {
         writeConversationFile(conversationId, filename, midiBytes);
-      } catch (_) {}
+      } catch (err) {
+        console.warn("Failed to write MIDI to conversation files:", err);
+      }
     }
 
     if (

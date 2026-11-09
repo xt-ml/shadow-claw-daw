@@ -4,8 +4,13 @@ import fs from "node:fs/promises";
 import {
   DEFAULT_GROUP_ID,
   DEFAULT_GROUP_NAME,
+  LEGACY_OPFS_ROOT,
+  LEGACY_DB_NAME,
   sanitizeGroupId,
   unsanitizeGroupId,
+  getDeploymentNamespace,
+  getOpfsRootName,
+  getDbName,
   classifyFile,
   formatFileSize,
   getFileIcon,
@@ -360,4 +365,179 @@ test("scdaw-browser UI: contains Files tab for browsing conversation files", asy
     /browser-conversation-select/i,
     "Browser Files tab must have conversation selector",
   );
+});
+
+test("scdaw-fs: resolves deployment namespace from <base href> and location pathname to match ShadowClaw OPFS root", () => {
+  // Save originals
+  const origWindow = globalThis.window;
+  const origDocument = globalThis.document;
+
+  try {
+    // 1. With explicit <base href="/shadow-claw-daw/">
+    globalThis.window = {
+      location: {
+        pathname: "/shadow-claw-daw/pages/main/",
+        origin: "https://xt-ml.github.io",
+      },
+    };
+    globalThis.document = {
+      querySelector: (selector) => {
+        if (selector === "base[href]") {
+          return {
+            getAttribute: (attr) =>
+              attr === "href" ? "/shadow-claw-daw/" : null,
+          };
+        }
+        return null;
+      },
+    };
+
+    assert.equal(getDeploymentNamespace(), "shadow-claw-daw");
+    assert.equal(getOpfsRootName(), "shadowclaw-shadow-claw-daw");
+    assert.equal(getDbName(), "shadowclaw-shadow-claw-daw");
+
+    // 2. Without base tag but on subpath pathname
+    globalThis.document = { querySelector: () => null };
+    globalThis.window = {
+      location: {
+        pathname: "/shadow-claw-daw/index.html",
+        origin: "https://xt-ml.github.io",
+      },
+    };
+    assert.equal(getDeploymentNamespace(), "shadow-claw-daw");
+    assert.equal(getOpfsRootName(), "shadowclaw-shadow-claw-daw");
+
+    // 3. At root domain
+    globalThis.window = {
+      location: {
+        pathname: "/pages/main/index.html",
+        origin: "http://localhost:3000",
+      },
+    };
+    assert.equal(getDeploymentNamespace(), "");
+    assert.equal(getOpfsRootName(), LEGACY_OPFS_ROOT);
+    assert.equal(getDbName(), LEGACY_DB_NAME);
+
+    // 4. Explicit deploy id override takes highest priority
+    globalThis.window = {
+      __SHADOWCLAW_DEPLOY_ID__: "custom-deploy-site",
+      location: {
+        pathname: "/shadow-claw-daw/",
+        origin: "https://example.com",
+      },
+    };
+    assert.equal(getDeploymentNamespace(), "custom-deploy-site");
+    assert.equal(getOpfsRootName(), "shadowclaw-custom-deploy-site");
+  } finally {
+    globalThis.window = origWindow;
+    globalThis.document = origDocument;
+  }
+});
+
+test("scdaw-fs: writeConversationFile falls back to worker-based sync access handle when main-thread writable stream is unavailable", async () => {
+  const origNavigatorDesc = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "navigator",
+  );
+  const origWorker = globalThis.Worker;
+  const origBlob = globalThis.Blob;
+  const origURL = globalThis.URL;
+
+  try {
+    let workerSpawned = false;
+    let workerPostMessagePayload = null;
+
+    // Simulate environment where createWritable is unavailable (Safari / iOS / iPadOS)
+    // and calling createSyncAccessHandle on the main thread throws
+    const mockFileHandle = {
+      createWritable: undefined,
+      createSyncAccessHandle: () => {
+        throw new Error(
+          "createSyncAccessHandle is only allowed in dedicated workers",
+        );
+      },
+    };
+
+    const mockDirHandle = {
+      getFileHandle: async () => mockFileHandle,
+    };
+
+    const mockGroupsDir = {
+      getDirectoryHandle: async () => mockDirHandle,
+    };
+
+    const mockAppDir = {
+      getDirectoryHandle: async () => mockGroupsDir,
+    };
+
+    const mockRoot = {
+      getDirectoryHandle: async () => mockAppDir,
+    };
+
+    Object.defineProperty(globalThis, "navigator", {
+      value: {
+        storage: {
+          getDirectory: async () => mockRoot,
+        },
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    // Mock Worker
+    class MockWorker {
+      constructor(scriptUrl) {
+        workerSpawned = true;
+        this.scriptUrl = scriptUrl;
+        setTimeout(() => {
+          if (this.onmessage) {
+            this.onmessage({ data: { ok: true } });
+          }
+        }, 10);
+      }
+      postMessage(payload) {
+        workerPostMessagePayload = payload;
+      }
+      terminate() {}
+    }
+
+    globalThis.Worker = MockWorker;
+    globalThis.Blob = class {
+      constructor(parts) {
+        this.content = parts.join("");
+      }
+    };
+    globalThis.URL = {
+      createObjectURL: () => "blob:mock-worker",
+      revokeObjectURL: () => {},
+    };
+
+    const writeResult = await writeConversationFile(
+      "br:main",
+      "test-export.wav",
+      new Uint8Array([82, 73, 70, 70]),
+    );
+
+    assert.equal(writeResult.ok, true);
+    assert.equal(
+      workerSpawned,
+      true,
+      "Worker must be spawned for OPFS sync fallback",
+    );
+    assert.ok(workerPostMessagePayload, "Worker must receive message payload");
+    assert.deepEqual(workerPostMessagePayload.pathSegments.slice(1), [
+      "groups",
+      "br-main",
+      "test-export.wav",
+    ]);
+  } finally {
+    if (origNavigatorDesc) {
+      Object.defineProperty(globalThis, "navigator", origNavigatorDesc);
+    } else {
+      delete globalThis.navigator;
+    }
+    globalThis.Worker = origWorker;
+    globalThis.Blob = origBlob;
+    globalThis.URL = origURL;
+  }
 });

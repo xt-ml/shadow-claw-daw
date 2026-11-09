@@ -680,17 +680,35 @@ export class DawWorkbenchElement extends BaseElement {
           background: rgba(0, 0, 0, 0.65);
           backdrop-filter: blur(2px);
         }
+        .scdaw-dialog {
+          padding: 1.4rem;
+          max-width: 480px;
+          width: 92%;
+          border-radius: 8px;
+          background: var(--bg-card, #161b1c);
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          border: 1px solid var(--border, #3f4849);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          box-sizing: border-box;
+          font-family: inherit;
+        }
         .scdaw-dialog__form {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
+          gap: 0.9rem;
           margin: 0;
         }
-        .scdaw-dialog__title {
+        .scdaw-dialog__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .scdaw-dialog__title,
+        .scdaw-dialog__header h3 {
           margin: 0;
           font-size: 1.15rem;
           font-weight: 600;
-          color: var(--accent, #80d4db);
+          color: var(--shadow-claw-text-primary, #dde4e4);
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -700,6 +718,81 @@ export class DawWorkbenchElement extends BaseElement {
           font-size: 0.88rem;
           line-height: 1.5;
           color: var(--shadow-claw-text-secondary, #94a3b8);
+        }
+        .scdaw-dialog__field {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+        .scdaw-dialog label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+        }
+        .scdaw-dialog input[type="text"],
+        .scdaw-dialog input[type="number"],
+        .scdaw-dialog select {
+          padding: 0.45rem 0.6rem;
+          background: var(--bg-app, #0e1415);
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          border: 1px solid var(--border, #3f4849);
+          border-radius: 4px;
+          font-family: inherit;
+          font-size: 0.82rem;
+          box-sizing: border-box;
+          transition: border-color 0.15s;
+        }
+        .scdaw-dialog input[type="text"]:focus,
+        .scdaw-dialog input[type="number"]:focus,
+        .scdaw-dialog select:focus {
+          border-color: var(--accent, #80d4db);
+          outline: none;
+        }
+        .scdaw-dialog__checkboxes {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          padding: 0.2rem 0;
+        }
+        .scdaw-dialog__checkboxes label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 0.8rem;
+          cursor: pointer;
+          color: var(--shadow-claw-text-primary, #dde4e4);
+        }
+        .scdaw-file-list {
+          min-height: 120px;
+          max-height: 180px;
+          overflow-y: auto;
+          background: var(--bg-app, #0e1415);
+          border: 1px solid var(--border, #3f4849);
+          border-radius: 4px;
+          padding: 0.4rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.3rem;
+        }
+        .scdaw-file-item {
+          padding: 0.45rem 0.6rem;
+          border-radius: 4px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          cursor: pointer;
+          font-size: 0.8rem;
+          background: var(--bg-elevated, #252b2c);
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          border: 1px solid transparent;
+          transition: border-color 0.15s, background 0.15s;
+        }
+        .scdaw-file-item:hover {
+          background: var(--border, #3f4849);
+        }
+        .scdaw-file-item[aria-selected="true"] {
+          border-color: var(--accent, #80d4db);
+          background: rgba(128, 212, 219, 0.15);
         }
         .scdaw-dialog__actions {
           display: flex;
@@ -826,31 +919,31 @@ export class DawWorkbenchElement extends BaseElement {
         <input type="file" id="import-file-input" style="display:none;" accept=".scdaw.json,.json,.dawproject,.mid,.midi" aria-hidden="true"/>
 
         <!-- Save & Export Modal Dialog -->
-        <dialog id="export-modal" class="scdaw-dialog" aria-labelledby="export-modal-title" style="padding:1.4rem; max-width:480px; width:92%; border-radius:8px; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
-          <form method="dialog" id="export-form" style="display:flex; flex-direction:column; gap:0.9rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3 id="export-modal-title" style="margin:0; font-size:1.1rem; color:var(--text, #f8fafc);">💾 Save & Export</h3>
+        <dialog id="export-modal" class="scdaw-dialog" aria-labelledby="export-modal-title">
+          <form method="dialog" id="export-form" class="scdaw-dialog__form">
+            <div class="scdaw-dialog__header">
+              <h3 id="export-modal-title">💾 Save & Export</h3>
               <button type="button" id="export-modal-close" class="btn btn-icon" aria-label="Close export dialog" style="padding:2px 8px; font-size:1rem;">✕</button>
             </div>
 
             <!-- Destination Conversation Selection -->
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <label for="export-conversation-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Destination Conversation</label>
-              <select id="export-conversation-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+            <div class="scdaw-dialog__field">
+              <label for="export-conversation-select">Destination Conversation</label>
+              <select id="export-conversation-select">
                 <option value="br:main" selected>Main (Default)</option>
               </select>
             </div>
 
             <!-- Filename Input -->
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <label for="export-filename-input" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">File Name</label>
-              <input type="text" id="export-filename-input" value="${p.name || "daw"}" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px; box-sizing:border-box;"/>
+            <div class="scdaw-dialog__field">
+              <label for="export-filename-input">File Name</label>
+              <input type="text" id="export-filename-input" value="${p.name || "daw"}"/>
             </div>
 
             <!-- Format Selector -->
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <label for="export-format-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Format</label>
-              <select id="export-format-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+            <div class="scdaw-dialog__field">
+              <label for="export-format-select">Format</label>
+              <select id="export-format-select">
                 <option value="json" selected>Native Project (.scdaw.json)</option>
                 <option value="dawproject">DAWproject Interchange (.dawproject)</option>
                 <option value="wav">WAV Audio Mixdown (.wav)</option>
@@ -860,12 +953,12 @@ export class DawWorkbenchElement extends BaseElement {
             </div>
 
             <!-- Save Target Options -->
-            <div style="display:flex; flex-direction:column; gap:0.4rem; padding:0.2rem 0;">
-              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--text, #f8fafc);">
+            <div class="scdaw-dialog__checkboxes">
+              <label>
                 <input type="checkbox" id="export-save-to-fs" checked />
                 <span>Save to Conversation Files (OPFS)</span>
               </label>
-              <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; color:var(--shadow-claw-text-secondary, #94a3b8);">
+              <label>
                 <input type="checkbox" id="export-download-copy" />
                 <span>Also download copy to computer</span>
               </label>
@@ -873,25 +966,25 @@ export class DawWorkbenchElement extends BaseElement {
 
             <div id="export-opt-wav" style="display:none; flex-direction:column; gap:0.6rem;">
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
-                <div>
-                  <label for="export-bitdepth" style="font-size:0.75rem; color:var(--shadow-claw-text-secondary, #94a3b8);">Bit Depth</label>
-                  <select id="export-bitdepth" style="width:100%; padding:0.35rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+                <div class="scdaw-dialog__field">
+                  <label for="export-bitdepth">Bit Depth</label>
+                  <select id="export-bitdepth" style="width:100%;">
                     <option value="16">16-bit PCM</option>
                     <option value="24" selected>24-bit PCM (Studio Standard)</option>
                     <option value="32">32-bit Float</option>
                   </select>
                 </div>
-                <div>
-                  <label for="export-loops" style="font-size:0.75rem; color:var(--shadow-claw-text-secondary, #94a3b8);">Loops</label>
-                  <input type="number" id="export-loops" min="1" max="16" value="1" style="width:100%; padding:0.35rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px; box-sizing:border-box;"/>
+                <div class="scdaw-dialog__field">
+                  <label for="export-loops">Loops</label>
+                  <input type="number" id="export-loops" min="1" max="16" value="1" style="width:100%;"/>
                 </div>
               </div>
             </div>
 
             <div id="export-opt-stems" style="display:none; flex-direction:column; gap:0.5rem;">
-              <div>
-                <label for="export-tap-select" style="font-size:0.75rem; color:var(--shadow-claw-text-secondary, #94a3b8);">Tap Routing</label>
-                <select id="export-tap-select" style="width:100%; padding:0.35rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+              <div class="scdaw-dialog__field">
+                <label for="export-tap-select">Tap Routing</label>
+                <select id="export-tap-select" style="width:100%;">
                   <option value="post-fader" selected>Post-Fader & Pan (Mixdown Stems)</option>
                   <option value="pre-fader">Pre-Fader (Raw Track Level)</option>
                   <option value="pre-fx">Pre-FX (Raw Voice Output)</option>
@@ -907,28 +1000,28 @@ export class DawWorkbenchElement extends BaseElement {
         </dialog>
 
         <!-- Open / Load Project Modal Dialog -->
-        <dialog id="import-modal" class="scdaw-dialog" aria-labelledby="import-modal-title" style="padding:1.4rem; max-width:480px; width:92%; border-radius:8px; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
-          <form method="dialog" id="import-form" style="display:flex; flex-direction:column; gap:0.9rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <h3 id="import-modal-title" style="margin:0; font-size:1.1rem; color:var(--text, #f8fafc);">📂 Open Project</h3>
+        <dialog id="import-modal" class="scdaw-dialog" aria-labelledby="import-modal-title">
+          <form method="dialog" id="import-form" class="scdaw-dialog__form">
+            <div class="scdaw-dialog__header">
+              <h3 id="import-modal-title">📂 Open Project</h3>
               <button type="button" id="import-modal-close" class="btn btn-icon" aria-label="Close open dialog" style="padding:2px 8px; font-size:1rem;">✕</button>
             </div>
 
             <!-- Source Conversation Selector -->
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
-              <label for="import-conversation-select" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Conversation</label>
-              <select id="import-conversation-select" style="padding:0.4rem; background:var(--background, #0f172a); color:var(--text, #f8fafc); border:1px solid var(--border, #334155); border-radius:4px;">
+            <div class="scdaw-dialog__field">
+              <label for="import-conversation-select">Conversation</label>
+              <select id="import-conversation-select">
                 <option value="br:main" selected>Main (Default)</option>
               </select>
             </div>
 
             <!-- Files in selected conversation -->
-            <div style="display:flex; flex-direction:column; gap:0.3rem;">
+            <div class="scdaw-dialog__field">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <label for="import-file-list" style="font-size:0.8rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Files in Conversation</label>
+                <label for="import-file-list">Files in Conversation</label>
                 <button type="button" id="import-refresh-btn" class="btn btn-icon" title="Refresh files" style="padding:2px 6px; font-size:0.75rem;">🔄 Refresh</button>
               </div>
-              <div id="import-file-list" class="scdaw-file-list" role="listbox" aria-label="Available project files" tabindex="0" style="min-height:160px; max-height:220px; overflow-y:auto; border:1px solid var(--border, #334155); border-radius:4px; padding:0.4rem; background:var(--background, #0f172a); display:flex; flex-direction:column; gap:4px;">
+              <div id="import-file-list" class="scdaw-file-list" role="listbox" aria-label="Available project files" tabindex="0">
                 <div style="padding:1rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.8rem;">Loading files...</div>
               </div>
             </div>
@@ -1067,14 +1160,6 @@ export class DawWorkbenchElement extends BaseElement {
       ?.addEventListener("click", () => {
         scdaw.sendCommand("undo");
       });
-    this.shadowRoot
-      .getElementById("bounce-btn")
-      ?.addEventListener("click", () => {
-        const modal = this.shadowRoot.getElementById("export-modal");
-        if (modal && typeof modal.showModal === "function") {
-          modal.showModal();
-        }
-      });
 
     // Helper to populate conversation dropdowns
     const populateConversations = async (
@@ -1130,7 +1215,7 @@ export class DawWorkbenchElement extends BaseElement {
         importFileList.innerHTML = files
           .map(
             (f) => `
-            <div class="scdaw-file-item" role="option" aria-selected="false" tabindex="0" data-filename="${f.name}" data-format="${f.format}" style="padding:0.45rem 0.6rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; font-size:0.8rem; background:var(--surface, #1e293b); color:var(--text, #f8fafc); border:1px solid transparent; transition:border-color 0.15s, background 0.15s;">
+            <div class="scdaw-file-item" role="option" aria-selected="false" tabindex="0" data-filename="${f.name}" data-format="${f.format}">
               <span style="display:flex; align-items:center; gap:8px;">
                 <span aria-hidden="true">${getFileIcon(f.name)}</span>
                 <span style="font-weight:500;">${f.name}</span>
@@ -1149,12 +1234,8 @@ export class DawWorkbenchElement extends BaseElement {
             importFileList
               .querySelectorAll(".scdaw-file-item")
               .forEach((el) => {
-                el.style.borderColor = "transparent";
-                el.style.background = "var(--surface, #1e293b)";
                 el.setAttribute("aria-selected", "false");
               });
-            item.style.borderColor = "var(--accent, #38bdf8)";
-            item.style.background = "var(--bg-elevated, #334155)";
             item.setAttribute("aria-selected", "true");
             this._selectedImportFile = item.dataset.filename;
             if (importSubmitBtn) importSubmitBtn.disabled = false;
@@ -1261,22 +1342,32 @@ export class DawWorkbenchElement extends BaseElement {
     const stemsOpt = this.shadowRoot.getElementById("export-opt-stems");
     const wavOpt = this.shadowRoot.getElementById("export-opt-wav");
 
+    const openExportModal = async (preferredFormat = null) => {
+      if (exportModal && typeof exportModal.showModal === "function") {
+        const p = scdaw.getProject();
+        if (exportFilenameInput) {
+          exportFilenameInput.value = (p.name || "daw").replace(
+            /[^a-zA-Z0-9_-]/g,
+            "_",
+          );
+        }
+        if (preferredFormat && formatSelect) {
+          formatSelect.value = preferredFormat;
+          formatSelect.dispatchEvent(new Event("change"));
+        }
+        const targetGid = exportConvSelect?.value || DEFAULT_GROUP_ID;
+        await populateConversations(exportConvSelect, targetGid);
+        exportModal.showModal();
+      }
+    };
+
     this.shadowRoot
       .getElementById("export-btn")
-      ?.addEventListener("click", async () => {
-        if (exportModal && typeof exportModal.showModal === "function") {
-          const p = scdaw.getProject();
-          if (exportFilenameInput) {
-            exportFilenameInput.value = (p.name || "daw").replace(
-              /[^a-zA-Z0-9_-]/g,
-              "_",
-            );
-          }
-          const targetGid = exportConvSelect?.value || DEFAULT_GROUP_ID;
-          await populateConversations(exportConvSelect, targetGid);
-          exportModal.showModal();
-        }
-      });
+      ?.addEventListener("click", () => openExportModal());
+
+    this.shadowRoot
+      .getElementById("bounce-btn")
+      ?.addEventListener("click", () => openExportModal("wav"));
 
     formatSelect?.addEventListener("change", (e) => {
       const fmt = e.target.value;
@@ -1391,10 +1482,25 @@ export class DawWorkbenchElement extends BaseElement {
             });
           }
           exportModal?.close();
+          const browserEl = this.shadowRoot.querySelector("scdaw-browser");
+          if (
+            browserEl &&
+            typeof browserEl.loadFilesForConversation === "function"
+          ) {
+            browserEl.loadFilesForConversation(conversationId);
+          }
         } catch (err) {
           console.error("Save/Export error:", err);
+          if (submitBtn) {
+            submitBtn.textContent = "Error saving!";
+            setTimeout(() => {
+              if (submitBtn) submitBtn.textContent = "Save & Export";
+            }, 3000);
+          }
         } finally {
-          if (submitBtn) submitBtn.textContent = "Save & Export";
+          if (submitBtn && submitBtn.textContent !== "Error saving!") {
+            submitBtn.textContent = "Save & Export";
+          }
         }
       });
 
