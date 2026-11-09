@@ -55,6 +55,12 @@
   "icons": [
     {
       "purpose": "any",
+      "sizes": "any",
+      "src": "assets/icons/favicon.svg",
+      "type": "image/svg+xml"
+    },
+    {
+      "purpose": "any",
       "sizes": "48x48",
       "src": "assets/icons/48.png",
       "type": "image/png"
@@ -85,6 +91,12 @@
     },
     {
       "purpose": "any",
+      "sizes": "180x180",
+      "src": "assets/icons/180.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
       "sizes": "192x192",
       "src": "assets/icons/192.png",
       "type": "image/png"
@@ -111,16 +123,9 @@
   "screenshots": [
     {
       "form_factor": "wide",
-      "label": "shadow-claw-daw",
-      "sizes": "1920x1052",
-      "src": "assets/screenshots/shadow-claw-screenshot-1920x1052.png",
-      "type": "image/png"
-    },
-    {
-      "form_factor": "narrow",
-      "label": "shadow-claw-daw",
-      "sizes": "731x1045",
-      "src": "assets/screenshots/shadow-claw-screenshot-731x1045.png",
+      "label": "ShadowClaw DAW Studio Workbench",
+      "sizes": "1024x768",
+      "src": "assets/screenshots/scdaw-workbench-1024x768.png",
       "type": "image/png"
     }
   ]

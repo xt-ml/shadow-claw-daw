@@ -1,6 +1,6 @@
 .cache
-.lighthouseci
-dist
-build
-node_modules
 .DS_Store
+.lighthouseci
+build
+dist
+node_modules

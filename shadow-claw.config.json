@@ -12,7 +12,7 @@
     "repoUrl": "https://github.com/xt-ml/shadow-claw-daw",
     "repoLabel": "ShadowClaw DAW on GitHub",
     "faviconPath": "assets/icons/favicon.svg",
-    "appleTouchIconPath": "assets/icons/favicon.svg",
+    "appleTouchIconPath": "assets/icons/180.png",
     "notFoundPath": "404.html",
     "logoSlotHtml": "<svg class=\"header-title-logo\" viewBox=\"0 0 32 32\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"32\" height=\"32\" rx=\"8\" fill=\"#1a2121\" stroke=\"#3f4849\" stroke-width=\"1.5\"/><circle cx=\"16\" cy=\"16\" r=\"9\" stroke=\"#80d4db\" stroke-width=\"1.2\" stroke-dasharray=\"2 2\" opacity=\"0.6\"/><path d=\"M10 20V12M14 24V8M18 22V10M22 18V14\" stroke=\"#9df0f8\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>"
   },
