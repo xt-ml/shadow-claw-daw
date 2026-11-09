@@ -223,12 +223,31 @@ test("Iconography & PWA Manifest: all icons and screenshots are template-specifi
   assert.notEqual(manifest.id, "shadow-claw");
   const iconSrcs = (manifest.icons || []).map((i) => i.src);
   assert.ok(
-    iconSrcs.includes("assets/icons/favicon.svg"),
-    "manifest.icons must include assets/icons/favicon.svg",
+    !iconSrcs.includes("assets/icons/favicon.svg"),
+    "manifest.icons must not include SVG favicon (avoids Chrome DevTools image decode failure)",
   );
   assert.ok(
     iconSrcs.includes("assets/icons/180.png"),
     "manifest.icons must include assets/icons/180.png",
+  );
+  assert.ok(
+    iconSrcs.includes("assets/icons/192.png"),
+    "manifest.icons must include assets/icons/192.png",
+  );
+  assert.ok(
+    iconSrcs.includes("assets/icons/512.png"),
+    "manifest.icons must include assets/icons/512.png",
+  );
+
+  // Screenshots: must include both wide (desktop) and narrow (mobile) for Richer PWA Install UI
+  const screenshots = manifest.screenshots || [];
+  assert.ok(
+    screenshots.some((s) => s.form_factor === "wide"),
+    "manifest.screenshots must include a wide screenshot for desktop Richer PWA Install UI",
+  );
+  assert.ok(
+    screenshots.some((s) => s.form_factor === "narrow" || !s.form_factor),
+    "manifest.screenshots must include a narrow/mobile screenshot for mobile Richer PWA Install UI",
   );
 
   const faviconSvgContent = readFileSync(
