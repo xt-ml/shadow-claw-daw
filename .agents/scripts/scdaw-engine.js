@@ -37,6 +37,7 @@ import {
   listConversationFiles,
   DEFAULT_GROUP_ID,
 } from "./scdaw-fs.js";
+import { AudioRecorder } from "./scdaw-recorder.js";
 
 export class DawEngine extends EventTarget {
   constructor(options = {}) {
@@ -45,7 +46,9 @@ export class DawEngine extends EventTarget {
     this.history = createHistory(50);
 
     const initialProject =
-      this._restoreSavedProject() || createProject("basic-beat");
+      this.options.project ||
+      this._restoreSavedProject() ||
+      createProject("basic-beat");
     const initialTrackId = initialProject.tracks[0]?.id || null;
 
     this.project = new State(initialProject);
@@ -73,6 +76,8 @@ export class DawEngine extends EventTarget {
     this._lastScheduleAudioTime = 0;
     this._activeVoices = new Set();
     this._sampleCache = new Map();
+    this._recorder = null;
+    this._recording = false;
 
     this._initAudioContext();
     this._initSchedulerClock();
@@ -494,6 +499,26 @@ export class DawEngine extends EventTarget {
         }
       }
 
+      // Schedule Metronome Clicks if enabled
+      if (p.metronome && p.metronome.enabled) {
+        const sigBeats = (p.signature && p.signature[0]) || 4;
+        const startBeat = Math.ceil(fromPpqn / PPQN.Quarter);
+        const endBeat = Math.floor(toPpqn / PPQN.Quarter);
+        for (let b = startBeat; b <= endBeat; b++) {
+          const beatPulse = (b * PPQN.Quarter) % totalPulses;
+          const deltaBeat =
+            (beatPulse - (fromPpqn % totalPulses) + totalPulses) % totalPulses;
+          if (deltaBeat < lookaheadPulses) {
+            const beatTime = Math.max(
+              nowAudio,
+              nowAudio + pulsesToSeconds(deltaBeat, bpm),
+            );
+            const isAccent = b % sigBeats === 0;
+            this._scheduleMetronomeClick(beatTime, isAccent);
+          }
+        }
+      }
+
       // Continuous parameter automation ramping (volume & pan)
       for (const track of p.tracks) {
         const nodes = this.graph.tracks.get(track.id);
@@ -541,6 +566,24 @@ export class DawEngine extends EventTarget {
       beat,
       step,
     });
+  }
+
+  _scheduleMetronomeClick(when, isAccent) {
+    if (!this.ctx || !this.graph || !this.graph.master) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const p = this.project.get();
+      const metroVol = (p.metronome?.volume ?? 0.8) * 0.4;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(isAccent ? 800 : 500, when);
+      gain.gain.setValueAtTime(isAccent ? metroVol * 1.2 : metroVol, when);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+      osc.connect(gain);
+      gain.connect(this.graph.master);
+      osc.start(when);
+      osc.stop(when + 0.05);
+    } catch (_) {}
   }
 
   getLevels() {
@@ -1459,6 +1502,13 @@ export class DawEngine extends EventTarget {
       }
       return this.importProjectFile(params.content || params.data, params);
     }
+    if (name === "import_audio") {
+      return await this.importAudioFile(
+        params.trackId,
+        params.buffer || params.data || params.file,
+        params,
+      );
+    }
     if (name === "undo") {
       const prev = this.history.undo();
       if (!prev) return { ok: false, message: "Nothing to undo" };
@@ -1526,6 +1576,184 @@ export class DawEngine extends EventTarget {
 
   async newProject(options = {}) {
     return await this.sendCommand("new_project", options);
+  }
+
+  hasSample(name) {
+    return this._sampleCache.has(name);
+  }
+
+  getSample(name) {
+    return this._sampleCache.get(name);
+  }
+
+  async loadSample(name, bufferOrAudioBuffer) {
+    if (!name) throw new Error("Sample name is required");
+    let audioBuffer;
+    if (
+      bufferOrAudioBuffer &&
+      typeof bufferOrAudioBuffer.getChannelData === "function"
+    ) {
+      audioBuffer = bufferOrAudioBuffer;
+    } else if (
+      bufferOrAudioBuffer instanceof ArrayBuffer ||
+      ArrayBuffer.isView(bufferOrAudioBuffer)
+    ) {
+      const arrayBuf =
+        bufferOrAudioBuffer instanceof ArrayBuffer
+          ? bufferOrAudioBuffer
+          : bufferOrAudioBuffer.buffer.slice(
+              bufferOrAudioBuffer.byteOffset,
+              bufferOrAudioBuffer.byteOffset + bufferOrAudioBuffer.byteLength,
+            );
+      if (this.ctx && typeof this.ctx.decodeAudioData === "function") {
+        audioBuffer = await this.ctx.decodeAudioData(arrayBuf);
+      } else {
+        const pcm = new Float32Array(44100);
+        audioBuffer = {
+          numberOfChannels: 1,
+          length: pcm.length,
+          sampleRate: 44100,
+          duration: 1.0,
+          getChannelData: () => pcm,
+        };
+      }
+    } else {
+      throw new Error("Invalid buffer provided to loadSample");
+    }
+
+    this._sampleCache.set(name, audioBuffer);
+    const durationSec =
+      audioBuffer.duration ||
+      audioBuffer.length / (audioBuffer.sampleRate || 44100);
+    return {
+      name,
+      durationSec,
+      sampleRate: audioBuffer.sampleRate || 44100,
+      numberOfChannels: audioBuffer.numberOfChannels || 1,
+    };
+  }
+
+  async importAudioFile(trackId, fileOrBuffer, { name, time = 0 } = {}) {
+    let rawBuffer;
+    let fileName = name;
+    if (typeof File !== "undefined" && fileOrBuffer instanceof File) {
+      fileName = fileName || fileOrBuffer.name;
+      rawBuffer = await fileOrBuffer.arrayBuffer();
+    } else if (
+      fileOrBuffer instanceof ArrayBuffer ||
+      ArrayBuffer.isView(fileOrBuffer)
+    ) {
+      rawBuffer = fileOrBuffer;
+      fileName = fileName || `sample_${Date.now().toString(36)}`;
+    } else {
+      throw new Error("Invalid audio file or buffer");
+    }
+
+    const sampleKey = `sample_${Date.now().toString(36)}_${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const info = await this.loadSample(sampleKey, rawBuffer);
+
+    // Convert seconds to beats based on project bpm
+    const bpm = this.project.get().bpm || 120;
+    const durationBeats = Math.max(
+      0.5,
+      Number(((info.durationSec * bpm) / 60).toFixed(2)),
+    );
+
+    // Send add_audio_clip command
+    const res = await this.sendCommand("add_audio_clip", {
+      trackId,
+      clip: {
+        name: fileName,
+        sample: sampleKey,
+        time: Number(time),
+        duration: durationBeats,
+        offset: 0,
+        gain: 1.0,
+      },
+    });
+
+    return {
+      ok: true,
+      trackId,
+      clipId: res.clipId,
+      clip: res.clip,
+      sampleInfo: info,
+    };
+  }
+
+  async startRecording(trackId = null, { stream = null } = {}) {
+    if (this._recording) throw new Error("Already recording");
+    const p = this.project.get();
+    let targetTrack = null;
+    if (trackId) {
+      targetTrack = p.tracks.find((t) => t.id === trackId);
+    } else {
+      targetTrack = p.tracks.find((t) => t.recordArm && t.kind === "audio");
+    }
+    if (!targetTrack) {
+      targetTrack = p.tracks.find((t) => t.kind === "audio");
+      if (!targetTrack) {
+        const addRes = await this.sendCommand("add_track", {
+          kind: "audio",
+          name: "Audio 1",
+        });
+        targetTrack = this.project
+          .get()
+          .tracks.find((t) => t.id === addRes.trackId);
+      }
+    }
+
+    await this.sendCommand("set_track_record_arm", {
+      trackId: targetTrack.id,
+      armed: true,
+    });
+
+    this._recorder = new AudioRecorder({ audioContext: this.ctx });
+    await this._recorder.start(stream);
+    this._recording = true;
+    this._recordingTrackId = targetTrack.id;
+    this._recordingStartBeat = Math.floor(
+      (this.state.get().positionPpqn || 0) / PPQN.Quarter,
+    );
+
+    if (!this.state.get().playing) {
+      await this.play();
+    }
+
+    this._updateState({ recording: true });
+    return { ok: true, trackId: targetTrack.id };
+  }
+
+  async stopRecording() {
+    if (!this._recording || !this._recorder) {
+      return { ok: false, message: "Not recording" };
+    }
+
+    this._recording = false;
+    const trackId = this._recordingTrackId;
+    const startBeat = this._recordingStartBeat || 0;
+    const recResult = await this._recorder.stop();
+    this._recorder = null;
+    this._updateState({ recording: false });
+
+    if (this.state.get().playing) {
+      await this.stop();
+    }
+
+    let clipResult = null;
+    if (trackId && recResult.buffer && recResult.buffer.byteLength > 44) {
+      clipResult = await this.importAudioFile(trackId, recResult.buffer, {
+        name: `Take ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`,
+        time: startBeat,
+      });
+    }
+
+    return {
+      ok: true,
+      trackId,
+      clipResult,
+      recResult,
+    };
   }
 }
 

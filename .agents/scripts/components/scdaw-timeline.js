@@ -10,6 +10,7 @@ import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { PPQN } from "../scdaw.js";
+import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -459,14 +460,34 @@ export class DawTimelineElement extends BaseElement {
                               ((clip.duration || 4) / totalBeats) * 100,
                             ),
                           );
+
+                          let waveformSvg = "";
+                          const sampleBuf = scdaw.getSample?.(clip.sample);
+                          if (sampleBuf) {
+                            const peaks = computeWaveformPeaks(sampleBuf, 24);
+                            const pathPoints = peaks
+                              .map((p, idx) => {
+                                const x = (idx / (peaks.length - 1 || 1)) * 100;
+                                const h = p * 40;
+                                return `M ${x.toFixed(1)},${(50 - h).toFixed(1)} L ${x.toFixed(1)},${(50 + h).toFixed(1)}`;
+                              })
+                              .join(" ");
+                            waveformSvg = `
+                              <svg class="scdaw-timeline__clip-waveform" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; inset:0; width:100%; height:100%; opacity:0.35; pointer-events:none;">
+                                <path d="${pathPoints}" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />
+                              </svg>
+                            `;
+                          }
+
                           return `
                             <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}"
-                                 style="left:${leftPct}%; width:${widthPct}%;"
+                                 style="left:${leftPct}%; width:${widthPct}%; position:absolute;"
                                  role="button"
                                  tabindex="0"
                                  aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats">
-                              <span style="margin-right:4px;" aria-hidden="true">🎙</span>
-                              <span>${clip.name}</span>
+                              ${waveformSvg}
+                              <span style="margin-right:4px; z-index:1;" aria-hidden="true">🎙</span>
+                              <span style="z-index:1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${clip.name}</span>
                             </div>
                           `;
                         })
@@ -491,6 +512,14 @@ export class DawTimelineElement extends BaseElement {
                   <div class="scdaw-timeline__track-header track-header">
                     <div class="scdaw-timeline__track-name track-name" title="${t.name}">${icon} ${t.name}</div>
                     <div style="display:flex; gap:4px; align-items:center;">
+                      ${
+                        t.kind === "audio"
+                          ? `
+                        <button type="button" class="btn btn-icon ${t.recordArm ? "btn-danger" : ""} record-arm-btn" data-track="${t.id}" aria-label="${t.recordArm ? `Disarm recording for ${t.name}` : `Arm recording for ${t.name}`}" aria-pressed="${Boolean(t.recordArm)}" title="${t.recordArm ? "Disarm recording" : "Record arm"}">● R</button>
+                        <button type="button" class="btn btn-icon import-audio-btn" data-track="${t.id}" aria-label="Import audio file into ${t.name}" title="Import WAV or Audio File">📂</button>
+                      `
+                          : ""
+                      }
                       <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
                       <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
                       <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
@@ -560,6 +589,41 @@ export class DawTimelineElement extends BaseElement {
       ?.addEventListener("click", () => {
         scdaw.sendCommand("add_track", { kind: "audio", name: "Audio Track" });
       });
+
+    // Record Arm & Import Audio
+    this.shadowRoot.querySelectorAll(".record-arm-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
+        const id = btn.dataset.track;
+        const currentProj = scdaw.getProject();
+        const t = currentProj.tracks.find((x) => x.id === id);
+        if (t) {
+          scdaw.sendCommand("set_track_record_arm", {
+            trackId: id,
+            armed: !t.recordArm,
+          });
+        }
+      });
+    });
+
+    this.shadowRoot.querySelectorAll(".import-audio-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
+        const id = btn.dataset.track;
+        if (typeof document !== "undefined") {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = "audio/*,.wav,.wave,.mp3,.ogg";
+          input.onchange = async () => {
+            const file = input.files?.[0];
+            if (file) {
+              await scdaw.importAudioFile(id, file);
+            }
+          };
+          input.click();
+        }
+      });
+    });
 
     // Mute & Solo
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((btn) => {

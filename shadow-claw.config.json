@@ -125,6 +125,8 @@
     "scdaw_clear_automation",
     "scdaw_add_audio_clip",
     "scdaw_set_audio_clip",
-    "scdaw_set_track_send"
+    "scdaw_set_track_send",
+    "scdaw_record_arm",
+    "scdaw_set_metronome"
   ]
 }

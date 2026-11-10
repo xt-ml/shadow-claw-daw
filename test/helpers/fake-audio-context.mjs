@@ -157,6 +157,31 @@ export class FakeAudioContext extends EventTarget {
   createBufferSource() {
     return new FakeAudioBufferSourceNode(this);
   }
+  createMediaStreamSource(stream) {
+    const node = new FakeAudioNode(this);
+    node.mediaStream = stream;
+    return node;
+  }
+  async decodeAudioData(arrayBuffer) {
+    let length = Math.round(this.sampleRate * 1.0);
+    let channels = 2;
+    let sampleRate = this.sampleRate;
+    if (arrayBuffer && arrayBuffer.byteLength >= 44) {
+      const view = new DataView(arrayBuffer);
+      const ch = view.getUint16(22, true);
+      const sr = view.getUint32(24, true);
+      const bps = view.getUint16(34, true);
+      const dataBytes = arrayBuffer.byteLength - 44;
+      if (ch > 0 && sr > 0 && bps > 0) {
+        channels = ch;
+        sampleRate = sr;
+        length = Math.floor(dataBytes / (ch * (bps / 8)));
+      }
+    }
+    const buf = this.createBuffer(channels, Math.max(1, length), sampleRate);
+    buf.duration = length / sampleRate;
+    return buf;
+  }
   createBuffer(channels, length, sampleRate) {
     return {
       numberOfChannels: channels,

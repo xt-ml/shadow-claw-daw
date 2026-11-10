@@ -268,6 +268,14 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("set_track_send", params);
     }
 
+    case "scdaw_record_arm": {
+      return await scdaw.sendCommand("set_track_record_arm", params);
+    }
+
+    case "scdaw_set_metronome": {
+      return await scdaw.sendCommand("set_metronome", params);
+    }
+
     case "scdaw_render_surface": {
       const el = params.element || "workbench";
       const tagMap = {

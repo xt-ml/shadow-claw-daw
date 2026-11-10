@@ -244,6 +244,9 @@ export function migrateProject(project) {
     comment: "Created with ShadowClaw DAW",
     ...(next.meta || {}),
   };
+  if (!next.metronome || typeof next.metronome !== "object") {
+    next.metronome = { enabled: false, volume: 0.8 };
+  }
   if (!next.master) next.master = { volume: 0.8 };
   if (!Array.isArray(next.tracks)) next.tracks = [];
 
@@ -270,6 +273,7 @@ export function migrateProject(project) {
     if (!track.automation || typeof track.automation !== "object") {
       track.automation = {};
     }
+    if (track.recordArm === undefined) track.recordArm = false;
     if (track.volume === undefined) track.volume = 0.8;
     if (track.pan === undefined) track.pan = 0.0;
     if (track.mute === undefined) track.mute = false;

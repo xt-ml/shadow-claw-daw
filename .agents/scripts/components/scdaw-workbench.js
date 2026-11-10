@@ -1597,12 +1597,26 @@ export class DawWorkbenchElement extends BaseElement {
             await scdaw.importMidi(buffer, { trackId: dropAction.trackId });
           } else if (dropAction.action === "import_track_audio") {
             const p = scdaw.getProject();
-            const target = p.tracks.find((t) => t.id === dropAction.trackId);
+            let target = dropAction.trackId
+              ? p.tracks.find((t) => t.id === dropAction.trackId)
+              : null;
+            if (!target) {
+              const baseName =
+                (file.name || "Audio").replace(/\.[^/.]+$/, "") || "Audio";
+              const addRes = await scdaw.sendCommand("add_track", {
+                kind: "audio",
+                name: baseName,
+              });
+              target = scdaw
+                .getProject()
+                .tracks.find((t) => t.id === addRes.trackId);
+            }
             if (target) {
-              target.sample = file.name;
-              await scdaw.sendCommand("set_track", {
-                trackId: target.id,
-                sample: file.name,
+              const curPos = scdaw.getState().positionPpqn || 0;
+              const curBeat = Math.floor(curPos / 480);
+              await scdaw.importAudioFile(target.id, file, {
+                name: file.name,
+                time: curBeat,
               });
             }
           } else if (dropAction.action === "add_fx") {

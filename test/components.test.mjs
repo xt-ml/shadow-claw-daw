@@ -1347,6 +1347,8 @@ test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degrada
     transportContent,
     /class=["'][^"']*scdaw-transport__group--playback/,
   );
+  assert.match(transportContent, /class=["'][^"']*scdaw-transport__btn--rec/);
+  assert.match(transportContent, /class=["'][^"']*scdaw-transport__btn--metro/);
   assert.match(
     transportContent,
     /class=["'][^"']*scdaw-transport__group--tempo/,
@@ -1788,6 +1790,16 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
   assert.match(
     timeline.shadowRoot.innerHTML,
     /class="[^"]*scdaw-timeline__clip--audio[^"]*"[^>]*role="button"[^>]*aria-label="Audio clip Vocal Chorus/,
+  );
+
+  // Verify Record Arm and Import buttons on audio track header
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*record-arm-btn[^"]*"[^>]*aria-label="Arm recording for Lead Vocal"[^>]*aria-pressed="false"/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*import-audio-btn[^"]*"[^>]*aria-label="Import audio file into Lead Vocal"/,
   );
 
   // Toggle automation lane

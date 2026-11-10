@@ -227,6 +227,7 @@ export class DawTransportElement extends BaseElement {
     const s = scdaw.getState();
 
     const playBtn = this.shadowRoot.getElementById("play-btn");
+    const recBtn = this.shadowRoot.getElementById("rec-btn");
     const posBadge = this.shadowRoot.getElementById("pos-badge");
     const audioBtn = this.shadowRoot.getElementById("audio-btn");
 
@@ -236,6 +237,15 @@ export class DawTransportElement extends BaseElement {
       playBtn.setAttribute(
         "aria-label",
         s.playing ? "Stop playback" : "Start playback",
+      );
+    }
+    if (recBtn) {
+      recBtn.textContent = s.recording ? "⏹ Stop REC" : "● REC";
+      recBtn.classList.toggle("btn-danger", Boolean(s.recording));
+      recBtn.setAttribute("aria-pressed", String(Boolean(s.recording)));
+      recBtn.setAttribute(
+        "aria-label",
+        s.recording ? "Stop recording" : "Record audio",
       );
     }
     if (posBadge) {
@@ -263,6 +273,12 @@ export class DawTransportElement extends BaseElement {
     }
     if (lengthBadge) {
       lengthBadge.textContent = `${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})`;
+    }
+    const metroBtn = this.shadowRoot.getElementById("metro-btn");
+    if (metroBtn) {
+      const metroOn = Boolean(p.metronome?.enabled);
+      metroBtn.classList.toggle("btn-primary", metroOn);
+      metroBtn.setAttribute("aria-pressed", String(metroOn));
     }
   }
 
@@ -316,6 +332,20 @@ export class DawTransportElement extends BaseElement {
         }
 
         .scdaw-transport__btn--play {
+          flex: 1 1 auto;
+          min-width: 75px;
+          justify-content: center;
+          min-height: 32px;
+        }
+
+        .scdaw-transport__btn--rec {
+          flex: 1 1 auto;
+          min-width: 80px;
+          justify-content: center;
+          min-height: 32px;
+        }
+
+        .scdaw-transport__btn--metro {
           flex: 1 1 auto;
           min-width: 75px;
           justify-content: center;
@@ -463,6 +493,8 @@ export class DawTransportElement extends BaseElement {
             flex-wrap: wrap;
           }
           .scdaw-transport__btn--play,
+          .scdaw-transport__btn--rec,
+          .scdaw-transport__btn--metro,
           .scdaw-transport__btn--audio,
           .scdaw-transport__pos {
             flex: 0 0 auto;
@@ -504,6 +536,12 @@ export class DawTransportElement extends BaseElement {
           <button id="play-btn" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Stop playback" : "Start playback"}">
             ${s.playing ? "⏸ Stop" : "▶ Play"}
           </button>
+          <button id="rec-btn" class="scdaw-transport__btn scdaw-transport__btn--rec btn ${s.recording ? "btn-danger" : ""}" aria-label="${s.recording ? "Stop recording" : "Record audio"}" aria-pressed="${Boolean(s.recording)}">
+            ${s.recording ? "⏹ Stop REC" : "● REC"}
+          </button>
+          <button id="metro-btn" class="scdaw-transport__btn scdaw-transport__btn--metro btn ${p.metronome?.enabled ? "btn-primary" : ""}" aria-label="Toggle Metronome" aria-pressed="${Boolean(p.metronome?.enabled)}" title="Metronome click track">
+            🔔 Metro
+          </button>
           <button id="audio-btn" class="scdaw-transport__btn scdaw-transport__btn--audio btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}" aria-label="Start Audio Processing Engine">
             🔊 Start Audio
           </button>
@@ -543,6 +581,33 @@ export class DawTransportElement extends BaseElement {
         const state = scdaw.getState();
         if (state.playing) scdaw.stop();
         else scdaw.play();
+      });
+
+    this.shadowRoot
+      .getElementById("rec-btn")
+      ?.addEventListener("click", async () => {
+        const state = scdaw.getState();
+        if (state.recording) {
+          await scdaw.stopRecording();
+        } else {
+          try {
+            await scdaw.startRecording();
+          } catch (err) {
+            console.error("Recording error:", err);
+            scdaw.requestDialog?.({
+              title: "Recording Error",
+              body: err.message || "Failed to start audio recording",
+            });
+          }
+        }
+      });
+
+    this.shadowRoot
+      .getElementById("metro-btn")
+      ?.addEventListener("click", () => {
+        const currentP = scdaw.getProject();
+        const nextEnabled = !currentP.metronome?.enabled;
+        scdaw.sendCommand("set_metronome", { enabled: nextEnabled });
       });
 
     this.shadowRoot

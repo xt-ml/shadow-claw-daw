@@ -216,7 +216,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+          "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
         }
       ]
     },
@@ -252,7 +252,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+          "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
         }
       ]
     },
@@ -278,7 +278,58 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+          "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
+        }
+      ]
+    },
+    {
+      "name": "scdaw-record",
+      "type": "skill-md",
+      "description": "Manage audio recording arms, configure metronome click tracks, and record live microphone/line-in audio takes.",
+      "url": "../../.agents/skills/scdaw-record/SKILL.md",
+      "digest": "sha256:ce1f9eb813883cb278c90d4144a195242745232e55d7c8f6311497a3b33f5921",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_play",
+          "url": "../../.agents/tools/scdaw_play.json",
+          "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+        },
+        {
+          "name": "scdaw_record_arm",
+          "url": "../../.agents/tools/scdaw_record_arm.json",
+          "digest": "sha256:e74345a714ab70962abe57b127b4f6e6159e50436f1edff56508f76765d7e9bd"
+        },
+        {
+          "name": "scdaw_set_metronome",
+          "url": "../../.agents/tools/scdaw_set_metronome.json",
+          "digest": "sha256:3751c751f234313c0527cf547422453f97c5557df9aebac653afc6db0cbe6cef"
+        },
+        {
+          "name": "scdaw_stop",
+          "url": "../../.agents/tools/scdaw_stop.json",
+          "digest": "sha256:382a85abab961ab9ce9cc7e5b6b764dce35c429d5f52c604699d539801ef4196"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "scdaw-recorder",
+          "url": "../../.agents/scripts/scdaw-recorder.js",
+          "digest": "sha256:54fc25d5aed238857b0a7fb587a29405b4d8f7960f13d994e326d3b64817140a"
+        },
+        {
+          "name": "scdaw",
+          "url": "../../.agents/scripts/scdaw.js",
+          "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
         }
       ]
     },
@@ -309,7 +360,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+          "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
         }
       ]
     },
@@ -463,6 +514,12 @@
       "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
     },
     {
+      "name": "scdaw_record_arm",
+      "description": "Arm or disarm an audio track for live recording.",
+      "url": "../../.agents/tools/scdaw_record_arm.json",
+      "digest": "sha256:e74345a714ab70962abe57b127b4f6e6159e50436f1edff56508f76765d7e9bd"
+    },
+    {
       "name": "scdaw_remove_track",
       "description": "Remove an existing track from the project by track ID.",
       "url": "../../.agents/tools/scdaw_remove_track.json",
@@ -491,6 +548,12 @@
       "description": "Set or update continuous parameter automation points (time in beats, value) for a track parameter such as 'volume', 'pan', or 'cutoff'.",
       "url": "../../.agents/tools/scdaw_set_automation.json",
       "digest": "sha256:c8c04211195cbf8079b6a02f43ce176b80810223158da87d4eb35504a3fb0a4a"
+    },
+    {
+      "name": "scdaw_set_metronome",
+      "description": "Toggle the metronome click track and configure click volume.",
+      "url": "../../.agents/tools/scdaw_set_metronome.json",
+      "digest": "sha256:3751c751f234313c0527cf547422453f97c5557df9aebac653afc6db0cbe6cef"
     },
     {
       "name": "scdaw_set_track",
@@ -588,25 +651,25 @@
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:0562a8e8e5742467c945ba2306e3c260cac4f3b3e9933a03beb399ede7ecbc78"
+      "digest": "sha256:7073522318666799423287ab8d21d6a3ac4ee49d213acd798b68d44c757dd5d2"
     },
     {
       "name": "scdaw-transport",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
       "url": "../../.agents/scripts/components/scdaw-transport.js",
-      "digest": "sha256:45e5ce8af9839b6332a636595fef54602d91a62f14f6d50686ae89469da55243"
+      "digest": "sha256:7554a22a1746c14525dbdf5cbde882f416fb692f07310fbf9fdf2add86f57f04"
     },
     {
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:12046757e069c14e5d384332f2b9f26be6d93582bd4842ee8a5f04f1cb6b0939"
+      "digest": "sha256:e062c0f088a182f2c7c3d38f9cddef124c16f853039e3a82c40e1de92bf02e98"
     },
     {
       "name": "scdaw-adapter",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
       "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:a0a54a38fee6c8c10771a722795bfe056a07bd51c458b8036c1ea1c9870a77ee"
+      "digest": "sha256:8ba8f984c6ddc2042f84511c4075f7ac0772d6749b80ddf97e0967847bdd1e03"
     },
     {
       "name": "scdaw-dawproject",
@@ -630,7 +693,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:c397360abdb05c18682137b27481a7f41d339bf3a61e3aeda6511feaf279b843"
+      "digest": "sha256:1e8e996dd29485d1c05dee088618ded2273fea564e4b849a5ce99b492db05b07"
     },
     {
       "name": "scdaw-fs",
@@ -657,10 +720,16 @@
       "digest": "sha256:901b8f902c7cbe91346e1e6c7310ad3732bc5dd278b44ec50654120ed6c9d4b1"
     },
     {
+      "name": "scdaw-recorder",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-recorder.",
+      "url": "../../.agents/scripts/scdaw-recorder.js",
+      "digest": "sha256:54fc25d5aed238857b0a7fb587a29405b4d8f7960f13d994e326d3b64817140a"
+    },
+    {
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:d332d61854435be056f85b9674ed7ab2f22955dcb8e228500ddc5c3250262412"
+      "digest": "sha256:cb1ef8ee0c6dd2beeb0049ed5a71894104481c75e45e88e63e48368c48c6122b"
     },
     {
       "name": "scdaw-signals",
@@ -678,7 +747,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+      "digest": "sha256:e288c98ccc5a4370423020c4b5c2d242061d65a362a857d140f4873e83f3ab59"
     },
     {
       "name": "starter-tools",
@@ -715,11 +784,13 @@
       "../../.agents/tools/scdaw_new_project.json",
       "../../.agents/tools/scdaw_panic.json",
       "../../.agents/tools/scdaw_play.json",
+      "../../.agents/tools/scdaw_record_arm.json",
       "../../.agents/tools/scdaw_remove_track.json",
       "../../.agents/tools/scdaw_render_surface.json",
       "../../.agents/tools/scdaw_reset.json",
       "../../.agents/tools/scdaw_set_audio_clip.json",
       "../../.agents/tools/scdaw_set_automation.json",
+      "../../.agents/tools/scdaw_set_metronome.json",
       "../../.agents/tools/scdaw_set_track.json",
       "../../.agents/tools/scdaw_set_track_send.json",
       "../../.agents/tools/scdaw_set_transport.json",
@@ -749,6 +820,7 @@
       "../../.agents/scripts/scdaw-instruments.js",
       "../../.agents/scripts/scdaw-midi.js",
       "../../.agents/scripts/scdaw-presets.js",
+      "../../.agents/scripts/scdaw-recorder.js",
       "../../.agents/scripts/scdaw-schema.js",
       "../../.agents/scripts/scdaw-signals.js",
       "../../.agents/scripts/scdaw-zip.js",

@@ -7,9 +7,9 @@ An in-browser digital audio workstation (DAW) template powered by **ShadowClaw**
 ## Overview
 
 - **Zero Runtime Dependencies**: 100% native Web Audio API, Web Components, and Vanilla JavaScript.
-- **Agent Controllable**: 30 declarative `scdaw_*` WebMCP tools allowing AI assistants to compose beats, arrange audio tracks and clips, automate parameters, configure sends, patch synthesizers, manage MIDI & Audio FX chains, mix channels, inspect telemetry, exchange DAWproject / MIDI sessions, and bounce audio.
+- **Agent Controllable**: 32 declarative `scdaw_*` WebMCP tools allowing AI assistants to compose beats, arrange audio tracks and clips, arm recording, toggle metronomes, automate parameters, configure sends, patch synthesizers, manage MIDI & Audio FX chains, mix channels, inspect telemetry, exchange DAWproject / MIDI sessions, and bounce audio.
 - **Reactive UI & Mobile-First Workbench**: 11 modular Custom Elements (`<scdaw-workbench>`, `<scdaw-transport>`, `<scdaw-browser>`, `<scdaw-timeline>`, `<scdaw-editor>`, `<scdaw-sequencer>`, `<scdaw-devices>`, `<scdaw-mixer>`, `<scdaw-knob>`, `<scdaw-resize-handle>`, `<scdaw-statusbar>`) synchronized via microtask-batched Signals, designed mobile-first with CSS Container Queries, BEM conventions, and WCAG 2.1 AA ARIA compliance.
-- **Autonomous Skills**: Agent routines including `/beat`, `/jam`, `/mixdown`, `/bounce`, `/scdaw-status`, `/scdaw-doctor`, `/scdaw-automate`, and `/scdaw-audio-clip`.
+- **Autonomous Skills**: Agent routines including `/beat`, `/jam`, `/mixdown`, `/bounce`, `/scdaw-status`, `/scdaw-doctor`, `/scdaw-automate`, `/scdaw-audio-clip`, and `/scdaw-record`.
 - **Storage, Interchange & Offline Bounce**: High-speed offline 16/24/32-bit WAV rendering (`OfflineAudioContext`), multi-tap stem ZIP exports, SMF MIDI (`.mid`), and DAWproject v1.0 (`.dawproject`) interchange with direct OPFS conversation file persistence and browser downloads.
 
 ## Commands

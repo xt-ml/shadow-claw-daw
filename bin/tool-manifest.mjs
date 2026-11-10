@@ -1,7 +1,7 @@
 /**
  * bin/tool-manifest.mjs
  *
- * Single source of truth for all 30 declarative scdaw_* tools.
+ * Single source of truth for all 32 declarative scdaw_* tools.
  * Generates .agents/tools/scdaw_*.json via bin/generate-tools.mjs.
  */
 
@@ -1060,6 +1060,57 @@ export const TOOLS = [
     execution: {
       type: "javascript",
       code: makeBroadcastCode("scdaw_set_track_send"),
+    },
+  },
+  {
+    name: "scdaw_record_arm",
+    description: "Arm or disarm an audio track for live recording.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        armed: {
+          type: "boolean",
+          description: "Whether track is armed for recording",
+        },
+      },
+      required: ["trackId", "armed"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_record_arm"),
+    },
+  },
+  {
+    name: "scdaw_set_metronome",
+    description: "Toggle the metronome click track and configure click volume.",
+    input_schema: {
+      type: "object",
+      properties: {
+        enabled: {
+          type: "boolean",
+          description: "Enable or disable audible metronome",
+        },
+        volume: {
+          type: "number",
+          description: "Metronome volume multiplier (0.0 to 1.0)",
+        },
+      },
+      required: ["enabled"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_metronome"),
     },
   },
 ];

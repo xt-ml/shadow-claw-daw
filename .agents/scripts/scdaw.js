@@ -156,6 +156,9 @@ export function createProject(template = "basic-beat") {
           ? template.lengthBars
           : base.lengthBars,
       swing: typeof template.swing === "number" ? template.swing : base.swing,
+      metronome: template.metronome
+        ? { ...base.metronome, ...template.metronome }
+        : base.metronome || { enabled: false, volume: 0.8 },
       master: template.master
         ? { ...base.master, ...template.master }
         : base.master,
@@ -171,6 +174,7 @@ export function createProject(template = "basic-beat") {
       signature: [4, 4],
       lengthBars: 1,
       swing: 0,
+      metronome: { enabled: false, volume: 0.8 },
       master: { volume: 0.8 },
       tracks: [],
     };
@@ -184,6 +188,7 @@ export function createProject(template = "basic-beat") {
       signature: [4, 4],
       lengthBars: 1,
       swing: 0,
+      metronome: { enabled: false, volume: 0.8 },
       master: { volume: 0.8 },
       tracks: [
         {
@@ -255,6 +260,7 @@ export function createProject(template = "basic-beat") {
     signature: [4, 4],
     lengthBars: 1,
     swing: 0.2,
+    metronome: { enabled: false, volume: 0.8 },
     master: { volume: 0.8 },
     tracks: [
       {
@@ -1083,6 +1089,35 @@ export function applyCommand(project, name, params = {}) {
           trackId: track.id,
           targetTrackId: params.targetTrackId,
         },
+      };
+    }
+
+    case "set_track_record_arm": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.recordArm = Boolean(params.armed);
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, armed: track.recordArm },
+      };
+    }
+
+    case "set_metronome": {
+      if (!next.metronome || typeof next.metronome !== "object") {
+        next.metronome = { enabled: false, volume: 0.8 };
+      }
+      if (params.enabled !== undefined) {
+        next.metronome.enabled = Boolean(params.enabled);
+      }
+      if (params.volume !== undefined) {
+        next.metronome.volume = Math.max(
+          0,
+          Math.min(1.0, Number(params.volume)),
+        );
+      }
+      return {
+        project: next,
+        result: { ok: true, metronome: next.metronome },
       };
     }
 

@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const TOOLS_DIR = resolve(ROOT, ".agents/tools");
 
-test("Tools: all 30 tools defined in manifest exist on disk and match schema", () => {
-  assert.equal(TOOLS.length, 30);
+test("Tools: all 32 tools defined in manifest exist on disk and match schema", () => {
+  assert.equal(TOOLS.length, 32);
 
   for (const tool of TOOLS) {
     const filePath = resolve(TOOLS_DIR, `${tool.name}.json`);
