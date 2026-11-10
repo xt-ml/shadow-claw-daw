@@ -651,7 +651,7 @@
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:b1a6d4ae2cad69d62a838d54dff39e26a8f5343b495c5c4bcba0b02435c6c21b"
+      "digest": "sha256:98c07f354a09eab3615b3a8f694a9b43da50d20136c9ca4310d211e827d1db04"
     },
     {
       "name": "scdaw-transport",

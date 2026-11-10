@@ -87,6 +87,465 @@ export function computeClipOverlapLayout(clips = []) {
   }));
 }
 
+/**
+ * Calculates new beat position when dragging an audio clip horizontally.
+ *
+ * @param {Object} options
+ * @param {number} options.startBeat - Initial clip start beat
+ * @param {number} options.deltaX - Horizontal pointer movement in pixels
+ * @param {number} options.laneWidth - Width of the timeline lane in pixels
+ * @param {number} options.totalBeats - Total musical beats in the project
+ * @param {number} [options.snap=1] - Standard grid snap in beats
+ * @param {boolean} [options.shiftKey=false] - When true, enables fine snap (0.25 beat)
+ * @returns {number} Clamped and snapped beat position
+ */
+export function calculateClipDragPosition({
+  startBeat = 0,
+  deltaX = 0,
+  laneWidth = 400,
+  totalBeats = 16,
+  snap = 1,
+  shiftKey = false,
+}) {
+  if (laneWidth <= 0 || totalBeats <= 0) return Math.max(0, startBeat);
+  const pixelsPerBeat = laneWidth / totalBeats;
+  const deltaBeats = deltaX / pixelsPerBeat;
+  const rawBeat = startBeat + deltaBeats;
+
+  const effectiveSnap = shiftKey ? 0.25 : snap;
+  const snapped = Math.round(rawBeat / effectiveSnap) * effectiveSnap;
+  const maxBeat = Math.max(0, totalBeats - 0.25);
+  return Math.max(0, Math.min(maxBeat, Number(snapped.toFixed(3))));
+}
+
+/**
+ * Calculates updated clip time, duration, and audio sample offset when trimming/resizing edges.
+ *
+ * @param {Object} options
+ * @param {number} options.startTime - Clip start beat
+ * @param {number} options.startDuration - Initial clip duration in beats
+ * @param {number} [options.startOffset=0] - Initial audio playback offset in seconds
+ * @param {number} options.deltaX - Horizontal movement in pixels
+ * @param {number} options.laneWidth - Lane width in pixels
+ * @param {number} options.totalBeats - Total project beats
+ * @param {"left"|"right"} [options.edge="right"] - Which handle is being dragged
+ * @param {number} [options.bpm=120] - Tempo in beats per minute
+ * @param {number} [options.snap=1] - Snap division in beats
+ * @param {boolean} [options.shiftKey=false] - Fine snap when true
+ * @returns {{ time: number, duration: number, offset: number }}
+ */
+export function calculateClipResize({
+  startTime = 0,
+  startDuration = 4,
+  startOffset = 0,
+  deltaX = 0,
+  laneWidth = 400,
+  totalBeats = 16,
+  edge = "right",
+  bpm = 120,
+  snap = 1,
+  shiftKey = false,
+}) {
+  if (laneWidth <= 0 || totalBeats <= 0) {
+    return { time: startTime, duration: startDuration, offset: startOffset };
+  }
+  const pixelsPerBeat = laneWidth / totalBeats;
+  const deltaBeats = deltaX / pixelsPerBeat;
+  const effectiveSnap = shiftKey ? 0.25 : snap;
+
+  if (edge === "right") {
+    const rawDur = startDuration + deltaBeats;
+    const snappedDur = Math.round(rawDur / effectiveSnap) * effectiveSnap;
+    const maxDur = Math.max(0.25, totalBeats - startTime);
+    const clampedDur = Math.max(0.25, Math.min(maxDur, snappedDur));
+    return {
+      time: startTime,
+      duration: Number(clampedDur.toFixed(3)),
+      offset: startOffset,
+    };
+  }
+
+  // Left edge trim: moving right delays start time, shortens duration, and advances sample offset
+  const snappedDelta = Math.round(deltaBeats / effectiveSnap) * effectiveSnap;
+  const maxDelta = startDuration - 0.25;
+  const minDelta = -startTime;
+  const clampedDelta = Math.max(minDelta, Math.min(maxDelta, snappedDelta));
+
+  const newTime = Math.max(0, startTime + clampedDelta);
+  const newDuration = Math.max(0.25, startDuration - clampedDelta);
+  const secondsPerBeat = 60 / Math.max(20, bpm);
+  const newOffset = Math.max(0, startOffset + clampedDelta * secondsPerBeat);
+
+  return {
+    time: Number(newTime.toFixed(3)),
+    duration: Number(newDuration.toFixed(3)),
+    offset: Number(newOffset.toFixed(3)),
+  };
+}
+
+/**
+ * Computes move or resize delta from keyboard arrow keys.
+ *
+ * @param {Object} options
+ * @param {number} options.currentBeat
+ * @param {number} options.currentDuration
+ * @param {string} options.key - Keyboard event key
+ * @param {boolean} [options.shiftKey=false] - Fine resolution (0.25 beat)
+ * @param {boolean} [options.altKey=false] - Resize mode instead of move
+ * @param {number} [options.totalBeats=16]
+ * @returns {{ action: "move"|"resize", time?: number, duration?: number } | null}
+ */
+export function calculateClipKeyboardNudge({
+  currentBeat = 0,
+  currentDuration = 4,
+  key,
+  shiftKey = false,
+  altKey = false,
+  totalBeats = 16,
+}) {
+  const step = shiftKey ? 0.25 : 1;
+
+  if (key === "Home") {
+    return { action: "move", time: 0 };
+  }
+  if (key === "End") {
+    return { action: "move", time: Math.max(0, totalBeats - currentDuration) };
+  }
+
+  if (altKey) {
+    if (key === "ArrowRight") {
+      const maxDur = Math.max(0.25, totalBeats - currentBeat);
+      const nextDur = Math.min(maxDur, currentDuration + step);
+      return { action: "resize", duration: Number(nextDur.toFixed(3)) };
+    }
+    if (key === "ArrowLeft") {
+      const nextDur = Math.max(0.25, currentDuration - step);
+      return { action: "resize", duration: Number(nextDur.toFixed(3)) };
+    }
+    return null;
+  }
+
+  if (key === "ArrowRight") {
+    const maxTime = Math.max(0, totalBeats - 0.25);
+    const nextTime = Math.min(maxTime, currentBeat + step);
+    return { action: "move", time: Number(nextTime.toFixed(3)) };
+  }
+  if (key === "ArrowLeft") {
+    const nextTime = Math.max(0, currentBeat - step);
+    return { action: "move", time: Number(nextTime.toFixed(3)) };
+  }
+
+  return null;
+}
+
+/**
+ * Binds pointer dragging (move), edge resizing (trim), and keyboard accessibility
+ * on a timeline audio clip element.
+ *
+ * @param {Object} options
+ * @param {HTMLElement} options.clipEl
+ * @param {HTMLElement} [options.laneEl]
+ * @param {Object} options.clip
+ * @param {string} options.trackId
+ * @param {number} [options.totalBeats=16]
+ * @param {number} [options.bpm=120]
+ * @param {Function} [options.onUpdate]
+ * @param {Function} [options.onRemove]
+ * @returns {Function} Cleanup function
+ */
+export function setupClipInteraction({
+  clipEl,
+  laneEl,
+  clip,
+  trackId,
+  totalBeats = 16,
+  bpm = 120,
+  onUpdate,
+  onRemove,
+}) {
+  if (!clipEl) return () => {};
+
+  let isInteracting = false;
+  let interactionMode = null;
+  let startX = 0;
+  let hasMoved = false;
+  let startBeat = Number(clip.time || 0);
+  let startDuration = Number(clip.duration || 4);
+  let startOffset = Number(clip.offset || 0);
+
+  const getLaneWidth = () => {
+    if (laneEl && typeof laneEl.getBoundingClientRect === "function") {
+      const rect = laneEl.getBoundingClientRect();
+      if (rect.width > 0) return rect.width;
+    }
+    return 400;
+  };
+
+  const onPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.stopPropagation?.();
+    const target = e.target;
+    const isLeftHandle = target.closest?.(".scdaw-timeline__clip-handle--left");
+    const isRightHandle = target.closest?.(
+      ".scdaw-timeline__clip-handle--right",
+    );
+
+    if (isLeftHandle) {
+      interactionMode = "resize-left";
+    } else if (isRightHandle) {
+      interactionMode = "resize-right";
+    } else {
+      interactionMode = "move";
+    }
+
+    isInteracting = true;
+    hasMoved = false;
+    startX = e.clientX;
+    startBeat = Number(clip.time || 0);
+    startDuration = Number(clip.duration || 4);
+    startOffset = Number(clip.offset || 0);
+
+    try {
+      clipEl.setPointerCapture?.(e.pointerId);
+    } catch {}
+
+    clipEl.classList.add(
+      interactionMode === "move"
+        ? "scdaw-timeline__clip--dragging"
+        : "scdaw-timeline__clip--resizing",
+    );
+  };
+
+  const onPointerMove = (e) => {
+    if (!isInteracting) return;
+    const deltaX = e.clientX - startX;
+    if (Math.abs(deltaX) >= 2) {
+      hasMoved = true;
+    }
+    if (!hasMoved) return;
+
+    e.preventDefault?.();
+    const laneWidth = getLaneWidth();
+
+    if (interactionMode === "move") {
+      const nextTime = calculateClipDragPosition({
+        startBeat,
+        deltaX,
+        laneWidth,
+        totalBeats,
+        shiftKey: Boolean(e.shiftKey),
+      });
+      const leftPct = (nextTime / totalBeats) * 100;
+      clipEl.style.left = `${leftPct}%`;
+      clipEl.setAttribute("aria-valuenow", String(nextTime));
+    } else if (interactionMode === "resize-right") {
+      const res = calculateClipResize({
+        startTime: startBeat,
+        startDuration,
+        startOffset,
+        deltaX,
+        laneWidth,
+        totalBeats,
+        edge: "right",
+        shiftKey: Boolean(e.shiftKey),
+      });
+      const widthPct = (res.duration / totalBeats) * 100;
+      clipEl.style.width = `${widthPct}%`;
+    } else if (interactionMode === "resize-left") {
+      const res = calculateClipResize({
+        startTime: startBeat,
+        startDuration,
+        startOffset,
+        deltaX,
+        laneWidth,
+        totalBeats,
+        edge: "left",
+        bpm,
+        shiftKey: Boolean(e.shiftKey),
+      });
+      const leftPct = (res.time / totalBeats) * 100;
+      const widthPct = (res.duration / totalBeats) * 100;
+      clipEl.style.left = `${leftPct}%`;
+      clipEl.style.width = `${widthPct}%`;
+      clipEl.setAttribute("aria-valuenow", String(res.time));
+    }
+  };
+
+  const onPointerUp = (e) => {
+    if (!isInteracting) return;
+    isInteracting = false;
+    clipEl.classList.remove(
+      "scdaw-timeline__clip--dragging",
+      "scdaw-timeline__clip--resizing",
+    );
+    try {
+      clipEl.releasePointerCapture?.(e.pointerId);
+    } catch {}
+
+    if (hasMoved) {
+      e.preventDefault?.();
+      const deltaX = e.clientX - startX;
+      const laneWidth = getLaneWidth();
+
+      if (interactionMode === "move") {
+        const nextTime = calculateClipDragPosition({
+          startBeat,
+          deltaX,
+          laneWidth,
+          totalBeats,
+          shiftKey: Boolean(e.shiftKey),
+        });
+        if (nextTime !== startBeat) {
+          onUpdate?.({ time: nextTime });
+        }
+      } else if (interactionMode === "resize-right") {
+        const res = calculateClipResize({
+          startTime: startBeat,
+          startDuration,
+          startOffset,
+          deltaX,
+          laneWidth,
+          totalBeats,
+          edge: "right",
+          shiftKey: Boolean(e.shiftKey),
+        });
+        if (res.duration !== startDuration) {
+          onUpdate?.({ duration: res.duration });
+        }
+      } else if (interactionMode === "resize-left") {
+        const res = calculateClipResize({
+          startTime: startBeat,
+          startDuration,
+          startOffset,
+          deltaX,
+          laneWidth,
+          totalBeats,
+          edge: "left",
+          bpm,
+          shiftKey: Boolean(e.shiftKey),
+        });
+        if (
+          res.time !== startBeat ||
+          res.duration !== startDuration ||
+          res.offset !== startOffset
+        ) {
+          onUpdate?.({
+            time: res.time,
+            duration: res.duration,
+            offset: res.offset,
+          });
+        }
+      }
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      if (typeof onRemove === "function") {
+        onRemove();
+      } else if (
+        typeof scdaw !== "undefined" &&
+        typeof scdaw.sendCommand === "function"
+      ) {
+        scdaw.sendCommand("remove_audio_clip", { trackId, clipId: clip.id });
+      }
+      return;
+    }
+
+    const target = e.target;
+    const isLeftHandle = target.closest?.(".scdaw-timeline__clip-handle--left");
+    const isRightHandle = target.closest?.(
+      ".scdaw-timeline__clip-handle--right",
+    );
+
+    if (isLeftHandle) {
+      const step = e.shiftKey ? 0.25 : 1;
+      let deltaBeats = 0;
+      if (e.key === "ArrowRight") deltaBeats = step;
+      else if (e.key === "ArrowLeft") deltaBeats = -step;
+      else return;
+
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      const currentLaneWidth = getLaneWidth();
+      const pixelsPerBeat = currentLaneWidth / totalBeats;
+      const res = calculateClipResize({
+        startTime: Number(clip.time || 0),
+        startDuration: Number(clip.duration || 4),
+        startOffset: Number(clip.offset || 0),
+        deltaX: deltaBeats * pixelsPerBeat,
+        laneWidth: currentLaneWidth,
+        totalBeats,
+        edge: "left",
+        bpm,
+        shiftKey: Boolean(e.shiftKey),
+      });
+      onUpdate?.(res);
+      return;
+    }
+
+    if (isRightHandle) {
+      const step = e.shiftKey ? 0.25 : 1;
+      let deltaBeats = 0;
+      if (e.key === "ArrowRight") deltaBeats = step;
+      else if (e.key === "ArrowLeft") deltaBeats = -step;
+      else return;
+
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      const currentLaneWidth = getLaneWidth();
+      const pixelsPerBeat = currentLaneWidth / totalBeats;
+      const res = calculateClipResize({
+        startTime: Number(clip.time || 0),
+        startDuration: Number(clip.duration || 4),
+        startOffset: Number(clip.offset || 0),
+        deltaX: deltaBeats * pixelsPerBeat,
+        laneWidth: currentLaneWidth,
+        totalBeats,
+        edge: "right",
+        shiftKey: Boolean(e.shiftKey),
+      });
+      onUpdate?.({ duration: res.duration });
+      return;
+    }
+
+    const nudge = calculateClipKeyboardNudge({
+      currentBeat: Number(clip.time || 0),
+      currentDuration: Number(clip.duration || 4),
+      key: e.key,
+      shiftKey: Boolean(e.shiftKey),
+      altKey: Boolean(e.altKey),
+      totalBeats,
+    });
+
+    if (nudge) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      if (nudge.action === "move" && nudge.time !== undefined) {
+        onUpdate?.({ time: nudge.time });
+      } else if (nudge.action === "resize" && nudge.duration !== undefined) {
+        onUpdate?.({ duration: nudge.duration });
+      }
+    }
+  };
+
+  clipEl.addEventListener("pointerdown", onPointerDown);
+  clipEl.addEventListener("pointermove", onPointerMove);
+  clipEl.addEventListener("pointerup", onPointerUp);
+  clipEl.addEventListener("pointercancel", onPointerUp);
+  clipEl.addEventListener("keydown", onKeyDown);
+
+  return () => {
+    clipEl.removeEventListener("pointerdown", onPointerDown);
+    clipEl.removeEventListener("pointermove", onPointerMove);
+    clipEl.removeEventListener("pointerup", onPointerUp);
+    clipEl.removeEventListener("pointercancel", onPointerUp);
+    clipEl.removeEventListener("keydown", onKeyDown);
+  };
+}
+
 export class DawTimelineElement extends BaseElement {
   constructor() {
     super();
@@ -142,6 +601,7 @@ export class DawTimelineElement extends BaseElement {
     const p = scdaw.getProject();
     const ticks = computeTimelineTicks(p.lengthBars, p.signature);
     const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
+    const totalBeats = (p.lengthBars || 1) * 4;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -419,6 +879,57 @@ export class DawTimelineElement extends BaseElement {
           background: rgba(167, 139, 250, 0.25);
           border: 1px solid #a78bfa;
           bottom: auto;
+          cursor: grab;
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+        }
+
+        .scdaw-timeline__clip--dragging {
+          cursor: grabbing !important;
+          opacity: 0.88;
+          z-index: 20 !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        }
+
+        .scdaw-timeline__clip--resizing {
+          z-index: 20 !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        }
+
+        .scdaw-timeline__clip-handle {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 8px;
+          cursor: ew-resize;
+          z-index: 3;
+          opacity: 0;
+          transition: opacity 0.1s ease, background 0.1s ease;
+        }
+
+        .scdaw-timeline__clip-handle--left {
+          left: 0;
+          border-top-left-radius: 3px;
+          border-bottom-left-radius: 3px;
+          border-left: 3px solid var(--accent, #6366f1);
+        }
+
+        .scdaw-timeline__clip-handle--right {
+          right: 0;
+          border-top-right-radius: 3px;
+          border-bottom-right-radius: 3px;
+          border-right: 3px solid var(--accent, #6366f1);
+        }
+
+        .scdaw-timeline__clip--audio:hover .scdaw-timeline__clip-handle,
+        .scdaw-timeline__clip--audio:focus-visible .scdaw-timeline__clip-handle,
+        .scdaw-timeline__clip-handle:hover,
+        .scdaw-timeline__clip-handle:focus-visible,
+        .scdaw-timeline__clip--resizing .scdaw-timeline__clip-handle {
+          opacity: 0.9;
+          background: rgba(255, 255, 255, 0.25);
+          outline: none;
         }
 
         .scdaw-timeline__clip--stacked {
@@ -652,14 +1163,18 @@ export class DawTimelineElement extends BaseElement {
                           const isStacked = rowCount > 1;
                           return `
                             <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""} ${isStacked ? "scdaw-timeline__clip--stacked" : ""}"
+                                 data-clip="${clip.id}"
+                                 data-track="${t.id}"
                                  style="left:${leftPct}%; width:${widthPct}%; ${topStyle} position:absolute; z-index:${rowIndex + 1};"
                                  role="button"
                                  tabindex="0"
                                  title="${clip.name} (Beat ${(clip.time || 0) + 1}, ${clip.duration} beats${isStacked ? ` — Layer ${rowIndex + 1} of ${rowCount}` : ""})"
                                  aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats${isStacked ? `, Layer ${rowIndex + 1} of ${rowCount}` : ""}">
+                              <div class="scdaw-timeline__clip-handle scdaw-timeline__clip-handle--left" data-edge="left" role="slider" tabindex="0" aria-label="Trim start for ${clip.name}" aria-valuemin="0" aria-valuemax="${totalBeats}" aria-valuenow="${clip.time || 0}" title="Drag to trim start"></div>
                               ${waveformSvg}
                               <span style="margin-right:4px; z-index:1;" aria-hidden="true">🎙</span>
                               <span style="z-index:1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:${rowCount > 1 ? "0.72rem" : "0.85rem"};">${clip.name}</span>
+                              <div class="scdaw-timeline__clip-handle scdaw-timeline__clip-handle--right" data-edge="right" role="slider" tabindex="0" aria-label="Resize duration for ${clip.name}" aria-valuemin="0.25" aria-valuemax="${totalBeats}" aria-valuenow="${clip.duration || 4}" title="Drag to resize duration"></div>
                             </div>
                           `;
                         })
@@ -931,6 +1446,35 @@ export class DawTimelineElement extends BaseElement {
         });
       });
     });
+
+    // Audio clip dragging, edge trimming/resizing, and keyboard nudging
+    const currentBpm = p.bpm || 120;
+    this.shadowRoot
+      .querySelectorAll(".scdaw-timeline__clip--audio[data-clip]")
+      .forEach((clipEl) => {
+        const trackId = clipEl.dataset.track;
+        const clipId = clipEl.dataset.clip;
+        const currentProj = scdaw.getProject();
+        const trk = currentProj.tracks?.find((x) => x.id === trackId);
+        const clip = trk?.audioClips?.find((c) => c.id === clipId);
+        const laneEl = clipEl.closest(".scdaw-timeline__lane");
+        if (clip) {
+          setupClipInteraction({
+            clipEl,
+            laneEl,
+            clip,
+            trackId,
+            totalBeats,
+            bpm: currentBpm,
+            onUpdate: (patch) => {
+              scdaw.sendCommand("set_audio_clip", { trackId, clipId, patch });
+            },
+            onRemove: () => {
+              scdaw.sendCommand("remove_audio_clip", { trackId, clipId });
+            },
+          });
+        }
+      });
   }
 }
 

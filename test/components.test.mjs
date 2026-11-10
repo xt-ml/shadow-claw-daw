@@ -8,7 +8,14 @@ import {
   formatValueWithUnit,
 } from "../.agents/scripts/components/scdaw-knob.js";
 import { filterBrowserItems } from "../.agents/scripts/components/scdaw-browser.js";
-import { computeTimelineTicks } from "../.agents/scripts/components/scdaw-timeline.js";
+import {
+  computeTimelineTicks,
+  computeClipOverlapLayout,
+  calculateClipDragPosition,
+  calculateClipResize,
+  calculateClipKeyboardNudge,
+  setupClipInteraction,
+} from "../.agents/scripts/components/scdaw-timeline.js";
 import {
   pitchToPianoRollRow,
   pianoRollRowToPitch,
@@ -98,6 +105,300 @@ test("scdaw-timeline: computes timeline bars and beat ticks based on signature",
   assert.equal(ticks[0].beat, 1);
   assert.equal(ticks[4].bar, 2);
   assert.equal(ticks[4].beat, 1);
+});
+
+test("scdaw-timeline: calculateClipDragPosition moves and snaps clip to beats with shift-key fine tuning", () => {
+  // 400px lane, 16 beats total = 25px per beat
+  const laneWidth = 400;
+  const totalBeats = 16;
+
+  // Move right +50px = +2 beats from beat 2 -> 4
+  const pos1 = calculateClipDragPosition({
+    startBeat: 2,
+    deltaX: 50,
+    laneWidth,
+    totalBeats,
+  });
+  assert.equal(pos1, 4);
+
+  // Move left -25px = -1 beat from beat 2 -> 1
+  const pos2 = calculateClipDragPosition({
+    startBeat: 2,
+    deltaX: -25,
+    laneWidth,
+    totalBeats,
+  });
+  assert.equal(pos2, 1);
+
+  // Clamp at beginning (0)
+  const pos3 = calculateClipDragPosition({
+    startBeat: 2,
+    deltaX: -100,
+    laneWidth,
+    totalBeats,
+  });
+  assert.equal(pos3, 0);
+
+  // Snap to integer beat without shiftKey (+35px = +1.4 beats from beat 1 -> snaps to 2)
+  const pos4 = calculateClipDragPosition({
+    startBeat: 1,
+    deltaX: 35,
+    laneWidth,
+    totalBeats,
+    shiftKey: false,
+  });
+  assert.equal(pos4, 2);
+
+  // Fine snap with shiftKey (+35px = +1.4 beats from beat 1 -> snaps to 2.5 with 0.25 grid)
+  const pos5 = calculateClipDragPosition({
+    startBeat: 1,
+    deltaX: 35,
+    laneWidth,
+    totalBeats,
+    shiftKey: true,
+  });
+  assert.equal(pos5, 2.5); // 1 + 1.4 = 2.4 -> rounded to nearest 0.25 is 2.5
+});
+
+test("scdaw-timeline: calculateClipResize resizes right duration and trims left start/offset", () => {
+  const laneWidth = 400;
+  const totalBeats = 16; // 25 px/beat
+
+  // 1. Right edge resize: lengthen duration by 50px (+2 beats)
+  const resRight1 = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: 50,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+  });
+  assert.equal(resRight1.time, 2);
+  assert.equal(resRight1.duration, 6);
+  assert.equal(resRight1.offset, 0);
+
+  // 2. Right edge resize: shorten duration by 25px (-1 beat)
+  const resRight2 = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: -25,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+  });
+  assert.equal(resRight2.duration, 3);
+
+  // 3. Right edge resize: clamped to min duration (0.25)
+  const resRight3 = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: -200,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+  });
+  assert.equal(resRight3.duration, 0.25);
+
+  // 4. Left edge trim: drag right 25px (+1 beat) -> delays time, shrinks duration, advances offset
+  // bpm 120 -> 0.5 sec/beat
+  const resLeft1 = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: 25,
+    laneWidth,
+    totalBeats,
+    edge: "left",
+    bpm: 120,
+  });
+  assert.equal(resLeft1.time, 3);
+  assert.equal(resLeft1.duration, 3);
+  assert.equal(resLeft1.offset, 0.5);
+
+  // 5. Left edge trim: drag left 25px (-1 beat) -> earlier time, larger duration, decrements offset
+  const resLeft2 = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 1.0,
+    deltaX: -25,
+    laneWidth,
+    totalBeats,
+    edge: "left",
+    bpm: 120,
+  });
+  assert.equal(resLeft2.time, 1);
+  assert.equal(resLeft2.duration, 5);
+  assert.equal(resLeft2.offset, 0.5);
+});
+
+test("scdaw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift fine tuning, and alt resizing", () => {
+  // Move right 1 beat
+  const n1 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "ArrowRight",
+  });
+  assert.deepEqual(n1, { action: "move", time: 5 });
+
+  // Move left 1 beat
+  const n2 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "ArrowLeft",
+  });
+  assert.deepEqual(n2, { action: "move", time: 3 });
+
+  // Fine move right 0.25 beat with Shift
+  const n3 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "ArrowRight",
+    shiftKey: true,
+  });
+  assert.deepEqual(n3, { action: "move", time: 4.25 });
+
+  // Alt + ArrowRight: resize duration +1
+  const n4 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "ArrowRight",
+    altKey: true,
+  });
+  assert.deepEqual(n4, { action: "resize", duration: 3 });
+
+  // Alt + ArrowLeft: resize duration -1
+  const n5 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "ArrowLeft",
+    altKey: true,
+  });
+  assert.deepEqual(n5, { action: "resize", duration: 1 });
+
+  // Home key: jump to start
+  const n6 = calculateClipKeyboardNudge({
+    currentBeat: 4,
+    currentDuration: 2,
+    key: "Home",
+  });
+  assert.deepEqual(n6, { action: "move", time: 0 });
+});
+
+test("scdaw-timeline: setupClipInteraction binds pointer dragging, edge resizing, and keyboard actions", () => {
+  const updates = [];
+  let removeCalled = false;
+  const classList = new Set();
+  const attributes = {};
+  const styles = {};
+  const listeners = {};
+
+  const leftHandle = {
+    closest: (sel) =>
+      sel.includes("scdaw-timeline__clip-handle--left") ? leftHandle : null,
+  };
+  const rightHandle = {
+    closest: (sel) =>
+      sel.includes("scdaw-timeline__clip-handle--right") ? rightHandle : null,
+  };
+
+  const clipEl = {
+    classList: {
+      add: (cls) => classList.add(cls),
+      remove: (cls) => classList.delete(cls),
+      contains: (cls) => classList.has(cls),
+    },
+    setAttribute: (name, val) => {
+      attributes[name] = val;
+    },
+    getAttribute: (name) => attributes[name],
+    style: styles,
+    addEventListener: (type, fn) => {
+      listeners[type] = fn;
+    },
+    removeEventListener: (type, fn) => {
+      if (listeners[type] === fn) delete listeners[type];
+    },
+    setPointerCapture: () => {},
+    releasePointerCapture: () => {},
+    closest: () => null,
+  };
+
+  const mockLane = {
+    getBoundingClientRect: () => ({ width: 400 }),
+  };
+
+  const clip = {
+    id: "clip_vocal_1",
+    name: "Lead Vocal",
+    time: 2,
+    duration: 4,
+    offset: 0,
+  };
+
+  const cleanup = setupClipInteraction({
+    clipEl,
+    laneEl: mockLane,
+    clip,
+    trackId: "trk_audio",
+    totalBeats: 16,
+    bpm: 120,
+    onUpdate: (patch) => updates.push(patch),
+    onRemove: () => {
+      removeCalled = true;
+    },
+  });
+
+  // Verify listeners were attached
+  assert.ok(typeof listeners.pointerdown === "function");
+  assert.ok(typeof listeners.pointermove === "function");
+  assert.ok(typeof listeners.pointerup === "function");
+  assert.ok(typeof listeners.keydown === "function");
+
+  // 1. Drag move (+50px = +2 beats from beat 2 -> 4)
+  listeners.pointerdown({ button: 0, clientX: 100, target: clipEl });
+  assert.ok(clipEl.classList.contains("scdaw-timeline__clip--dragging"));
+  listeners.pointermove({ clientX: 150 });
+  assert.equal(clipEl.style.left, "25%"); // 4 / 16 * 100% = 25%
+  listeners.pointerup({ clientX: 150 });
+  assert.ok(!clipEl.classList.contains("scdaw-timeline__clip--dragging"));
+  assert.deepEqual(updates[updates.length - 1], { time: 4 });
+
+  // 2. Right edge resize (+50px = +2 beats duration -> 6 beats)
+  listeners.pointerdown({ button: 0, clientX: 100, target: rightHandle });
+  assert.ok(clipEl.classList.contains("scdaw-timeline__clip--resizing"));
+  listeners.pointermove({ clientX: 150 });
+  assert.equal(clipEl.style.width, "37.5%"); // 6 / 16 * 100% = 37.5%
+  listeners.pointerup({ clientX: 150 });
+  assert.deepEqual(updates[updates.length - 1], { duration: 6 });
+
+  // 3. Left edge trim (+25px = +1 beat delay -> time: 3, duration: 3, offset: 0.5s at 120 BPM)
+  listeners.pointerdown({ button: 0, clientX: 100, target: leftHandle });
+  assert.ok(clipEl.classList.contains("scdaw-timeline__clip--resizing"));
+  listeners.pointermove({ clientX: 125 });
+  listeners.pointerup({ clientX: 125 });
+  assert.deepEqual(updates[updates.length - 1], {
+    time: 3,
+    duration: 3,
+    offset: 0.5,
+  });
+
+  // 4. Keyboard ArrowRight nudges position (+1 beat -> 3)
+  listeners.keydown({ key: "ArrowRight", target: clipEl });
+  assert.deepEqual(updates[updates.length - 1], { time: 3 });
+
+  // 5. Keyboard Alt+ArrowRight resizes duration (+1 beat -> 5)
+  listeners.keydown({ key: "ArrowRight", altKey: true, target: clipEl });
+  assert.deepEqual(updates[updates.length - 1], { duration: 5 });
+
+  // 6. Keyboard Delete triggers onRemove
+  listeners.keydown({ key: "Delete", target: clipEl });
+  assert.equal(removeCalled, true);
+
+  cleanup();
+  assert.equal(Object.keys(listeners).length, 0);
 });
 
 test("scdaw-editor: maps MIDI pitch to piano roll row and back", () => {
@@ -1847,6 +2148,14 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
   assert.match(
     timeline.shadowRoot.innerHTML,
     /class="[^"]*scdaw-timeline__clip--audio[^"]*"[^>]*role="button"[^>]*aria-label="Audio clip Vocal Chorus/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*scdaw-timeline__clip-handle--left[^"]*"[^>]*role="slider"[^>]*aria-label="Trim start for Vocal Chorus"[^>]*title="Drag to trim start"/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*scdaw-timeline__clip-handle--right[^"]*"[^>]*role="slider"[^>]*aria-label="Resize duration for Vocal Chorus"[^>]*title="Drag to resize duration"/,
   );
 
   // Verify Record Arm and Import buttons on audio track header
