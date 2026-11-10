@@ -46,6 +46,55 @@ function createNoiseBuffer(ctx, durationSec = 0.5) {
   return buffer;
 }
 
+export function createVoiceHandle(
+  nodesToDisconnect = [],
+  sourcesToStop = [],
+  stopTime = 0,
+  ctx = null,
+) {
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    for (const node of nodesToDisconnect) {
+      try {
+        if (typeof node?.disconnect === "function") node.disconnect();
+      } catch (_) {}
+    }
+    if (typeof voice.onended === "function") {
+      voice.onended();
+    }
+  };
+
+  const primarySource = sourcesToStop[0];
+  if (primarySource) {
+    primarySource.onended = cleanup;
+  }
+  const delayMs = Math.max(
+    50,
+    Math.round((stopTime - (ctx?.currentTime || 0)) * 1000 + 100),
+  );
+  const safetyTimeout = setTimeout(cleanup, delayMs);
+
+  const voice = {
+    stop: (t = 0) => {
+      clearTimeout(safetyTimeout);
+      for (const src of sourcesToStop) {
+        try {
+          if (typeof src?.stop === "function") src.stop(t);
+        } catch (_) {}
+      }
+      cleanup();
+    },
+    disconnect: () => {
+      clearTimeout(safetyTimeout);
+      cleanup();
+    },
+    onended: null,
+  };
+  return voice;
+}
+
 export function triggerDrums(
   ctx,
   dest,
@@ -70,7 +119,11 @@ export function triggerDrums(
     src.connect(gain);
     gain.connect(dest);
     src.start(when);
-    return src;
+    const stopTime = when + (cachedBuffer.duration || 1);
+    try {
+      src.stop(stopTime);
+    } catch (_) {}
+    return createVoiceHandle([gain], [src], stopTime, ctx);
   }
 
   // Pure Web Audio procedural synthesizers for drums
@@ -91,7 +144,7 @@ export function triggerDrums(
       gain.connect(dest);
       osc.start(when);
       osc.stop(when + 0.29);
-      return osc;
+      return createVoiceHandle([gain], [osc], when + 0.29, ctx);
     }
 
     case 37: {
@@ -109,7 +162,7 @@ export function triggerDrums(
       gain.connect(dest);
       osc.start(when);
       osc.stop(when + 0.05);
-      return osc;
+      return createVoiceHandle([gain], [osc], when + 0.05, ctx);
     }
 
     case 38: {
@@ -143,7 +196,12 @@ export function triggerDrums(
       noiseGain.connect(dest);
       noise.start(when);
       noise.stop(when + 0.19);
-      return toneOsc;
+      return createVoiceHandle(
+        [toneGain, filter, noiseGain],
+        [toneOsc, noise],
+        when + 0.19,
+        ctx,
+      );
     }
 
     case 39: {
@@ -170,7 +228,7 @@ export function triggerDrums(
       gain.connect(dest);
       noise.start(when);
       noise.stop(when + 0.23);
-      return noise;
+      return createVoiceHandle([filter, gain], [noise], when + 0.23, ctx);
     }
 
     case 41:
@@ -192,7 +250,7 @@ export function triggerDrums(
       gain.connect(dest);
       osc.start(when);
       osc.stop(when + 0.33);
-      return osc;
+      return createVoiceHandle([gain], [osc], when + 0.33, ctx);
     }
 
     case 42:
@@ -217,7 +275,12 @@ export function triggerDrums(
       gain.connect(dest);
       noise.start(when);
       noise.stop(when + decayTime + 0.01);
-      return noise;
+      return createVoiceHandle(
+        [filter, gain],
+        [noise],
+        when + decayTime + 0.01,
+        ctx,
+      );
     }
 
     case 49: {
@@ -239,7 +302,12 @@ export function triggerDrums(
       gain.connect(dest);
       noise.start(when);
       noise.stop(when + decayTime + 0.05);
-      return noise;
+      return createVoiceHandle(
+        [filter, gain],
+        [noise],
+        when + decayTime + 0.05,
+        ctx,
+      );
     }
 
     case 51: {
@@ -271,7 +339,12 @@ export function triggerDrums(
       noiseGain.connect(dest);
       noise.start(when);
       noise.stop(when + 0.6);
-      return osc;
+      return createVoiceHandle(
+        [oscGain, filter, noiseGain],
+        [osc, noise],
+        when + 0.6,
+        ctx,
+      );
     }
 
     case 54:
@@ -304,7 +377,12 @@ export function triggerDrums(
         osc2.start(when);
         osc1.stop(when + 0.22);
         osc2.stop(when + 0.22);
-        return osc1;
+        return createVoiceHandle(
+          [filter, gain],
+          [osc1, osc2],
+          when + 0.22,
+          ctx,
+        );
       }
       // Shaker
       const noise = ctx.createBufferSource();
@@ -322,7 +400,7 @@ export function triggerDrums(
       gain.connect(dest);
       noise.start(when);
       noise.stop(when + 0.08);
-      return noise;
+      return createVoiceHandle([filter, gain], [noise], when + 0.08, ctx);
     }
 
     default: {
@@ -338,7 +416,7 @@ export function triggerDrums(
       gain.connect(dest);
       osc.start(when);
       osc.stop(when + 0.16);
-      return osc;
+      return createVoiceHandle([gain], [osc], when + 0.16, ctx);
     }
   }
 }
@@ -424,6 +502,7 @@ export function triggerSynth(
 
   // Secondary Oscillator (Osc 2)
   let osc2 = null;
+  let osc2Gain = null;
   if (params.osc2Waveform && params.osc2Waveform !== "off") {
     osc2 = ctx.createOscillator();
     osc2.type = params.osc2Waveform;
@@ -433,7 +512,7 @@ export function triggerSynth(
     if (params.osc2Detune) {
       osc2.detune.setValueAtTime(Number(params.osc2Detune), when);
     }
-    const osc2Gain = ctx.createGain();
+    osc2Gain = ctx.createGain();
     osc2Gain.gain.setValueAtTime(Number(params.osc2Mix ?? 0.35), when);
     osc2.connect(osc2Gain);
     osc2Gain.connect(filter);
@@ -442,11 +521,12 @@ export function triggerSynth(
 
   // Sub Oscillator
   let subOsc = null;
+  let subGain = null;
   if (params.subMix && Number(params.subMix) > 0) {
     subOsc = ctx.createOscillator();
     subOsc.type = "sine";
     subOsc.frequency.setValueAtTime(freq * 0.5, when); // 1 octave below
-    const subGain = ctx.createGain();
+    subGain = ctx.createGain();
     subGain.gain.setValueAtTime(Number(params.subMix), when);
     subOsc.connect(subGain);
     subGain.connect(filter);
@@ -462,21 +542,12 @@ export function triggerSynth(
   if (osc2) osc2.stop(stopTime);
   if (subOsc) subOsc.stop(stopTime);
 
-  // Return voice handle capable of stopping all nodes
-  return {
-    stop: (t = 0) => {
-      try {
-        osc1.stop(t);
-        if (osc2) osc2.stop(t);
-        if (subOsc) subOsc.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, filter, osc2Gain, subGain].filter(Boolean),
+    [osc1, osc2, subOsc].filter(Boolean),
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -583,20 +654,12 @@ export function trigger808(
   osc2.stop(stopTime);
   osc3.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        osc1.stop(t);
-        osc2.stop(t);
-        osc3.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, driveNode, filter, gain2, gain3].filter(Boolean),
+    [osc1, osc2, osc3],
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -665,18 +728,7 @@ export function triggerCubed(
   osc.start(when);
   osc.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        osc.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle([amp, filter], [osc], stopTime, ctx);
 }
 
 /**
@@ -749,18 +801,12 @@ export function triggerPluck(
   const stopTime = when + totalDecayTime + 0.05;
   exciter.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        exciter.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, delay, dampingFilter, feedbackGain, exciterGain].filter(Boolean),
+    [exciter],
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -836,19 +882,7 @@ export function triggerTubular(
   carrier.stop(stopTime);
   modulator.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        carrier.stop(t);
-        modulator.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle([amp, modGain], [carrier, modulator], stopTime, ctx);
 }
 
 /**
@@ -906,8 +940,10 @@ export function triggerNeon(
   amp.gain.setValueAtTime(velocity * 0.7, releaseStart);
   amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
 
+  let ringGain = null;
+  let lineMix = null;
   if (mode === "ring") {
-    const ringGain = ctx.createGain();
+    ringGain = ctx.createGain();
     ringGain.gain.setValueAtTime(0, when);
     osc1.connect(ringGain);
     try {
@@ -917,7 +953,7 @@ export function triggerNeon(
     }
     ringGain.connect(dcwFilter);
   } else {
-    const lineMix = ctx.createGain();
+    lineMix = ctx.createGain();
     lineMix.gain.setValueAtTime(0.5, when);
     osc1.connect(lineMix);
     osc2.connect(lineMix);
@@ -933,19 +969,12 @@ export function triggerNeon(
   osc1.stop(stopTime);
   osc2.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        osc1.stop(t);
-        osc2.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, dcwFilter, ringGain, lineMix].filter(Boolean),
+    [osc1, osc2],
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -1022,20 +1051,12 @@ export function triggerNoisePad(
   oscR.stop(stopTime);
   noise.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        oscL.stop(t);
-        oscR.stop(t);
-        noise.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, noiseFilter, noiseGain],
+    [oscL, oscR, noise],
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -1096,18 +1117,12 @@ export function triggerKorpus(
   const stopTime = when + decayTime + 0.05;
   exciter.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        exciter.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle(
+    [amp, exciterGain, resFilter],
+    [exciter],
+    stopTime,
+    ctx,
+  );
 }
 
 /**
@@ -1157,18 +1172,7 @@ export function triggerNano(
     const stopTime = when + durationSec + release + 0.05;
     src.stop(stopTime);
 
-    return {
-      stop: (t = 0) => {
-        try {
-          src.stop(t);
-        } catch (_) {}
-      },
-      disconnect: () => {
-        try {
-          amp.disconnect();
-        } catch (_) {}
-      },
-    };
+    return createVoiceHandle([amp], [src], stopTime, ctx);
   }
 
   // Pure synthetic multi-sample tone fallback
@@ -1183,20 +1187,10 @@ export function triggerNano(
   osc.connect(amp);
   amp.connect(dest);
   osc.start(when);
-  osc.stop(when + durationSec + 0.12);
+  const stopTime = when + durationSec + 0.12;
+  osc.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        osc.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle([amp], [osc], stopTime, ctx);
 }
 
 /**
@@ -1288,23 +1282,13 @@ export function triggerSoundfont(
   const stopTime = releaseStart + release + 0.05;
   osc.stop(stopTime);
 
-  return {
-    stop: (t = 0) => {
-      try {
-        osc.stop(t);
-      } catch (_) {}
-    },
-    disconnect: () => {
-      try {
-        amp.disconnect();
-      } catch (_) {}
-    },
-  };
+  return createVoiceHandle([amp, filter], [osc], stopTime, ctx);
 }
 
 export function triggerInstrumentVoice(ctx, dest, event, when, bpm = 120) {
   const inst = (
     event.trackInstrument ||
+    event.trackParams?.instrument ||
     event.trackKind ||
     event.instrument ||
     "synth"

@@ -23,6 +23,9 @@ export const SHARED_STYLES = `
   --warning: #f59e0b;
   --danger: var(--shadow-claw-error-color, rgb(255, 180, 171));
   --mono: var(--shadow-claw-font-mono, "JetBrains Mono", ui-monospace, monospace);
+  --text-primary: var(--shadow-claw-text-primary, #dde4e4);
+  --text-secondary: var(--shadow-claw-text-secondary, #879394);
+  --text-muted: var(--shadow-claw-text-muted, #738082);
 }
 
 *, *::before, *::after {

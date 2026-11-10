@@ -297,19 +297,29 @@ export class DawWorkbenchElement extends BaseElement {
     if (typeof ResizeObserver !== "undefined" && this.shadowRoot) {
       this._resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
-          const cr = entry.contentRect;
-          if (
-            cr &&
-            cr.width > 0 &&
-            Math.round(cr.width) !== this._containerWidth
-          ) {
-            this._containerWidth = Math.round(cr.width);
-            this._updatePanels();
+          const centerStackEl = this.shadowRoot.getElementById("center-stack");
+          if (centerStackEl && entry.target === centerStackEl) {
+            const h = Math.round(entry.contentRect.height);
+            if (h > 0) {
+              this.style.setProperty("--center-stack-h", `${h}px`);
+            }
+          } else {
+            const cr = entry.contentRect;
+            if (
+              cr &&
+              cr.width > 0 &&
+              Math.round(cr.width) !== this._containerWidth
+            ) {
+              this._containerWidth = Math.round(cr.width);
+              this._updatePanels();
+            }
           }
         }
       });
       const rootEl = this.shadowRoot.querySelector(".scdaw-workbench");
       if (rootEl) this._resizeObserver.observe(rootEl);
+      const centerStack = this.shadowRoot.getElementById("center-stack");
+      if (centerStack) this._resizeObserver.observe(centerStack);
     }
   }
 
@@ -337,6 +347,7 @@ export class DawWorkbenchElement extends BaseElement {
           container-name: scdaw-workbench;
           --browser-w: ${this._browserWidth}px;
           --mixer-w: ${this._mixerWidth}px;
+          --center-stack-h: calc(100vh - 180px);
         }
 
         /* 1. Mobile First Base Styles (Default for all viewports) */
@@ -561,11 +572,25 @@ export class DawWorkbenchElement extends BaseElement {
           display: none !important;
         }
 
-        #browser-container,
+        #browser-container {
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          max-height: clamp(220px, 38vh, 340px);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          overflow: hidden;
+        }
+
         #mixer-container {
           width: 100%;
           min-width: 0;
           box-sizing: border-box;
+          max-height: clamp(260px, 45vh, 420px);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
         }
 
         /* 2. Progressive Enhancement: Tablet and Wider (>= 640px) */
@@ -619,6 +644,21 @@ export class DawWorkbenchElement extends BaseElement {
             align-items: stretch;
             grid-template-columns: var(--browser-w, 230px) 8px minmax(0, 1fr) 8px var(--mixer-w, 320px);
           }
+          #browser-container {
+            height: 100%;
+            max-height: var(--center-stack-h, calc(100vh - 180px));
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          #mixer-container {
+            height: 100%;
+            max-height: var(--center-stack-h, calc(100vh - 180px));
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+          }
         }
 
         /* 3. Progressive Enhancement: Desktop Multi-Pane Grid (>= 1024px) */
@@ -628,6 +668,21 @@ export class DawWorkbenchElement extends BaseElement {
             gap: 0;
             align-items: stretch;
             grid-template-columns: var(--browser-w, 230px) 8px minmax(0, 1fr) 8px var(--mixer-w, 320px);
+          }
+          #browser-container {
+            height: 100%;
+            max-height: var(--center-stack-h, calc(100vh - 180px));
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          #mixer-container {
+            height: 100%;
+            max-height: var(--center-stack-h, calc(100vh - 180px));
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
           }
         }
 
@@ -656,6 +711,21 @@ export class DawWorkbenchElement extends BaseElement {
               display: grid;
               gap: 0;
               align-items: stretch;
+            }
+            #browser-container {
+              height: 100%;
+              max-height: var(--center-stack-h, calc(100vh - 180px));
+              min-height: 0;
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+            }
+            #mixer-container {
+              height: 100%;
+              max-height: var(--center-stack-h, calc(100vh - 180px));
+              min-height: 0;
+              display: flex;
+              flex-direction: column;
             }
           }
         }
@@ -1744,6 +1814,14 @@ export class DawWorkbenchElement extends BaseElement {
     const edCont = this.shadowRoot.getElementById("editor-container");
     const seqCont = this.shadowRoot.getElementById("seq-container");
     const devCont = this.shadowRoot.getElementById("devices-container");
+
+    if (centerStack) {
+      const csHeight =
+        centerStack.offsetHeight || centerStack.clientHeight || 0;
+      if (csHeight > 0) {
+        this.style.setProperty("--center-stack-h", `${csHeight}px`);
+      }
+    }
 
     const setVisible = (el, visible, display = "block") => {
       if (!el) return;

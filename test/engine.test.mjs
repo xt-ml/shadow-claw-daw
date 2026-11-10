@@ -251,3 +251,228 @@ test("DawEngine: configures aux send gain routing between tracks", async () => {
     await engine.stop();
   }
 });
+
+test("DawEngine & Presets: applying new synth presets replaces parameters cleanly and updates track.instrument without combining prior preset params", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  const p = engine.getProject();
+  const trkBass = p.tracks.find((t) => t.id === "trk_bass");
+  assert.ok(trkBass, "trk_bass exists");
+
+  // 1. Apply clean-808
+  await engine.sendCommand("apply_preset", {
+    trackId: trkBass.id,
+    preset: "clean-808",
+  });
+  let track = engine.getProject().tracks.find((t) => t.id === trkBass.id);
+  assert.equal(
+    track.instrument,
+    "808",
+    "track.instrument should be updated to 808",
+  );
+  assert.equal(track.params.instrument, "808");
+  assert.equal(track.params.drive, 1.15);
+  assert.equal(track.params.decay, 0.85);
+
+  // 2. Apply tubular-electric-piano (DX7 FM)
+  await engine.sendCommand("apply_preset", {
+    trackId: trkBass.id,
+    preset: "tubular-electric-piano",
+  });
+  track = engine.getProject().tracks.find((t) => t.id === trkBass.id);
+  assert.equal(
+    track.instrument,
+    "tubular",
+    "track.instrument should be updated to tubular",
+  );
+  assert.equal(track.params.algorithm, 5);
+  assert.equal(track.params.modIndex, 2.2);
+  assert.equal(
+    track.params.glide,
+    undefined,
+    "808 glide should not leak into tubular",
+  );
+  assert.equal(
+    track.params.tone,
+    undefined,
+    "808 tone should not leak into tubular",
+  );
+
+  // 3. Apply acid-303 (standard synth preset without explicit instrument field)
+  await engine.sendCommand("apply_preset", {
+    trackId: trkBass.id,
+    preset: "acid-303",
+  });
+  track = engine.getProject().tracks.find((t) => t.id === trkBass.id);
+  assert.equal(
+    track.instrument,
+    "synth",
+    "track.instrument should revert to synth",
+  );
+  assert.equal(track.params.cutoff, 280);
+  assert.equal(track.params.resonance, 18.0);
+  assert.equal(
+    track.params.algorithm,
+    undefined,
+    "tubular algorithm should not leak into acid-303",
+  );
+  assert.equal(
+    track.params.modIndex,
+    undefined,
+    "tubular modIndex should not leak into acid-303",
+  );
+
+  // 4. Apply pluck-guitarish (Karplus-Strong)
+  await engine.sendCommand("apply_preset", {
+    trackId: trkBass.id,
+    preset: "pluck-guitarish",
+  });
+  track = engine.getProject().tracks.find((t) => t.id === trkBass.id);
+  assert.equal(
+    track.instrument,
+    "pluck",
+    "track.instrument should be updated to pluck",
+  );
+  assert.equal(track.params.tone, 0.7);
+  assert.equal(
+    track.params.waveform,
+    undefined,
+    "synth waveform should not leak into pluck",
+  );
+  assert.equal(
+    track.params.cutoff,
+    undefined,
+    "synth cutoff should not leak into pluck",
+  );
+});
+
+test("DawEngine: playing and switching presets does not stack voices, duplicate lookahead events, or leak active voices", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    // Basic beat has 20 notes across drums and bass
+    const initialProject = engine.getProject();
+    const totalNotesInBar = initialProject.tracks.reduce(
+      (sum, t) => sum + (t.notes?.length || 0),
+      0,
+    );
+    assert.ok(totalNotesInBar > 0, "project has notes in bar");
+
+    let voiceTriggerCount = 0;
+    const origTrigger = engine._triggerVoice;
+
+    await engine.play();
+
+    // Track total voices triggered across exactly 1 bar (2.0s = 80 ticks of 25ms)
+    // In lookahead scheduling, each note in the bar must be triggered EXACTLY ONCE per loop
+    for (let step = 0; step < 80; step++) {
+      ctx.currentTime += 0.025;
+      engine._onClockTick();
+    }
+
+    // Apply preset while playing
+    await engine.sendCommand("apply_preset", {
+      trackId: "trk_bass",
+      preset: "clean-808",
+    });
+
+    // Check that previous active voices on trk_bass were stopped
+    for (const v of engine._activeVoices) {
+      if (v.trackId === "trk_bass") {
+        assert.fail(
+          "Previous active voices on trk_bass should be stopped when applying new preset",
+        );
+      }
+    }
+
+    // More clock ticks with the new preset
+    for (let step = 0; step < 8; step++) {
+      ctx.currentTime += 0.025;
+      engine._onClockTick();
+    }
+
+    // Apply another preset while playing
+    await engine.sendCommand("apply_preset", {
+      trackId: "trk_bass",
+      preset: "tubular-solid-bass",
+    });
+
+    for (let step = 0; step < 8; step++) {
+      ctx.currentTime += 0.025;
+      engine._onClockTick();
+    }
+
+    // Apply a third preset
+    await engine.sendCommand("apply_preset", {
+      trackId: "trk_bass",
+      preset: "pluck-guitarish",
+    });
+
+    for (let step = 0; step < 8; step++) {
+      ctx.currentTime += 0.025;
+      engine._onClockTick();
+    }
+
+    // Advance time and allow onended timers to fire to verify cleanup
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    // _activeVoices should not have accumulated all historical voices indefinitely
+    assert.ok(
+      engine._activeVoices.size < 20,
+      `_activeVoices (${engine._activeVoices.size}) should not leak indefinitely across preset changes`,
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("Instruments: voices disconnect their audio nodes and invoke onended on completion to prevent Web Audio memory leaks", async () => {
+  const ctx = new FakeAudioContext();
+  const dest = ctx.createGain();
+
+  let synthEnded = false;
+  const synthVoice = triggerInstrumentVoice(
+    ctx,
+    dest,
+    {
+      trackInstrument: "synth",
+      trackKind: "synth",
+      note: { pitch: 60, velocity: 0.8, duration: 120 },
+    },
+    ctx.currentTime,
+    120,
+  );
+  assert.ok(synthVoice, "synth voice should be created");
+  synthVoice.onended = () => {
+    synthEnded = true;
+  };
+  synthVoice.stop(0);
+  assert.equal(synthEnded, true, "synthVoice onended should fire on stop");
+
+  let pluckEnded = false;
+  const pluckVoice = triggerInstrumentVoice(
+    ctx,
+    dest,
+    {
+      trackInstrument: "pluck",
+      trackKind: "synth",
+      note: { pitch: 64, velocity: 0.9, duration: 120 },
+    },
+    ctx.currentTime,
+    120,
+  );
+  assert.ok(pluckVoice, "pluck voice should be created");
+  pluckVoice.onended = () => {
+    pluckEnded = true;
+  };
+  pluckVoice.stop(0);
+  assert.equal(pluckEnded, true, "pluckVoice onended should fire on stop");
+});

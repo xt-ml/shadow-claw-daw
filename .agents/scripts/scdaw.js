@@ -724,10 +724,20 @@ export function applyCommand(project, name, params = {}) {
       const presetName = params.preset;
       const presetData = INSTRUMENT_PRESETS[presetName];
       if (!presetData) throw new Error(`Unknown preset: ${presetName}`);
-      track.params = { ...(track.params || {}), ...presetData };
+      const targetInstrument = String(
+        presetData.instrument || "synth",
+      ).toLowerCase();
+      track.instrument = targetInstrument;
+      const defaultParams = getDefaultParams(targetInstrument);
+      track.params = { ...defaultParams, ...presetData };
       return {
         project: next,
-        result: { ok: true, trackId: track.id, preset: presetName },
+        result: {
+          ok: true,
+          trackId: track.id,
+          preset: presetName,
+          instrument: targetInstrument,
+        },
       };
     }
 
@@ -1267,7 +1277,8 @@ export function computeEventsInRange(project, fromPpqn, toPpqn) {
         events.push({
           trackId: track.id,
           trackKind: track.kind,
-          trackInstrument: track.instrument || track.kind,
+          trackInstrument:
+            track.instrument || track.params?.instrument || track.kind,
           trackParams: track.params,
           trackVolume: track.volume,
           trackPan: track.pan,

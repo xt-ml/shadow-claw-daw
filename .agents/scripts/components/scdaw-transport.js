@@ -554,56 +554,77 @@ export class DawTransportElement extends BaseElement {
             }
           }
         }
+        dialog.scdaw-dialog,
         dialog:modal {
-          max-width: 440px;
-          width: 90vw;
-          background: var(--scdaw-surface, #1e293b);
-          border: 1px solid var(--scdaw-border, #334155);
+          max-width: 460px;
+          width: 92vw;
+          background: var(--bg-card, #161b1c);
+          border: 1px solid var(--border, #3f4849);
           border-radius: 8px;
-          color: var(--scdaw-text, #f8fafc);
+          color: var(--shadow-claw-text-primary, #dde4e4);
           padding: 0;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--border-subtle, rgba(255, 255, 255, 0.08));
+          box-sizing: border-box;
+          font-family: inherit;
         }
 
         dialog::backdrop {
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(2px);
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(4px);
         }
 
         .scdaw-dialog__form {
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          padding: 16px;
+          gap: 1rem;
+          padding: 1.25rem;
+          margin: 0;
         }
 
         .scdaw-dialog__header {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid var(--scdaw-border, #334155);
-          padding-bottom: 8px;
+          border-bottom: 1px solid var(--border, #3f4849);
+          padding-bottom: 0.75rem;
+        }
+
+        .scdaw-dialog__header .btn-icon {
+          padding: 4px 8px;
+          font-size: 0.85rem;
+          line-height: 1;
+          background: transparent;
+          border-color: transparent;
+          color: var(--shadow-claw-text-secondary, #879394);
+          border-radius: 4px;
+        }
+
+        .scdaw-dialog__header .btn-icon:hover {
+          background: var(--border, #3f4849);
+          color: var(--shadow-claw-text-primary, #dde4e4);
         }
 
         .scdaw-dialog__title {
           margin: 0;
-          font-size: 1rem;
-          font-weight: 600;
-          color: var(--scdaw-text, #f8fafc);
+          font-size: 1.05rem;
+          font-weight: 700;
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
         }
 
         .scdaw-dialog__desc {
-          margin: 0;
+          margin: 0 0 0.85rem 0;
           font-size: 0.85rem;
-          color: var(--scdaw-text-secondary, #94a3b8);
-          line-height: 1.4;
+          color: var(--shadow-claw-text-secondary, #879394);
+          line-height: 1.5;
         }
 
         .scdaw-dialog__actions-vertical {
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          margin: 8px 0;
+          gap: 0.6rem;
         }
 
         .scdaw-dialog__btn {
@@ -611,24 +632,74 @@ export class DawTransportElement extends BaseElement {
           flex-direction: column;
           align-items: flex-start;
           text-align: left;
-          padding: 8px 12px;
-          gap: 2px;
+          padding: 0.7rem 0.95rem;
+          gap: 0.3rem;
           border-radius: 6px;
           cursor: pointer;
+          background: var(--bg-elevated, #252b2c);
+          border: 1px solid var(--border, #3f4849);
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          width: 100%;
+          box-sizing: border-box;
+          transition: border-color 0.15s ease, background 0.15s ease, transform 0.05s ease;
+        }
+
+        .scdaw-dialog__btn:hover {
+          background: var(--border, #3f4849);
+          border-color: var(--accent, #80d4db);
+          color: #ffffff;
+        }
+
+        .scdaw-dialog__btn:active {
+          transform: scale(0.99);
+        }
+
+        .scdaw-dialog__btn.btn-primary {
+          background: var(--accent, #80d4db);
+          color: var(--on-accent, #00363a);
+          border-color: var(--accent, #80d4db);
+        }
+
+        .scdaw-dialog__btn.btn-primary:hover {
+          background: var(--accent-hover, #9df0f8);
+          border-color: var(--accent-hover, #9df0f8);
+          color: var(--on-accent, #00363a);
         }
 
         .scdaw-dialog__btn-sub {
-          font-size: 0.72rem;
-          opacity: 0.8;
-          font-weight: normal;
+          font-size: 0.75rem;
+          color: var(--shadow-claw-text-secondary, #879394);
+          font-weight: 400;
+          line-height: 1.35;
+        }
+
+        .scdaw-dialog__btn.btn-primary .scdaw-dialog__btn-sub {
+          color: var(--on-accent, #00363a);
+          opacity: 0.88;
         }
 
         .scdaw-dialog__footer {
           display: flex;
           justify-content: flex-end;
-          gap: 8px;
-          border-top: 1px solid var(--scdaw-border, #334155);
-          padding-top: 8px;
+          gap: 0.6rem;
+          border-top: 1px solid var(--border, #3f4849);
+          padding-top: 0.75rem;
+          margin-top: 0.25rem;
+        }
+
+        .scdaw-dialog__footer .btn {
+          height: 32px;
+          padding: 0 1rem;
+          font-size: 0.82rem;
+          background: var(--bg-elevated, #252b2c);
+          border: 1px solid var(--border, #3f4849);
+          color: var(--shadow-claw-text-primary, #dde4e4);
+          border-radius: 4px;
+        }
+
+        .scdaw-dialog__footer .btn:hover {
+          background: var(--border, #3f4849);
+          color: #ffffff;
         }
       </style>
       <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">

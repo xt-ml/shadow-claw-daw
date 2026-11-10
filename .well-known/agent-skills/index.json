@@ -216,7 +216,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
         }
       ]
     },
@@ -252,7 +252,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
         }
       ]
     },
@@ -278,7 +278,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
         }
       ]
     },
@@ -329,7 +329,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
         }
       ]
     },
@@ -360,7 +360,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
         }
       ]
     },
@@ -597,7 +597,7 @@
       "name": "scdaw-browser",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-browser.",
       "url": "../../.agents/scripts/components/scdaw-browser.js",
-      "digest": "sha256:85dc902640a82c31eacaed10096705546b9fd543e754570e31aaa1de61c773e4"
+      "digest": "sha256:cddc5c70842653a851e2a27ca7510c83af31bc74d5fa47084f605efb56c53407"
     },
     {
       "name": "scdaw-devices",
@@ -645,7 +645,7 @@
       "name": "scdaw-styles",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-styles.",
       "url": "../../.agents/scripts/components/scdaw-styles.js",
-      "digest": "sha256:6baa57cd45c5bbebe9c3366482b8f33681584389977200c64e85054bdbe00c3d"
+      "digest": "sha256:2140b5b547cdce3c17f8991fbc6e00b5ec2e8e2ed73f71ee86932e0f57bb3aa3"
     },
     {
       "name": "scdaw-timeline",
@@ -657,13 +657,13 @@
       "name": "scdaw-transport",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
       "url": "../../.agents/scripts/components/scdaw-transport.js",
-      "digest": "sha256:dc33ce204c328aa3a21f663cb56bf4b059241e93d55b673456a4b3f5c9fde2b1"
+      "digest": "sha256:56b8e1075f928e054da9beefed09798d91532307cf278183b1c5ff8d76b6ef7d"
     },
     {
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:e062c0f088a182f2c7c3d38f9cddef124c16f853039e3a82c40e1de92bf02e98"
+      "digest": "sha256:2acd771b3264ade5c7ffb4e63600800224f61d12c1d0357914d8204d6073f863"
     },
     {
       "name": "scdaw-adapter",
@@ -693,7 +693,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:e41632096620765fbb8c6f904f758b74ac452cb5b5e5a40cd69e765e22572cf1"
+      "digest": "sha256:1140da0f73303d235e1a6bad1bb62411af05032396039b212b2b4b726ccb5500"
     },
     {
       "name": "scdaw-fs",
@@ -705,7 +705,7 @@
       "name": "scdaw-instruments",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
       "url": "../../.agents/scripts/scdaw-instruments.js",
-      "digest": "sha256:ce030b6ca384de7a486033cd0316fece2bfb14e17f9a2de7269fb578d977e6fa"
+      "digest": "sha256:d6913366aaf7d9bd63fa152b1e26d29efbd2728dde03a00a3feb96a2c4dc305d"
     },
     {
       "name": "scdaw-midi",
@@ -729,7 +729,7 @@
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:ee610979bfddcc4365cf326b17758f9165ac1b985fadb28b6071e6b37ce8cac8"
+      "digest": "sha256:8a6b0519bc317a17e45def9c84f5314f267b94859c0e0c28ac87ba389bc9be9d"
     },
     {
       "name": "scdaw-signals",
@@ -747,7 +747,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:d5987f5a9076d555e4362e7dc48eac21ff114e2e1b49f8aa586693f8ee0171eb"
+      "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
     },
     {
       "name": "starter-tools",

@@ -39,6 +39,12 @@ class FakeAudioNode {
     return dest;
   }
   disconnect() {
+    for (const out of this.outputs) {
+      if (out && out.inputs) {
+        const idx = out.inputs.indexOf(this);
+        if (idx !== -1) out.inputs.splice(idx, 1);
+      }
+    }
     this.outputs = [];
   }
 }
@@ -82,9 +88,9 @@ class FakeOscillatorNode extends FakeAudioNode {
   stop(when = 0) {
     this.stopped = true;
     this.stopTime = when;
-    if (this.onended) {
-      setTimeout(() => this.onended(), 10);
-    }
+    setTimeout(() => {
+      if (typeof this.onended === "function") this.onended();
+    }, 10);
   }
 }
 
@@ -139,7 +145,9 @@ class FakeAudioBufferSourceNode extends FakeAudioNode {
   }
   stop(when = 0) {
     this.stopTime = when;
-    if (this.onended) setTimeout(() => this.onended(), 10);
+    setTimeout(() => {
+      if (typeof this.onended === "function") this.onended();
+    }, 10);
   }
 }
 

@@ -344,6 +344,8 @@ export class DawEngine extends EventTarget {
     this._lastScheduleAudioTime = this.ctx
       ? this.ctx.currentTime
       : Date.now() / 1000;
+    this._lastSchedulePpqn = 0;
+    this._scheduledUntilPpqn = null;
     this._updateState({ playing: true });
 
     if (this._worker) {
@@ -362,6 +364,15 @@ export class DawEngine extends EventTarget {
       step: 0,
     });
     this._lastSchedulePpqn = 0;
+    this._scheduledUntilPpqn = null;
+
+    for (const voice of this._activeVoices) {
+      try {
+        if (typeof voice.stop === "function") voice.stop(0);
+        if (typeof voice.disconnect === "function") voice.disconnect();
+      } catch (_) {}
+    }
+    this._activeVoices.clear();
 
     if (this._worker) {
       this._worker.postMessage("stop");
@@ -381,6 +392,7 @@ export class DawEngine extends EventTarget {
       } catch (_) {}
     }
     this._activeVoices.clear();
+    this._scheduledUntilPpqn = null;
   }
 
   _onClockTick() {
@@ -400,13 +412,24 @@ export class DawEngine extends EventTarget {
     let toPpqn = fromPpqn + deltaPulses;
     const nextPos = toPpqn % totalPulses;
 
-    // Schedule audio voices in lookahead window (100ms)
+    // Schedule audio voices in lookahead window (100ms) without duplication
     const lookaheadPulses = secondsToPulses(0.1, bpm);
-    const events = computeEventsInRange(
-      p,
-      fromPpqn,
-      (fromPpqn + lookaheadPulses) % totalPulses,
-    );
+    let schedStart, schedEnd;
+
+    if (
+      this._scheduledUntilPpqn === null ||
+      this._scheduledUntilPpqn === undefined
+    ) {
+      schedStart = fromPpqn % totalPulses;
+      schedEnd = (fromPpqn + lookaheadPulses) % totalPulses;
+      this._scheduledUntilPpqn = (fromPpqn + lookaheadPulses) % totalPulses;
+    } else {
+      schedStart = this._scheduledUntilPpqn;
+      schedEnd = (this._scheduledUntilPpqn + deltaPulses) % totalPulses;
+      this._scheduledUntilPpqn = schedEnd;
+    }
+
+    const events = computeEventsInRange(p, schedStart, schedEnd);
 
     if (this.ctx && this.graph) {
       const hasSolo = p.tracks.some((t) => t.solo);
@@ -439,19 +462,18 @@ export class DawEngine extends EventTarget {
             bpm,
           );
           if (voice) {
+            voice.trackId = ev.trackId;
             this._activeVoices.add(voice);
-            if (voice.onended !== undefined) {
-              const origEnded = voice.onended;
-              voice.onended = () => {
-                this._activeVoices.delete(voice);
-                if (typeof origEnded === "function") origEnded();
-              };
-            }
+            const origEnded = voice.onended;
+            voice.onended = () => {
+              this._activeVoices.delete(voice);
+              if (typeof origEnded === "function") origEnded();
+            };
           }
         }
       }
 
-      // Schedule audio clips for audio tracks
+      // Schedule audio clips for audio tracks without duplication
       for (const track of p.tracks) {
         if (track.kind === "audio" && Array.isArray(track.audioClips)) {
           const nodes = this.graph.tracks.get(track.id);
@@ -461,9 +483,16 @@ export class DawEngine extends EventTarget {
             const clipDurPulses = Math.round(
               (clip.duration || 4) * PPQN.Quarter,
             );
-            const deltaEvPulses =
-              (clipStartPulses - fromPpqn + totalPulses) % totalPulses;
-            if (deltaEvPulses < lookaheadPulses) {
+            const clipPos = clipStartPulses % totalPulses;
+            let clipInRange = false;
+            if (schedStart <= schedEnd) {
+              clipInRange = clipPos >= schedStart && clipPos < schedEnd;
+            } else {
+              clipInRange = clipPos >= schedStart || clipPos < schedEnd;
+            }
+            if (clipInRange) {
+              const deltaEvPulses =
+                (clipPos - fromPpqn + totalPulses) % totalPulses;
               const evTime = Math.max(
                 nowAudio,
                 nowAudio + pulsesToSeconds(deltaEvPulses, bpm),
@@ -488,12 +517,15 @@ export class DawEngine extends EventTarget {
               clipGain.connect(nodes.gain);
               const durSec = pulsesToSeconds(clipDurPulses, bpm);
               source.start(evTime, clip.offset || 0, durSec);
+              source.trackId = track.id;
               this._activeVoices.add(source);
-              const origEnded = source.onended;
-              source.onended = () => {
+              const cleanupClip = () => {
                 this._activeVoices.delete(source);
-                if (typeof origEnded === "function") origEnded();
+                try {
+                  clipGain.disconnect();
+                } catch (_) {}
               };
+              source.onended = cleanupClip;
             }
           }
         }
@@ -581,6 +613,11 @@ export class DawEngine extends EventTarget {
       gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
       osc.connect(gain);
       gain.connect(this.graph.master);
+      osc.onended = () => {
+        try {
+          gain.disconnect();
+        } catch (_) {}
+      };
       osc.start(when);
       osc.stop(when + 0.05);
     } catch (_) {}
@@ -1562,6 +1599,24 @@ export class DawEngine extends EventTarget {
     // Mutating commands: snapshot current project before applying
     const current = this.project.get();
     this.history.push(current);
+
+    // If changing preset, instrument, or track params, stop active voices on that track
+    if (
+      (name === "apply_preset" ||
+        name === "set_instrument" ||
+        name === "set_track_params") &&
+      params.trackId
+    ) {
+      for (const voice of this._activeVoices) {
+        if (voice.trackId === params.trackId) {
+          try {
+            if (typeof voice.stop === "function") voice.stop(0);
+            if (typeof voice.disconnect === "function") voice.disconnect();
+          } catch (_) {}
+          this._activeVoices.delete(voice);
+        }
+      }
+    }
 
     const { project: next, result } = applyCommand(current, name, params);
     this.project.set(next);

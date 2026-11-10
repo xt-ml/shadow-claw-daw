@@ -1318,6 +1318,77 @@ test("scdaw-transport: shouldPromptRecordOptions identifies overlapping clips at
   );
 });
 
+test("scdaw-transport: Audio Recording Options dialog strictly follows ShadowClaw theme tokens and avoids slate-blue/hardcoded colors", async () => {
+  const transportContent = await fs.readFile(
+    new URL(
+      "../.agents/scripts/components/scdaw-transport.js",
+      import.meta.url,
+    ),
+    "utf-8",
+  );
+
+  // Must not have hardcoded Tailwind slate-blue colors (#1e293b, #334155, #f8fafc)
+  assert.doesNotMatch(
+    transportContent,
+    /#1e293b/i,
+    "scdaw-transport must not use hardcoded slate-800 (#1e293b)",
+  );
+  assert.doesNotMatch(
+    transportContent,
+    /#334155/i,
+    "scdaw-transport must not use hardcoded slate-700 (#334155)",
+  );
+  assert.doesNotMatch(
+    transportContent,
+    /#f8fafc/i,
+    "scdaw-transport must not use hardcoded slate-50 (#f8fafc)",
+  );
+
+  // Must not use ungrounded --scdaw- variables instead of theme tokens
+  assert.doesNotMatch(
+    transportContent,
+    /--scdaw-surface/i,
+    "scdaw-transport must not use non-existent --scdaw-surface variable",
+  );
+  assert.doesNotMatch(
+    transportContent,
+    /--scdaw-border/i,
+    "scdaw-transport must not use non-existent --scdaw-border variable",
+  );
+  assert.doesNotMatch(
+    transportContent,
+    /--scdaw-text\b/i,
+    "scdaw-transport must not use non-existent --scdaw-text variable",
+  );
+
+  // Must use proper ShadowClaw theme variables for dialog surface and borders
+  assert.match(
+    transportContent,
+    /var\(--bg-card/i,
+    "dialog modal must use var(--bg-card)",
+  );
+  assert.match(
+    transportContent,
+    /var\(--border/i,
+    "dialog modal must use var(--border)",
+  );
+  assert.match(
+    transportContent,
+    /var\(--shadow-claw-text-primary/i,
+    "dialog modal must use var(--shadow-claw-text-primary)",
+  );
+  assert.match(
+    transportContent,
+    /\.scdaw-dialog__btn[\s\S]*?var\(--bg-elevated/i,
+    "dialog option buttons must use var(--bg-elevated)",
+  );
+  assert.match(
+    transportContent,
+    /\.scdaw-dialog__btn\.btn-primary[\s\S]*?var\(--accent/i,
+    "dialog primary button must use var(--accent)",
+  );
+});
+
 test("scdaw-statusbar: formats audio telemetry, project summary, and bounce status", () => {
   const status = formatTelemetryStatus(
     { audio: "running", lastBounce: { durationSec: 4.0, peakDb: -1.2 } },
@@ -2438,4 +2509,114 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
   assert.match(knobContent, /role=["']slider["']/);
   assert.match(knobContent, /touch-action:\s*none/);
   assert.match(knobContent, /scdaw-knob/);
+});
+
+test("scdaw-browser & scdaw-workbench: mobile-first container query height capping and internal scroll containment", async () => {
+  const [workbenchContent, browserContent] = await Promise.all([
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-workbench.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-browser.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+  ]);
+
+  // 1. Mobile-First base styles for #browser-container in workbench
+  // Bounded height cap so browser does not push workspace out of view on mobile
+  assert.match(
+    workbenchContent,
+    /#browser-container\s*\{[^}]*max-height:\s*clamp\(/,
+    "#browser-container must enforce a mobile-first bounded max-height with clamp()",
+  );
+  assert.match(
+    workbenchContent,
+    /#browser-container\s*\{[^}]*overflow:\s*hidden/,
+    "#browser-container must enforce overflow: hidden to contain scrollable children",
+  );
+  assert.match(
+    workbenchContent,
+    /#browser-container\s*\{[^}]*min-height:\s*0/,
+    "#browser-container must enforce min-height: 0 to allow flex/grid shrinking",
+  );
+
+  // 2. Progressive enhancement for tablet/desktop in @container scdaw-workbench (min-width: 640px)
+  // Height is capped relative to center-stack UI elements and viewport
+  assert.match(
+    workbenchContent,
+    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?#browser-container\s*\{[^}]*max-height:\s*var\(--center-stack-h/,
+    "#browser-container must cap height relative to center-stack UI elements (--center-stack-h) at >= 640px container width",
+  );
+
+  // 3. Dynamic height synchronization: workbench measures #center-stack and sets --center-stack-h
+  assert.match(
+    workbenchContent,
+    /--center-stack-h/,
+    "Workbench must define and update --center-stack-h CSS variable",
+  );
+
+  // 4. scdaw-browser internal styles: :host and inner panel must not expand unboundedly
+  assert.match(
+    browserContent,
+    /:host\s*\{[^}]*min-height:\s*0/,
+    "scdaw-browser :host must declare min-height: 0",
+  );
+  assert.match(
+    browserContent,
+    /:host\s*\{[^}]*max-height:\s*100%/,
+    "scdaw-browser :host must declare max-height: 100%",
+  );
+  assert.match(
+    browserContent,
+    /:host\s*\{[^}]*overflow:\s*hidden/,
+    "scdaw-browser :host must declare overflow: hidden",
+  );
+
+  // 5. scdaw-browser item list: flex shrink and scroll containment per modern-web-guidance
+  assert.match(
+    browserContent,
+    /\.item-list\s*\{[^}]*min-height:\s*0/,
+    ".item-list must declare min-height: 0 so flex child shrinks and scrolls",
+  );
+  assert.match(
+    browserContent,
+    /\.item-list\s*\{[^}]*overflow-y:\s*auto/,
+    ".item-list must declare overflow-y: auto",
+  );
+  assert.match(
+    browserContent,
+    /\.item-list\s*\{[^}]*overscroll-behavior:\s*contain/,
+    ".item-list must declare overscroll-behavior: contain to prevent scroll chaining",
+  );
+  assert.match(
+    browserContent,
+    /\.item-list\s*\{[^}]*scrollbar-gutter:\s*stable/,
+    ".item-list must declare scrollbar-gutter: stable to prevent layout shifts",
+  );
+
+  // 6. Fixed elements inside scdaw-browser must have flex-shrink: 0
+  assert.match(
+    browserContent,
+    /\.scdaw-browser__header[^}]*flex-shrink:\s*0/,
+    "Browser header must declare flex-shrink: 0",
+  );
+  assert.match(
+    browserContent,
+    /\.search-box[^}]*flex-shrink:\s*0/,
+    "Search box must declare flex-shrink: 0",
+  );
+
+  // 7. Internal container query @container scdaw-browser (min-width: ...) for component-level reactivity
+  assert.match(
+    browserContent,
+    /@container scdaw-browser\s*\(\s*min-width:\s*\d+px\s*\)/,
+    "scdaw-browser must declare internal mobile-first container query @container scdaw-browser",
+  );
 });

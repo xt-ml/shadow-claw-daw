@@ -186,11 +186,24 @@ export class DawBrowserElement extends BaseElement {
           display: flex;
           flex-direction: column;
           height: 100%;
+          max-height: 100%;
+          min-height: 0;
           width: 100%;
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
           container-name: scdaw-browser;
+          overflow: hidden;
+        }
+        .scdaw-browser {
+          height: 100%;
+          max-height: 100%;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+          width: 100%;
+          overflow: hidden;
         }
         .scdaw-browser__header,
         .browser-header {
@@ -202,6 +215,7 @@ export class DawBrowserElement extends BaseElement {
           padding-bottom: 0.4rem;
           width: 100%;
           box-sizing: border-box;
+          flex-shrink: 0;
         }
         .scdaw-browser__tab-btn,
         .tab-btn {
@@ -237,11 +251,16 @@ export class DawBrowserElement extends BaseElement {
           font-size: 0.75rem;
           margin-bottom: 0.5rem;
           box-sizing: border-box;
+          flex-shrink: 0;
         }
         .scdaw-browser__list,
         .item-list {
-          flex: 1;
+          flex: 1 1 0;
+          min-height: 0;
+          max-height: 100%;
           overflow-y: auto;
+          overscroll-behavior: contain;
+          scrollbar-gutter: stable;
           display: flex;
           flex-direction: column;
           gap: 2px;
@@ -265,8 +284,32 @@ export class DawBrowserElement extends BaseElement {
           background: var(--bg-elevated);
           color: var(--accent);
         }
+
+        /* Progressive Enhancement: Wider browser sidebar (>= 220px) */
+        @container scdaw-browser (min-width: 220px) {
+          .scdaw-browser__tab-btn,
+          .tab-btn {
+            font-size: 0.75rem;
+            padding: 0.4rem 0.25rem;
+          }
+          .scdaw-browser__item,
+          .browser-item {
+            padding: 0.45rem 0.65rem;
+            font-size: 0.78rem;
+          }
+        }
+
+        /* Fallback for environments lacking CSS container query evaluation */
+        @supports not (container-type: inline-size) {
+          @media (min-width: 220px) {
+            .scdaw-browser__tab-btn,
+            .tab-btn {
+              font-size: 0.75rem;
+            }
+          }
+        }
       </style>
-      <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; display:flex; flex-direction:column; box-sizing:border-box; width:100%;">
+      <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
         <div class="scdaw-browser__header browser-header" role="tablist" aria-label="Library Categories">
           <button role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
           <button role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>

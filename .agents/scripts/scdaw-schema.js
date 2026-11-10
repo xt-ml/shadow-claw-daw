@@ -427,16 +427,14 @@ export function migrateProject(project) {
 }
 
 export function getDefaultParams(kind) {
-  if (kind === "synth") {
+  const normKind = String(kind || "").toLowerCase();
+  const schema =
+    INSTRUMENT_SCHEMAS[normKind] ||
+    (normKind === "synth" ? SYNTH_PARAM_SCHEMA : null) ||
+    FX_SCHEMAS[normKind];
+  if (schema) {
     const defaults = {};
-    for (const [key, def] of Object.entries(SYNTH_PARAM_SCHEMA)) {
-      defaults[key] = def.default;
-    }
-    return defaults;
-  }
-  if (FX_SCHEMAS[kind]) {
-    const defaults = {};
-    for (const [key, def] of Object.entries(FX_SCHEMAS[kind])) {
+    for (const [key, def] of Object.entries(schema)) {
       defaults[key] = def.default;
     }
     return defaults;
