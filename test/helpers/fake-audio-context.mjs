@@ -112,6 +112,22 @@ class FakeDynamicsCompressorNode extends FakeAudioNode {
   }
 }
 
+class FakeWaveShaperNode extends FakeAudioNode {
+  constructor(ctx) {
+    super(ctx);
+    this.curve = null;
+    this.oversample = "none";
+  }
+}
+
+class FakeDelayNode extends FakeAudioNode {
+  constructor(ctx, maxDelay = 1) {
+    super(ctx);
+    this.delayTime = new FakeAudioParam(0);
+    this.maxDelay = maxDelay;
+  }
+}
+
 class FakeAudioBufferSourceNode extends FakeAudioNode {
   constructor(ctx) {
     super(ctx);
@@ -153,6 +169,12 @@ export class FakeAudioContext extends EventTarget {
   }
   createDynamicsCompressor() {
     return new FakeDynamicsCompressorNode(this);
+  }
+  createWaveShaper() {
+    return new FakeWaveShaperNode(this);
+  }
+  createDelay(maxDelay = 1) {
+    return new FakeDelayNode(this, maxDelay);
   }
   createBufferSource() {
     return new FakeAudioBufferSourceNode(this);

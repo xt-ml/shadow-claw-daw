@@ -14,7 +14,21 @@ import {
 import {
   triggerSynth,
   triggerDrums,
+  trigger808,
+  triggerCubed,
+  triggerPluck,
+  triggerTubular,
+  triggerNeon,
+  triggerNoisePad,
+  triggerKorpus,
+  triggerNano,
+  triggerSoundfont,
+  triggerInstrumentVoice,
+  setCachedSoundfont,
+  getCachedSoundfont,
+  clearSoundfontCache,
 } from "../.agents/scripts/scdaw-instruments.js";
+import { INSTRUMENT_SCHEMAS } from "../.agents/scripts/scdaw-schema.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 import {
   computeEventsInRange,
@@ -88,6 +102,23 @@ test("scdaw-presets: provides rich synth presets and genre templates", () => {
   const popProject = generateGenrePattern("pop");
   assert.equal(popProject.bpm, 118);
   assert.ok(popProject.tracks.length >= 2);
+
+  const trapProject = generateGenrePattern("trap");
+  assert.equal(trapProject.bpm, 140);
+  const trapBass = trapProject.tracks.find((t) => t.id === "trk_bass");
+  assert.equal(trapBass.instrument, "808");
+  assert.ok(trapBass.notes.length > 0);
+
+  const acidProject = generateGenrePattern("acid");
+  assert.equal(acidProject.bpm, 135);
+  const acidBass = acidProject.tracks.find((t) => t.id === "trk_bass");
+  assert.equal(acidBass.instrument, "cubed");
+  assert.ok(acidBass.notes.some((n) => n.accent));
+
+  const ambientProject = generateGenrePattern("ambient");
+  assert.equal(ambientProject.bpm, 75);
+  const ambientPad = ambientProject.tracks.find((t) => t.id === "trk_bass");
+  assert.equal(ambientPad.instrument, "noise-pad");
 });
 
 test("Vaporisateur: triggers multi-oscillator synth voice with filter envelope sweep", () => {
@@ -219,4 +250,219 @@ test("applyCommand('manage_fx'): adds, updates, resets, and removes audio/midi f
   });
   p = removeRes.project;
   assert.equal(p.tracks.find((t) => t.id === trackId).fx.length, 0);
+});
+
+test("INSTRUMENT_SCHEMAS: defines parameters and defaults for all 9 roster instruments", () => {
+  const expected = [
+    "vaporisateur",
+    "playfield",
+    "808",
+    "cubed",
+    "pluck",
+    "tubular",
+    "neon",
+    "noise-pad",
+    "korpus",
+    "nano",
+    "soundfont",
+  ];
+  for (const name of expected) {
+    assert.ok(INSTRUMENT_SCHEMAS[name], `Missing schema for ${name}`);
+  }
+
+  assert.equal(INSTRUMENT_SCHEMAS["808"].preset.default, "clean");
+  assert.equal(INSTRUMENT_SCHEMAS.cubed.waveform.default, "sawtooth");
+  assert.equal(INSTRUMENT_SCHEMAS.pluck.preset.default, "guitarish");
+  assert.equal(INSTRUMENT_SCHEMAS.tubular.algorithm.default, 1);
+  assert.equal(INSTRUMENT_SCHEMAS.neon.mode.default, "normal");
+  assert.equal(INSTRUMENT_SCHEMAS["noise-pad"].preset.default, "air_pad");
+  assert.equal(INSTRUMENT_SCHEMAS.korpus.exciter.default, "strike");
+  assert.equal(INSTRUMENT_SCHEMAS.nano.rootKey.default, 60);
+  assert.equal(INSTRUMENT_SCHEMAS.soundfont.program.default, 0);
+});
+
+test("9-Instrument Roster: triggers all procedural instruments and returns valid voice handles", () => {
+  const ctx = new FakeAudioContext();
+  const dest = ctx.createGain();
+  const note = { pitch: 48, velocity: 0.85, duration: 480 };
+
+  // 1. 808 Sub Bass
+  const v808 = trigger808(
+    ctx,
+    dest,
+    note,
+    0,
+    { preset: "dist", glide: 0.04 },
+    120,
+    1,
+  );
+  assert.ok(typeof v808.stop === "function");
+  v808.stop(0.1);
+
+  // 2. Cubed TB-303
+  const vCubed = triggerCubed(
+    ctx,
+    dest,
+    { ...note, accent: true },
+    0,
+    { cutoff: 500, resonance: 14 },
+    120,
+    1,
+  );
+  assert.ok(typeof vCubed.stop === "function");
+  vCubed.stop(0.1);
+
+  // 3. Pluck Karplus-Strong
+  const vPluck = triggerPluck(
+    ctx,
+    dest,
+    note,
+    0,
+    { tone: 0.8, decay: 0.5 },
+    120,
+    1,
+  );
+  assert.ok(typeof vPluck.stop === "function");
+  vPluck.stop(0.1);
+
+  // 4. Tubular DX7 6-Op FM
+  const vTubular = triggerTubular(
+    ctx,
+    dest,
+    note,
+    0,
+    { algorithm: 5, modIndex: 3.0 },
+    120,
+    1,
+  );
+  assert.ok(typeof vTubular.stop === "function");
+  vTubular.stop(0.1);
+
+  // 5. Neon Casio CZ-101
+  const vNeon = triggerNeon(
+    ctx,
+    dest,
+    note,
+    0,
+    { mode: "ring", dcw: 0.7 },
+    120,
+    1,
+  );
+  assert.ok(typeof vNeon.stop === "function");
+  vNeon.stop(0.1);
+
+  // 6. Noise Pad
+  const vNoisePad = triggerNoisePad(
+    ctx,
+    dest,
+    note,
+    0,
+    { texture: 0.3, attack: 0.2 },
+    120,
+    1,
+  );
+  assert.ok(typeof vNoisePad.stop === "function");
+  vNoisePad.stop(0.1);
+
+  // 7. Korpus Physical Modeling
+  const vKorpus = triggerKorpus(
+    ctx,
+    dest,
+    note,
+    0,
+    { exciter: "strike", materialA: "bell" },
+    120,
+    1,
+  );
+  assert.ok(typeof vKorpus.stop === "function");
+  vKorpus.stop(0.1);
+
+  // 8. Nano Micro-Sampler
+  const vNano = triggerNano(ctx, dest, note, 0, { rootKey: 48 }, 120, 1);
+  assert.ok(typeof vNano.stop === "function");
+  vNano.stop(0.1);
+
+  // 9. SoundFont General MIDI
+  const vSoundfont = triggerSoundfont(
+    ctx,
+    dest,
+    note,
+    0,
+    { program: 40 },
+    120,
+    1,
+  );
+  assert.ok(typeof vSoundfont.stop === "function");
+  vSoundfont.stop(0.1);
+});
+
+test("triggerInstrumentVoice: dispatches seamlessly based on trackInstrument attribute", () => {
+  const ctx = new FakeAudioContext();
+  const dest = ctx.createGain();
+  const note = { pitch: 36, velocity: 0.9, duration: 240 };
+
+  const instruments = [
+    "808",
+    "cubed",
+    "pluck",
+    "tubular",
+    "neon",
+    "noise-pad",
+    "korpus",
+    "nano",
+    "soundfont",
+    "drums",
+    "vaporisateur",
+  ];
+
+  for (const inst of instruments) {
+    const voice = triggerInstrumentVoice(
+      ctx,
+      dest,
+      {
+        trackInstrument: inst,
+        trackParams: {},
+        trackVolume: 0.9,
+        note,
+      },
+      0,
+      120,
+    );
+    assert.ok(voice, `Failed to get voice handle for ${inst}`);
+    assert.ok(typeof voice.stop === "function");
+  }
+});
+
+test("applyCommand('set_instrument'): updates track instrument and persists custom parameters", () => {
+  let p = createProject("acid-groove");
+  const trackId = "trk_bass";
+
+  const res = applyCommand(p, "set_instrument", {
+    trackId,
+    instrument: "cubed",
+    params: { cutoff: 550, resonance: 18.0, waveform: "square" },
+  });
+
+  const updatedTrack = res.project.tracks.find((t) => t.id === trackId);
+  assert.equal(updatedTrack.instrument, "cubed");
+  assert.equal(updatedTrack.params.cutoff, 550);
+  assert.equal(updatedTrack.params.resonance, 18.0);
+  assert.equal(updatedTrack.params.waveform, "square");
+});
+
+test("SoundFont Caching & Bundling: stores, retrieves, and clears binary soundfont banks", () => {
+  clearSoundfontCache();
+  assert.equal(getCachedSoundfont("A320U_drums.sf2"), undefined);
+
+  const mockSf2 = new Uint8Array([
+    0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x73, 0x66, 0x62, 0x6b,
+  ]);
+  setCachedSoundfont("A320U_drums.sf2", mockSf2.buffer);
+
+  const retrieved = getCachedSoundfont("A320U_drums.sf2");
+  assert.ok(retrieved instanceof ArrayBuffer);
+  assert.equal(retrieved.byteLength, 12);
+
+  clearSoundfontCache();
+  assert.equal(getCachedSoundfont("A320U_drums.sf2"), undefined);
 });

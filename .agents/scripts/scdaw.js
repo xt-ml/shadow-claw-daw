@@ -579,10 +579,27 @@ export function applyCommand(project, name, params = {}) {
         track.pan = Math.max(-1, Math.min(1, Number(params.pan)));
       if (params.mute !== undefined) track.mute = Boolean(params.mute);
       if (params.solo !== undefined) track.solo = Boolean(params.solo);
+      if (params.instrument !== undefined)
+        track.instrument = String(params.instrument);
       if (params.params && typeof params.params === "object") {
         track.params = { ...track.params, ...params.params };
       }
       return { project: next, result: { ok: true, track } };
+    }
+
+    case "set_instrument": {
+      const trackId = params.trackId || params.id;
+      const track = next.tracks.find((t) => t.id === trackId);
+      if (!track) throw new Error(`Track not found: ${trackId}`);
+      const inst = String(params.instrument || "synth").toLowerCase();
+      track.instrument = inst;
+      if (params.params && typeof params.params === "object") {
+        track.params = { ...track.params, ...params.params };
+      }
+      return {
+        project: next,
+        result: { ok: true, trackId, instrument: inst, track },
+      };
     }
 
     case "write_notes": {
@@ -1250,6 +1267,7 @@ export function computeEventsInRange(project, fromPpqn, toPpqn) {
         events.push({
           trackId: track.id,
           trackKind: track.kind,
+          trackInstrument: track.instrument || track.kind,
           trackParams: track.params,
           trackVolume: track.volume,
           trackPan: track.pan,

@@ -76,6 +76,150 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
 
 export const DRUM_PARAM_SCHEMA = Object.freeze({});
 
+export const SYNTH_808_SCHEMA = Object.freeze({
+  preset: {
+    default: "clean",
+    type: "enum",
+    values: ["clean", "dist", "growl", "grit"],
+  },
+  glide: { default: 0.05, min: 0.0, max: 0.5, step: 0.01, unit: "s" },
+  drive: { default: 1.15, min: 0.5, max: 3.0, step: 0.05, unit: "x" },
+  tone: { default: 0.6, min: 0.1, max: 1.0, step: 0.05, unit: "ratio" },
+  decay: { default: 0.8, min: 0.1, max: 3.0, step: 0.05, unit: "s" },
+});
+
+export const CUBED_SCHEMA = Object.freeze({
+  waveform: {
+    default: "sawtooth",
+    type: "enum",
+    values: ["sawtooth", "square"],
+  },
+  tuning: { default: 0, min: -1200, max: 1200, step: 1, unit: "cents" },
+  cutoff: {
+    default: 450,
+    min: 40,
+    max: 10000,
+    step: 10,
+    unit: "Hz",
+    scaling: "exponential",
+  },
+  resonance: { default: 8.0, min: 0.5, max: 25.0, step: 0.5, unit: "Q" },
+  envMod: { default: 2400, min: 0, max: 8000, step: 50, unit: "Hz" },
+  decay: { default: 0.25, min: 0.05, max: 2.0, step: 0.01, unit: "s" },
+  accent: { default: 1.3, min: 1.0, max: 2.5, step: 0.1, unit: "x" },
+});
+
+export const PLUCK_SCHEMA = Object.freeze({
+  preset: {
+    default: "guitarish",
+    type: "enum",
+    values: ["guitarish", "koto_dark", "short_bell", "dark_pluck"],
+  },
+  tone: { default: 0.65, min: 0.1, max: 1.0, step: 0.05, unit: "ratio" },
+  decay: { default: 0.4, min: 0.05, max: 1.0, step: 0.05, unit: "s" },
+  drive: { default: 1.1, min: 0.5, max: 3.0, step: 0.1, unit: "x" },
+  width: { default: 0.75, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+});
+
+export const TUBULAR_SCHEMA = Object.freeze({
+  algorithm: { default: 1, min: 1, max: 32, step: 1, unit: "algo" },
+  feedback: { default: 4.0, min: 0.0, max: 7.0, step: 1, unit: "level" },
+  modIndex: { default: 2.5, min: 0.0, max: 10.0, step: 0.1, unit: "ratio" },
+  attack: { default: 0.01, min: 0.002, max: 2.0, step: 0.01, unit: "s" },
+  decay: { default: 0.5, min: 0.05, max: 4.0, step: 0.05, unit: "s" },
+  sustain: { default: 0.4, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  release: { default: 0.3, min: 0.02, max: 4.0, step: 0.05, unit: "s" },
+});
+
+export const NEON_SCHEMA = Object.freeze({
+  mode: {
+    default: "normal",
+    type: "enum",
+    values: ["normal", "ring", "noise"],
+  },
+  wave1: {
+    default: "resonant-saw",
+    type: "enum",
+    values: ["saw", "square", "resonant-saw", "resonant-tri"],
+  },
+  wave2: {
+    default: "saw",
+    type: "enum",
+    values: ["saw", "square", "pulse", "sine"],
+  },
+  dcw: { default: 0.5, min: 0.0, max: 1.0, step: 0.01, unit: "ratio" },
+  detune: { default: 8, min: -1200, max: 1200, step: 1, unit: "cents" },
+  attack: { default: 0.02, min: 0.005, max: 2.0, step: 0.01, unit: "s" },
+  release: { default: 0.25, min: 0.02, max: 4.0, step: 0.01, unit: "s" },
+});
+
+export const NOISE_PAD_SCHEMA = Object.freeze({
+  preset: {
+    default: "air_pad",
+    type: "enum",
+    values: ["air_pad", "vinyl_hiss_pad", "dark_wind", "cinematic_haze"],
+  },
+  attack: { default: 0.6, min: 0.05, max: 3.0, step: 0.05, unit: "s" },
+  decay: { default: 0.6, min: 0.05, max: 3.0, step: 0.05, unit: "s" },
+  sustain: { default: 0.7, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  release: { default: 0.9, min: 0.1, max: 5.0, step: 0.1, unit: "s" },
+  tone: { default: 0.4, min: 0.1, max: 1.0, step: 0.05, unit: "ratio" },
+  texture: { default: 0.25, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  width: { default: 0.9, min: 0.0, max: 1.5, step: 0.05, unit: "ratio" },
+});
+
+export const KORPUS_SCHEMA = Object.freeze({
+  exciter: {
+    default: "strike",
+    type: "enum",
+    values: ["strike", "breath", "bow", "pick", "wind"],
+  },
+  intensity: { default: 0.6, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  materialA: {
+    default: "marimba",
+    type: "enum",
+    values: ["marimba", "bell", "membrane", "plate", "wire"],
+  },
+  materialB: {
+    default: "plate",
+    type: "enum",
+    values: ["bell", "plate", "wire", "membrane", "off"],
+  },
+  coupling: { default: 0.3, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  damping: { default: 0.5, min: 0.05, max: 1.0, step: 0.05, unit: "ratio" },
+});
+
+export const NANO_SCHEMA = Object.freeze({
+  rootKey: { default: 60, min: 0, max: 127, step: 1, unit: "key" },
+  attack: { default: 0.005, min: 0.001, max: 2.0, step: 0.005, unit: "s" },
+  release: { default: 0.2, min: 0.01, max: 5.0, step: 0.01, unit: "s" },
+  loop: { default: false, type: "boolean" },
+  reverse: { default: false, type: "boolean" },
+});
+
+export const SOUNDFONT_SCHEMA = Object.freeze({
+  soundfont: { default: "", type: "string" },
+  bank: { default: 0, min: 0, max: 128, step: 1, unit: "bank" },
+  program: { default: 0, min: 0, max: 127, step: 1, unit: "program" },
+  channel: { default: 0, min: 0, max: 15, step: 1, unit: "channel" },
+});
+
+export const INSTRUMENT_SCHEMAS = Object.freeze({
+  vaporisateur: SYNTH_PARAM_SCHEMA,
+  synth: SYNTH_PARAM_SCHEMA,
+  playfield: DRUM_PARAM_SCHEMA,
+  drums: DRUM_PARAM_SCHEMA,
+  808: SYNTH_808_SCHEMA,
+  cubed: CUBED_SCHEMA,
+  pluck: PLUCK_SCHEMA,
+  tubular: TUBULAR_SCHEMA,
+  neon: NEON_SCHEMA,
+  "noise-pad": NOISE_PAD_SCHEMA,
+  korpus: KORPUS_SCHEMA,
+  nano: NANO_SCHEMA,
+  soundfont: SOUNDFONT_SCHEMA,
+});
+
 export const AUTOMATABLE_PARAMS = Object.freeze({
   volume: Object.freeze({
     scope: "track",

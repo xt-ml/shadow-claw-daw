@@ -763,6 +763,7 @@ export class DawEngine extends EventTarget {
           gainNode,
           {
             trackKind: track.kind || track.type,
+            trackInstrument: track.instrument || track.kind || track.type,
             trackParams,
             trackVolume: track.volume,
             trackPan: track.pan,
@@ -966,6 +967,7 @@ export class DawEngine extends EventTarget {
             gain,
             {
               trackKind: track.kind || track.type,
+              trackInstrument: track.instrument || track.kind || track.type,
               trackParams: track.params,
               trackVolume: tap === "pre-fader" ? 1.0 : track.volume,
               trackPan: tap === "pre-fader" ? 0 : track.pan,
@@ -1046,6 +1048,7 @@ export class DawEngine extends EventTarget {
           gain,
           {
             trackKind: track.kind || track.type,
+            trackInstrument: track.instrument || track.kind || track.type,
             trackParams: track.params,
             trackVolume: tap === "pre-fader" ? 1.0 : track.volume,
             trackPan: tap === "pre-fader" ? 0 : track.pan,
