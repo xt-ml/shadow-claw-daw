@@ -109,6 +109,69 @@ export class DawBrowserElement extends BaseElement {
     }
     // Instruments
     items.push({
+      id: "dev_808",
+      name: "808 Sub Bass",
+      type: "devices",
+      category: "Instrument",
+      kind: "808",
+    });
+    items.push({
+      id: "dev_cubed",
+      name: "Cubed (TB-303 Acid)",
+      type: "devices",
+      category: "Instrument",
+      kind: "cubed",
+    });
+    items.push({
+      id: "dev_pluck",
+      name: "Pluck (Karplus-Strong)",
+      type: "devices",
+      category: "Instrument",
+      kind: "pluck",
+    });
+    items.push({
+      id: "dev_tubular",
+      name: "Tubular (DX7 6-Op FM)",
+      type: "devices",
+      category: "Instrument",
+      kind: "tubular",
+    });
+    items.push({
+      id: "dev_neon",
+      name: "Neon (CZ-101 PD)",
+      type: "devices",
+      category: "Instrument",
+      kind: "neon",
+    });
+    items.push({
+      id: "dev_noise_pad",
+      name: "Noise Pad (Atmospheric)",
+      type: "devices",
+      category: "Instrument",
+      kind: "noise-pad",
+    });
+    items.push({
+      id: "dev_korpus",
+      name: "Korpus (Modal Resonator)",
+      type: "devices",
+      category: "Instrument",
+      kind: "korpus",
+    });
+    items.push({
+      id: "dev_nano",
+      name: "Nano (Micro-Sampler)",
+      type: "devices",
+      category: "Instrument",
+      kind: "nano",
+    });
+    items.push({
+      id: "dev_soundfont",
+      name: "SoundFont (GM Synth)",
+      type: "devices",
+      category: "Instrument",
+      kind: "soundfont",
+    });
+    items.push({
       id: "dev_vaporisateur",
       name: "Vaporisateur",
       type: "devices",
@@ -122,49 +185,128 @@ export class DawBrowserElement extends BaseElement {
       category: "Instrument",
       kind: "drums",
     });
+
     // Audio FX
+    items.push({
+      id: "fx_autotune",
+      name: "Autotune (Pitch Snap)",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "autotune",
+    });
+    items.push({
+      id: "fx_vocoder",
+      name: "Vocoder (16-Band)",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "vocoder",
+    });
+    items.push({
+      id: "fx_maximizer",
+      name: "Maximizer (Peak Limiter)",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "maximizer",
+    });
+    items.push({
+      id: "fx_tidal",
+      name: "Tidal (Modulation LFO)",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "tidal",
+    });
+    items.push({
+      id: "fx_transient",
+      name: "Transient Shaper",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "transient",
+    });
+    items.push({
+      id: "fx_sidechain",
+      name: "Sidechain Ducker",
+      type: "devices",
+      category: "Audio FX",
+      fxType: "sidechain",
+    });
     items.push({
       id: "fx_fold",
       name: "Fold (Wavefolder)",
       type: "devices",
       category: "Audio FX",
+      fxType: "fold",
     });
     items.push({
       id: "fx_crusher",
       name: "Crusher (Bitcrush)",
       type: "devices",
       category: "Audio FX",
+      fxType: "crusher",
     });
     items.push({
       id: "fx_delay",
       name: "Delay (Stereo Echo)",
       type: "devices",
       category: "Audio FX",
+      fxType: "delay",
     });
     items.push({
       id: "fx_reverb",
       name: "Reverb (Plate)",
       type: "devices",
       category: "Audio FX",
+      fxType: "reverb",
     });
     items.push({
       id: "fx_stereo",
       name: "StereoTool (Width)",
       type: "devices",
       category: "Audio FX",
+      fxType: "stereoTool",
     });
+
     // MIDI FX
+    items.push({
+      id: "mfx_zeitgeist",
+      name: "Zeitgeist (Groove Engine)",
+      type: "devices",
+      category: "MIDI FX",
+      fxType: "zeitgeist",
+    });
+    items.push({
+      id: "mfx_notefilter",
+      name: "Note Filter (Key Zones)",
+      type: "devices",
+      category: "MIDI FX",
+      fxType: "notefilter",
+    });
+    items.push({
+      id: "mfx_chord",
+      name: "Chord & Strummer",
+      type: "devices",
+      category: "MIDI FX",
+      fxType: "chord",
+    });
+    items.push({
+      id: "mfx_humanize",
+      name: "Humanizer (Micro-Timing)",
+      type: "devices",
+      category: "MIDI FX",
+      fxType: "humanize",
+    });
     items.push({
       id: "mfx_arp",
       name: "Arpeggiator",
       type: "devices",
       category: "MIDI FX",
+      fxType: "arpeggio",
     });
     items.push({
       id: "mfx_pitch",
       name: "Pitch Transpose",
       type: "devices",
       category: "MIDI FX",
+      fxType: "pitch",
     });
 
     return items;
@@ -354,7 +496,7 @@ export class DawBrowserElement extends BaseElement {
               : filtered
                   .map(
                     (item) => `
-            <div class="browser-item" draggable="true" role="button" tabindex="0" aria-label="${item.name} (${item.category}). Drag to track or press Enter to apply." data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}" data-category="${item.category || ""}" data-format="${item.format || ""}">
+            <div class="browser-item" draggable="true" role="button" tabindex="0" aria-label="${item.name} (${item.category}). Drag to track or press Enter to apply." data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}" data-category="${item.category || ""}" data-format="${item.format || ""}" data-fx-type="${item.fxType || ""}">
               <span style="display:flex; align-items:center; gap:6px;">
                 ${item.type === "files" ? `<span aria-hidden="true">${getFileIcon(item.name)}</span>` : ""}
                 <span>${item.name}</span>
@@ -496,10 +638,33 @@ export class DawBrowserElement extends BaseElement {
             });
           }
         } else if (kind) {
-          await scdaw.sendCommand("add_track", {
-            kind,
-            name: el.innerText.trim(),
-          });
+          const p = scdaw.getProject();
+          const selectedTrackId = scdaw.selectedTrackId?.get();
+          const targetTrack = p.tracks.find((t) => t.id === selectedTrackId);
+          if (targetTrack && targetTrack.kind !== "audio") {
+            await scdaw.sendCommand("set_instrument", {
+              trackId: targetTrack.id,
+              instrument: kind,
+            });
+          } else {
+            await scdaw.sendCommand("add_track", {
+              kind: kind === "drums" ? "drums" : "synth",
+              instrument: kind,
+              name: el.innerText.trim(),
+            });
+          }
+        } else if (el.dataset.fxType) {
+          const p = scdaw.getProject();
+          const selectedTrackId = scdaw.selectedTrackId?.get();
+          const targetTrack =
+            p.tracks.find((t) => t.id === selectedTrackId) || p.tracks[0];
+          if (targetTrack) {
+            await scdaw.sendCommand("manage_fx", {
+              action: "add",
+              trackId: targetTrack.id,
+              fxType: el.dataset.fxType,
+            });
+          }
         }
       });
     });

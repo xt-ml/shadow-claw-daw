@@ -5,6 +5,13 @@ import {
   processCrusherBuffer,
   processStereoTool,
   generateReverbImpulse,
+  processAutotune,
+  processVocoder,
+  processMaximizer,
+  processTidal,
+  processTransientShaper,
+  processSidechainDucking,
+  TidalComputer,
 } from "../.agents/scripts/scdaw-dsp.js";
 import {
   INSTRUMENT_PRESETS,
@@ -28,7 +35,10 @@ import {
   getCachedSoundfont,
   clearSoundfontCache,
 } from "../.agents/scripts/scdaw-instruments.js";
-import { INSTRUMENT_SCHEMAS } from "../.agents/scripts/scdaw-schema.js";
+import {
+  INSTRUMENT_SCHEMAS,
+  getDefaultParams,
+} from "../.agents/scripts/scdaw-schema.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 import {
   computeEventsInRange,
@@ -465,4 +475,225 @@ test("SoundFont Caching & Bundling: stores, retrieves, and clears binary soundfo
 
   clearSoundfontCache();
   assert.equal(getCachedSoundfont("A320U_drums.sf2"), undefined);
+});
+
+test("scdaw-dsp: TidalComputer computes non-linear LFO modulation curve with slope and symmetry", () => {
+  const computer = new TidalComputer();
+  computer.set(1.0, 0.0, 0.5); // Triangle shape
+  assert.ok(Math.abs(computer.compute(0.0)) < 1e-4);
+  assert.ok(Math.abs(computer.compute(0.5) - 1.0) < 1e-4);
+
+  computer.set(0.0, 0.3, 0.5); // Zero depth = unity gain
+  for (let step = 0; step <= 8; step++) {
+    assert.ok(Math.abs(computer.compute(step / 8.0) - 1.0) < 1e-4);
+  }
+});
+
+test("scdaw-dsp: processTidal modulates stereo audio with rate, depth, and stereo channel offset", () => {
+  const len = 4410; // 100ms at 44.1kHz
+  const left = new Float32Array(len).fill(0.5);
+  const right = new Float32Array(len).fill(0.5);
+
+  const { outLeft, outRight } = processTidal(
+    left,
+    right,
+    {
+      depth: 0.8,
+      rate: 4,
+      slope: 0.2,
+      symmetry: 0.5,
+      channelOffset: 90,
+    },
+    120,
+    44100,
+  );
+
+  assert.equal(outLeft.length, len);
+  assert.equal(outRight.length, len);
+  // Verify modulated values differ due to channel offset
+  assert.notEqual(outLeft[100], outRight[100]);
+  for (let i = 0; i < len; i++) {
+    assert.ok(outLeft[i] >= -1 && outLeft[i] <= 1);
+    assert.ok(outRight[i] >= -1 && outRight[i] <= 1);
+  }
+});
+
+test("scdaw-dsp: processMaximizer limits peaks and applies automatic makeup gain transparently", () => {
+  const len = 2048;
+  const left = new Float32Array(len);
+  const right = new Float32Array(len);
+
+  // Generate a burst of loud audio (e.g. peaking at +3 dB / 1.41)
+  for (let i = 0; i < len; i++) {
+    const s = Math.sin((i / 32) * Math.PI) * 1.4;
+    left[i] = s;
+    right[i] = s;
+  }
+
+  const { outLeft, outRight, reductionDb } = processMaximizer(
+    left,
+    right,
+    {
+      threshold: -6.0,
+      ceiling: -0.1,
+      lookahead: true,
+    },
+    44100,
+  );
+
+  assert.equal(outLeft.length, len);
+  assert.equal(outRight.length, len);
+  assert.ok(reductionDb < 0, "Maximizer should report active gain reduction");
+
+  // Output must not exceed ceiling (in linear amplitude, -0.1 dB is ~0.988)
+  const maxPeakL = Math.max(...outLeft.map(Math.abs));
+  const maxPeakR = Math.max(...outRight.map(Math.abs));
+  assert.ok(maxPeakL <= 1.0, `Peak ${maxPeakL} should be bounded under 1.0`);
+  assert.ok(maxPeakR <= 1.0, `Peak ${maxPeakR} should be bounded under 1.0`);
+});
+
+test("scdaw-dsp: processTransientShaper enhances or cuts attack and sustain envelopes", () => {
+  const len = 4410;
+  const left = new Float32Array(len);
+  const right = new Float32Array(len);
+
+  // Sharp impulse attack then sustained tone
+  left[10] = 0.9;
+  left[11] = 0.8;
+  right[10] = 0.9;
+  right[11] = 0.8;
+  for (let i = 100; i < 2000; i++) {
+    left[i] = 0.2;
+    right[i] = 0.2;
+  }
+
+  const boosted = processTransientShaper(
+    left,
+    right,
+    { attack: 0.8, sustain: -0.5 },
+    44100,
+  );
+  assert.equal(boosted.outLeft.length, len);
+  // Attack transient should be boosted compared to original
+  assert.ok(boosted.outLeft[10] >= left[10]);
+  // Sustain should be reduced in steady state
+  assert.ok(boosted.outLeft[1500] <= left[1500]);
+});
+
+test("scdaw-dsp: processAutotune quantizes pitch to musical scales with retune speed", () => {
+  const len = 2048;
+  const left = new Float32Array(len);
+  const right = new Float32Array(len);
+  // Input: 440 Hz (A4) sine wave
+  for (let i = 0; i < len; i++) {
+    const s = Math.sin((2 * Math.PI * 440 * i) / 44100) * 0.8;
+    left[i] = s;
+    right[i] = s;
+  }
+
+  const res = processAutotune(
+    left,
+    right,
+    {
+      key: "C",
+      scale: "major",
+      retune: 0.9,
+      amount: 1.0,
+    },
+    44100,
+  );
+
+  assert.equal(res.outLeft.length, len);
+  assert.equal(res.outRight.length, len);
+  assert.ok(res.detectedPitch > 0);
+  assert.ok(res.targetPitch > 0);
+});
+
+test("scdaw-dsp: processVocoder modulates carrier with speech or noise modulator bands", () => {
+  const len = 2048;
+  const carrier = new Float32Array(len).fill(0.3);
+  const modulator = new Float32Array(len);
+  // Modulator with bursts
+  for (let i = 200; i < 800; i++) modulator[i] = 0.8;
+
+  const res = processVocoder(
+    carrier,
+    carrier,
+    modulator,
+    modulator,
+    {
+      bands: 16,
+      release: 0.05,
+    },
+    44100,
+  );
+
+  assert.equal(res.outLeft.length, len);
+  assert.equal(res.outRight.length, len);
+  // Carrier should have higher energy when modulator has energy
+  let silentEnergy = 0;
+  let activeEnergy = 0;
+  for (let i = 50; i < 150; i++) silentEnergy += Math.abs(res.outLeft[i]);
+  for (let i = 300; i < 400; i++) activeEnergy += Math.abs(res.outLeft[i]);
+  assert.ok(activeEnergy > silentEnergy);
+});
+
+test("scdaw-dsp: processSidechainDucking ducks target audio based on trigger volume", () => {
+  const len = 4410;
+  const targetL = new Float32Array(len).fill(0.8);
+  const targetR = new Float32Array(len).fill(0.8);
+
+  const trigger = new Float32Array(len);
+  // Trigger hit (e.g. kick) at frame 100 to 500
+  for (let i = 100; i < 500; i++) {
+    trigger[i] = 0.95;
+  }
+
+  const { outLeft, outRight } = processSidechainDucking(
+    targetL,
+    targetR,
+    trigger,
+    {
+      thresholdDb: -12,
+      depthDb: 18,
+      attackMs: 5,
+      releaseMs: 50,
+    },
+    44100,
+  );
+
+  assert.equal(outLeft.length, len);
+  // Target should be ducked significantly during kick hit
+  assert.ok(
+    outLeft[250] < 0.4,
+    `Expected ducked gain < 0.4, got ${outLeft[250]}`,
+  );
+  // Target should recover after kick finishes
+  assert.ok(
+    outLeft[3000] > 0.7,
+    `Expected recovered gain > 0.7, got ${outLeft[3000]}`,
+  );
+});
+
+test("scdaw-schema: defines complete schemas and defaults for new Audio FX", () => {
+  const fxTypes = [
+    "autotune",
+    "vocoder",
+    "maximizer",
+    "tidal",
+    "transient",
+    "sidechain",
+    "zeitgeist",
+    "notefilter",
+    "chord",
+    "humanize",
+  ];
+  for (const fxType of fxTypes) {
+    const defaults = getDefaultParams(fxType);
+    assert.ok(defaults, `Defaults missing for ${fxType}`);
+    assert.ok(Object.keys(defaults).length > 0, `No defaults for ${fxType}`);
+  }
+  assert.equal(getDefaultParams("autotune").scale, "chromatic");
+  assert.equal(getDefaultParams("maximizer").lookahead, true);
+  assert.equal(getDefaultParams("zeitgeist").template, "swing16");
 });

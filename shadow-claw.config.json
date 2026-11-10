@@ -127,6 +127,10 @@
     "scdaw_set_audio_clip",
     "scdaw_set_track_send",
     "scdaw_record_arm",
-    "scdaw_set_metronome"
+    "scdaw_set_metronome",
+    "scdaw_set_instrument",
+    "scdaw_set_808",
+    "scdaw_configure_fx",
+    "scdaw_apply_groove"
   ]
 }

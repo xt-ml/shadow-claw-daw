@@ -30,6 +30,7 @@ import { encodeZip } from "./scdaw-zip.js";
 import { encodeMidiFile, midiToProject } from "./scdaw-midi.js";
 import { encodeDawProject, decodeDawProject } from "./scdaw-dawproject.js";
 import { triggerInstrumentVoice } from "./scdaw-instruments.js";
+import { processMaximizer, processStereoTool } from "./scdaw-dsp.js";
 import {
   writeConversationFile,
   readConversationFile,
@@ -852,6 +853,21 @@ export class DawEngine extends EventTarget {
       renderedBuffer.numberOfChannels > 1
         ? renderedBuffer.getChannelData(1)
         : left;
+
+    // Apply master FX post-processing if configured
+    if (Array.isArray(p.master?.fx)) {
+      for (const fx of p.master.fx) {
+        if (fx.type === "maximizer") {
+          const maxRes = processMaximizer(left, right, fx, sampleRate);
+          left = maxRes.outLeft;
+          right = maxRes.outRight;
+        } else if (fx.type === "stereoTool" || fx.type === "stereo") {
+          const stRes = processStereoTool(left, right, fx.width, fx.pan);
+          left = stRes.outLeft;
+          right = stRes.outRight;
+        }
+      }
+    }
 
     if (trimSilence) {
       const minFrames = Math.ceil(durationSec * sampleRate);

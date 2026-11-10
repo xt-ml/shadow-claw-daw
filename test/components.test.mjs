@@ -7,7 +7,10 @@ import {
   mapValueToNormalized,
   formatValueWithUnit,
 } from "../.agents/scripts/components/scdaw-knob.js";
-import { filterBrowserItems } from "../.agents/scripts/components/scdaw-browser.js";
+import {
+  filterBrowserItems,
+  DawBrowserElement,
+} from "../.agents/scripts/components/scdaw-browser.js";
 import {
   computeTimelineTicks,
   computeClipOverlapLayout,
@@ -25,7 +28,10 @@ import {
   computeStepVelocity,
   calculateVelocityFromPointer,
 } from "../.agents/scripts/components/scdaw-editor.js";
-import { getDeviceChainForTrack } from "../.agents/scripts/components/scdaw-devices.js";
+import {
+  getDeviceChainForTrack,
+  DawDevicesElement,
+} from "../.agents/scripts/components/scdaw-devices.js";
 import {
   computeMeterSegments,
   formatDb,
@@ -2619,4 +2625,90 @@ test("scdaw-browser & scdaw-workbench: mobile-first container query height cappi
     /@container scdaw-browser\s*\(\s*min-width:\s*\d+px\s*\)/,
     "scdaw-browser must declare internal mobile-first container query @container scdaw-browser",
   );
+});
+
+test("scdaw-devices: constructs device chain for all 9 roster instruments and new FX", () => {
+  const instruments = [
+    "808",
+    "cubed",
+    "pluck",
+    "tubular",
+    "neon",
+    "noise-pad",
+    "korpus",
+    "nano",
+    "soundfont",
+  ];
+  for (const inst of instruments) {
+    const track = {
+      id: `trk_${inst}`,
+      name: inst.toUpperCase(),
+      kind: "synth",
+      instrument: inst,
+      params: { cutoff: 1200 },
+      fx: [{ type: "maximizer", threshold: -6 }],
+      midiFx: [{ type: "zeitgeist", template: "swing16" }],
+    };
+    const chain = getDeviceChainForTrack(track);
+    assert.equal(chain.length, 3);
+    assert.equal(chain[0].role, "midi-fx");
+    assert.equal(chain[0].type, "zeitgeist");
+    assert.equal(chain[1].role, "instrument");
+    assert.equal(chain[1].type, inst);
+    assert.equal(chain[2].role, "audio-fx");
+    assert.equal(chain[2].type, "maximizer");
+  }
+});
+
+test("scdaw-browser: _getItems lists all 9 roster instruments, Audio FX, and MIDI FX", () => {
+  const browser = new DawBrowserElement();
+  const items = browser._getItems();
+  const deviceItems = items.filter((i) => i.type === "devices");
+
+  // Roster instruments
+  const instKinds = [
+    "808",
+    "cubed",
+    "pluck",
+    "tubular",
+    "neon",
+    "noise-pad",
+    "korpus",
+    "nano",
+    "soundfont",
+    "synth",
+    "drums",
+  ];
+  for (const kind of instKinds) {
+    const found = deviceItems.find((i) => i.kind === kind);
+    assert.ok(found, `Instrument kind '${kind}' missing from browser devices`);
+    assert.equal(found.category, "Instrument");
+  }
+
+  // Audio FX
+  const fxTypes = [
+    "autotune",
+    "vocoder",
+    "maximizer",
+    "tidal",
+    "transient",
+    "sidechain",
+  ];
+  for (const fx of fxTypes) {
+    const found = deviceItems.find(
+      (i) => i.id === `fx_${fx}` || i.name.toLowerCase().includes(fx),
+    );
+    assert.ok(found, `Audio FX '${fx}' missing from browser devices`);
+    assert.equal(found.category, "Audio FX");
+  }
+
+  // MIDI FX
+  const mfxTypes = ["zeitgeist", "notefilter", "chord", "humanize"];
+  for (const mfx of mfxTypes) {
+    const found = deviceItems.find(
+      (i) => i.id === `mfx_${mfx}` || i.name.toLowerCase().includes(mfx),
+    );
+    assert.ok(found, `MIDI FX '${mfx}' missing from browser devices`);
+    assert.equal(found.category, "MIDI FX");
+  }
 });

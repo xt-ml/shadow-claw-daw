@@ -276,6 +276,46 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("set_metronome", params);
     }
 
+    case "scdaw_set_instrument": {
+      return await scdaw.sendCommand("set_instrument", params);
+    }
+
+    case "scdaw_set_808": {
+      const subParams = {};
+      if (params.glide !== undefined) subParams.glide = params.glide;
+      if (params.decay !== undefined) subParams.decay = params.decay;
+      if (params.drive !== undefined) subParams.drive = params.drive;
+      if (params.tone !== undefined) subParams.tone = params.tone;
+      if (params.harmonics !== undefined)
+        subParams.harmonics = params.harmonics;
+      return await scdaw.sendCommand("set_instrument", {
+        trackId: params.trackId,
+        instrument: "808",
+        params: subParams,
+      });
+    }
+
+    case "scdaw_configure_fx": {
+      return await scdaw.sendCommand("manage_fx", params);
+    }
+
+    case "scdaw_apply_groove": {
+      const type = params.type || (params.template ? "zeitgeist" : "humanize");
+      const fxParams = {};
+      if (params.template) fxParams.template = params.template;
+      if (params.amount !== undefined) fxParams.amount = params.amount;
+      if (params.timingTicks !== undefined)
+        fxParams.timingTicks = params.timingTicks;
+      if (params.velocity !== undefined) fxParams.velocity = params.velocity;
+      if (params.seed !== undefined) fxParams.seed = params.seed;
+      return await scdaw.sendCommand("manage_fx", {
+        action: params.action || "add",
+        trackId: params.trackId,
+        fxType: type,
+        params: fxParams,
+      });
+    }
+
     case "scdaw_render_surface": {
       const el = params.element || "workbench";
       const tagMap = {

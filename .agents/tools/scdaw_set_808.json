@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_set_808",
+  "description": "Configure and shape an authentic 808 sub bass voice with portamento glide, drive, decay, tone, and harmonics presets.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trackId": {
+        "type": "string",
+        "description": "Target track ID"
+      },
+      "glide": {
+        "type": "number",
+        "description": "Portamento slide time in PPQN ticks (0 to 480)"
+      },
+      "decay": {
+        "type": "number",
+        "description": "Sub bass decay envelope duration in seconds (0.1 to 4.0)"
+      },
+      "drive": {
+        "type": "number",
+        "description": "Tanh soft-clip drive factor (0.0 to 1.0)"
+      },
+      "tone": {
+        "type": "number",
+        "description": "Low-pass filter brightness (0.1 to 1.0)"
+      },
+      "harmonics": {
+        "type": "string",
+        "enum": ["clean", "dist", "growl", "grit"],
+        "description": "Harmonics saturation preset"
+      }
+    },
+    "required": ["trackId"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": true
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_set_808. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_set_808\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

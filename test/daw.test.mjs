@@ -19,6 +19,11 @@ import {
   encodeWav,
   createHistory,
   automationValueAt,
+  applyNoteFilter,
+  applyChordStrum,
+  applyZeitgeistGroove,
+  applyHumanize,
+  resolveTrackNotes,
 } from "../.agents/scripts/scdaw.js";
 
 test("PPQN: conforms to openDAW constants and conversions", () => {
@@ -493,4 +498,127 @@ test("applyCommand: sends and return routing management", () => {
   });
   assert.equal(res3.result.ok, true);
   assert.equal(res3.project.tracks.find((t) => t.id === trk1).sends.length, 0);
+});
+
+test("applyNoteFilter: filters notes outside pitch and velocity boundaries", () => {
+  const notes = [
+    { pitch: 36, velocity: 0.8, position: 0, duration: 240 },
+    { pitch: 48, velocity: 0.5, position: 240, duration: 240 },
+    { pitch: 60, velocity: 0.9, position: 480, duration: 240 },
+    { pitch: 72, velocity: 0.2, position: 720, duration: 240 },
+  ];
+
+  // Pitch range 40..65
+  const pitchFiltered = applyNoteFilter(notes, { minPitch: 40, maxPitch: 65 });
+  assert.equal(pitchFiltered.length, 2);
+  assert.deepEqual(
+    pitchFiltered.map((n) => n.pitch),
+    [48, 60],
+  );
+
+  // Velocity range 0.4..0.85
+  const velFiltered = applyNoteFilter(notes, {
+    minVelocity: 0.4,
+    maxVelocity: 0.85,
+  });
+  assert.equal(velFiltered.length, 2);
+  assert.deepEqual(
+    velFiltered.map((n) => n.pitch),
+    [36, 48],
+  );
+});
+
+test("applyChordStrum: expands notes into chords with strum offsets", () => {
+  const notes = [{ pitch: 60, velocity: 0.8, position: 0, duration: 480 }]; // C4
+
+  // Major triad (C4, E4, G4 -> 60, 64, 67)
+  const triad = applyChordStrum(notes, {
+    type: "major",
+    strumTicks: 10,
+    direction: "up",
+  });
+  assert.equal(triad.length, 3);
+  assert.deepEqual(
+    triad.map((n) => n.pitch),
+    [60, 64, 67],
+  );
+  assert.equal(triad[0].position, 0);
+  assert.equal(triad[1].position, 10);
+  assert.equal(triad[2].position, 20);
+
+  // Minor 7th downward strum (60, 63, 67, 70)
+  const min7 = applyChordStrum(notes, {
+    type: "min7",
+    strumTicks: 15,
+    direction: "down",
+  });
+  assert.equal(min7.length, 4);
+  assert.deepEqual(
+    min7.map((n) => n.pitch),
+    [70, 67, 63, 60],
+  );
+  assert.equal(min7[0].position, 0);
+  assert.equal(min7[1].position, 15);
+});
+
+test("applyZeitgeistGroove: warps micro-timing according to groove templates", () => {
+  const notes = [
+    { pitch: 60, position: 0, duration: 240, velocity: 0.8 },
+    { pitch: 60, position: 240, duration: 240, velocity: 0.8 }, // 16th note offbeat
+    { pitch: 60, position: 480, duration: 240, velocity: 0.8 },
+    { pitch: 60, position: 720, duration: 240, velocity: 0.8 },
+  ];
+
+  const mpc = applyZeitgeistGroove(notes, { template: "mpc60", amount: 0.8 });
+  assert.equal(mpc.length, 4);
+  assert.equal(mpc[0].position, 0); // onbeats stay aligned
+  assert.ok(mpc[1].position > 240, "MPC60 groove should push 16th notes later");
+
+  const rushed = applyZeitgeistGroove(notes, {
+    template: "rushed",
+    amount: 0.5,
+  });
+  assert.ok(
+    rushed[1].position < 240,
+    "Rushed groove should pull notes earlier",
+  );
+});
+
+test("applyHumanize: adds deterministic micro-timing and velocity deviations", () => {
+  const notes = [
+    { pitch: 60, position: 0, duration: 240, velocity: 0.8 },
+    { pitch: 62, position: 240, duration: 240, velocity: 0.8 },
+    { pitch: 64, position: 480, duration: 240, velocity: 0.8 },
+  ];
+
+  const h1 = applyHumanize(notes, {
+    timingTicks: 15,
+    velocity: 10,
+    seed: 1234,
+  });
+  const h2 = applyHumanize(notes, {
+    timingTicks: 15,
+    velocity: 10,
+    seed: 1234,
+  });
+  assert.deepEqual(h1, h2, "Humanize with same seed must be deterministic");
+
+  // Deviations occurred
+  assert.ok(h1[1].position !== 240 || h1[1].velocity !== 0.8);
+  assert.ok(h1[0].position >= 0, "Position should never be negative");
+});
+
+test("resolveTrackNotes: chains MIDI FX pipeline (NoteFilter -> Chord -> Arp -> Zeitgeist -> Humanize)", () => {
+  const p = createProject();
+  const track = {
+    id: "trk_test",
+    notes: [{ pitch: 60, position: 0, duration: 960, velocity: 0.8 }],
+    midiFx: [
+      { type: "chord", chordType: "triad", strumTicks: 5 },
+      { type: "zeitgeist", template: "swing16", amount: 0.6 },
+    ],
+  };
+
+  const resolved = resolveTrackNotes(p, track, { loops: 1, bakeMidiFx: true });
+  assert.ok(resolved.length >= 3, "Chord expansion should produce 3 voices");
 });

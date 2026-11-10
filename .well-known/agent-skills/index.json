@@ -4,6 +4,70 @@
   "description": "In-browser Digital Audio Workstation powered by Web Audio API, Web Components, WebMCP and ShadowClaw.",
   "skills": [
     {
+      "name": "acid-jam",
+      "type": "skill-md",
+      "description": "Create and perform acid house and techno jams with the Cubed TB-303 synthesizer, diode ladder filter sweeps, accent recharge dynamics, and slide portamento.",
+      "url": "../../.agents/skills/acid-jam/SKILL.md",
+      "digest": "sha256:89386f71756b8eb92e9933960f772e1c09814475d4dac8ce88eadf7d0ef8c211",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_apply_preset",
+          "url": "../../.agents/tools/scdaw_apply_preset.json",
+          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_new_project",
+          "url": "../../.agents/tools/scdaw_new_project.json",
+          "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+        },
+        {
+          "name": "scdaw_play",
+          "url": "../../.agents/tools/scdaw_play.json",
+          "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_set_instrument",
+          "url": "../../.agents/tools/scdaw_set_instrument.json",
+          "digest": "sha256:aa6f861fe5e0988b8d153352870b563130046a757915e1bbf4167299faf7b2aa"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_set_transport",
+          "url": "../../.agents/tools/scdaw_set_transport.json",
+          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
+        }
+      ]
+    },
+    {
       "name": "beat",
       "type": "skill-md",
       "description": "Program or update a drum and bass rhythm for techno-bass, pop, house, trap, or synthwave styles.",
@@ -146,6 +210,70 @@
       ]
     },
     {
+      "name": "lofi-session",
+      "type": "skill-md",
+      "description": "Arrange cozy lofi chillhop and ambient tracks with warm noise pads, detuned tape drift, humanized jazz chords, and crunchy vinyl drums.",
+      "url": "../../.agents/skills/lofi-session/SKILL.md",
+      "digest": "sha256:d9522b91319321bcb10778f2ede87a22e6da2250a40c2a57a36c78491f9e4150",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_apply_groove",
+          "url": "../../.agents/tools/scdaw_apply_groove.json",
+          "digest": "sha256:c245b5c3691e1a3ca371cc63a9be12f62da0a1fb8091485879e8d755bbec1e27"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_new_project",
+          "url": "../../.agents/tools/scdaw_new_project.json",
+          "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+        },
+        {
+          "name": "scdaw_play",
+          "url": "../../.agents/tools/scdaw_play.json",
+          "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_set_instrument",
+          "url": "../../.agents/tools/scdaw_set_instrument.json",
+          "digest": "sha256:aa6f861fe5e0988b8d153352870b563130046a757915e1bbf4167299faf7b2aa"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_set_transport",
+          "url": "../../.agents/tools/scdaw_set_transport.json",
+          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
+        }
+      ]
+    },
+    {
       "name": "mixdown",
       "type": "skill-md",
       "description": "Analyze audio meter levels and automatically adjust track gains to eliminate clipping and achieve balanced headroom.",
@@ -216,7 +344,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+          "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
         }
       ]
     },
@@ -252,7 +380,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+          "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
         }
       ]
     },
@@ -278,7 +406,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+          "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
         }
       ]
     },
@@ -329,7 +457,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+          "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
         }
       ]
     },
@@ -360,7 +488,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+          "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
         }
       ]
     },
@@ -378,6 +506,65 @@
       ]
     },
     {
+      "name": "soundfont-orchestra",
+      "type": "skill-md",
+      "description": "Build orchestral and acoustic multi-instrument arrangements using the SoundFont General MIDI engine and SoundFont banks.",
+      "url": "../../.agents/skills/soundfont-orchestra/SKILL.md",
+      "digest": "sha256:d29b2fa1c1677a86d1e8e0142917aa473183800835d36f4a10ff4d24b463f696",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_new_project",
+          "url": "../../.agents/tools/scdaw_new_project.json",
+          "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+        },
+        {
+          "name": "scdaw_play",
+          "url": "../../.agents/tools/scdaw_play.json",
+          "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_set_instrument",
+          "url": "../../.agents/tools/scdaw_set_instrument.json",
+          "digest": "sha256:aa6f861fe5e0988b8d153352870b563130046a757915e1bbf4167299faf7b2aa"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_set_transport",
+          "url": "../../.agents/tools/scdaw_set_transport.json",
+          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
+        }
+      ]
+    },
+    {
       "name": "toast-random-number",
       "type": "skill-md",
       "description": "Generate a random integer from 1 to 1000000 and show it in a ShadowClaw toast notification.",
@@ -388,6 +575,75 @@
           "name": "generate_random_number",
           "url": "../../.agents/tools/generate_random_number.json",
           "digest": "sha256:daf69f22c7c852b10122ef06812f760d97a31dde098450e41a4b4a65549c030c"
+        }
+      ]
+    },
+    {
+      "name": "trap-beat",
+      "type": "skill-md",
+      "description": "Produce hard-hitting modern trap beats featuring gliding 808 sub bass, Karplus-Strong plucked melodies, half-time snares, and fast hi-hat rolls.",
+      "url": "../../.agents/skills/trap-beat/SKILL.md",
+      "digest": "sha256:8e6d0d443ec272df718057b50e6bf49810a30c0e1bbe5dc40551d0a8cf32c0b3",
+      "tools": [
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_apply_groove",
+          "url": "../../.agents/tools/scdaw_apply_groove.json",
+          "digest": "sha256:c245b5c3691e1a3ca371cc63a9be12f62da0a1fb8091485879e8d755bbec1e27"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_manage_fx",
+          "url": "../../.agents/tools/scdaw_manage_fx.json",
+          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+        },
+        {
+          "name": "scdaw_new_project",
+          "url": "../../.agents/tools/scdaw_new_project.json",
+          "digest": "sha256:47cb0fa028af2bd50f45059fc16b05ce60b9d2fb90745ff41b7c9520fd101d90"
+        },
+        {
+          "name": "scdaw_play",
+          "url": "../../.agents/tools/scdaw_play.json",
+          "digest": "sha256:59cd9d3ce0a026e4c8cbe0f89d81611bc9c531925bce3a021533ef7e04648bf5"
+        },
+        {
+          "name": "scdaw_render_surface",
+          "url": "../../.agents/tools/scdaw_render_surface.json",
+          "digest": "sha256:ff7bd26fbb9ed86af2b7944be091f57421b377ff2f7d3dc837369ace9452de5a"
+        },
+        {
+          "name": "scdaw_set_808",
+          "url": "../../.agents/tools/scdaw_set_808.json",
+          "digest": "sha256:0a34ff70c705de0aa40c718aa124027aa5f2f97d37c537fe2d2040085a095c54"
+        },
+        {
+          "name": "scdaw_set_instrument",
+          "url": "../../.agents/tools/scdaw_set_instrument.json",
+          "digest": "sha256:aa6f861fe5e0988b8d153352870b563130046a757915e1bbf4167299faf7b2aa"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        },
+        {
+          "name": "scdaw_set_transport",
+          "url": "../../.agents/tools/scdaw_set_transport.json",
+          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+        },
+        {
+          "name": "scdaw_write_notes",
+          "url": "../../.agents/tools/scdaw_write_notes.json",
+          "digest": "sha256:a50d76d03e7dc84bf030de3a78faa4fa50f96eb8bf820aa31e4e36e8ae3018c6"
         }
       ]
     }
@@ -412,6 +668,12 @@
       "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
     },
     {
+      "name": "scdaw_apply_groove",
+      "description": "Apply micro-timing groove templates (Zeitgeist: mpc60, sp1200, swing16, shuffle, laidback, rushed) or humanize timing and velocity on a track.",
+      "url": "../../.agents/tools/scdaw_apply_groove.json",
+      "digest": "sha256:c245b5c3691e1a3ca371cc63a9be12f62da0a1fb8091485879e8d755bbec1e27"
+    },
+    {
       "name": "scdaw_apply_preset",
       "description": "Apply a curated synthesizer preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead') to a synth track.",
       "url": "../../.agents/tools/scdaw_apply_preset.json",
@@ -434,6 +696,12 @@
       "description": "Clear notes on a specific track, optionally within a specified step range.",
       "url": "../../.agents/tools/scdaw_clear_notes.json",
       "digest": "sha256:daaa6b56f6bbd4b9222f9b34353b5f661ffe951981cb4e590136b0e8d593dfff"
+    },
+    {
+      "name": "scdaw_configure_fx",
+      "description": "Add, update, or remove an audio effect (autotune, vocoder, maximizer, tidal, transient, sidechain, fold, crusher, delay, reverb, stereoTool) on a track.",
+      "url": "../../.agents/tools/scdaw_configure_fx.json",
+      "digest": "sha256:454095a2cdfab8a6f9c9c1ca734d8bdc1f4456cf5d844b83e53c06abe6a69a3c"
     },
     {
       "name": "scdaw_export_midi",
@@ -538,6 +806,12 @@
       "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
     },
     {
+      "name": "scdaw_set_808",
+      "description": "Configure and shape an authentic 808 sub bass voice with portamento glide, drive, decay, tone, and harmonics presets.",
+      "url": "../../.agents/tools/scdaw_set_808.json",
+      "digest": "sha256:0a34ff70c705de0aa40c718aa124027aa5f2f97d37c537fe2d2040085a095c54"
+    },
+    {
       "name": "scdaw_set_audio_clip",
       "description": "Update properties (time, duration, offset, gain, name) of an existing audio clip on an audio track.",
       "url": "../../.agents/tools/scdaw_set_audio_clip.json",
@@ -548,6 +822,12 @@
       "description": "Set or update continuous parameter automation points (time in beats, value) for a track parameter such as 'volume', 'pan', or 'cutoff'.",
       "url": "../../.agents/tools/scdaw_set_automation.json",
       "digest": "sha256:c8c04211195cbf8079b6a02f43ce176b80810223158da87d4eb35504a3fb0a4a"
+    },
+    {
+      "name": "scdaw_set_instrument",
+      "description": "Set the synthesis instrument on an existing track (808, cubed, pluck, tubular, neon, noise-pad, korpus, nano, soundfont, synth, drums).",
+      "url": "../../.agents/tools/scdaw_set_instrument.json",
+      "digest": "sha256:aa6f861fe5e0988b8d153352870b563130046a757915e1bbf4167299faf7b2aa"
     },
     {
       "name": "scdaw_set_metronome",
@@ -597,13 +877,13 @@
       "name": "scdaw-browser",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-browser.",
       "url": "../../.agents/scripts/components/scdaw-browser.js",
-      "digest": "sha256:cddc5c70842653a851e2a27ca7510c83af31bc74d5fa47084f605efb56c53407"
+      "digest": "sha256:db240f67be40a01c60378d0a7ea515b9b374b742e7af4ab7acf4d50655ab5e7c"
     },
     {
       "name": "scdaw-devices",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-devices.",
       "url": "../../.agents/scripts/components/scdaw-devices.js",
-      "digest": "sha256:5009fdd339c33788a99072ac8110c5ca2d9b8cf32e47a49d943947f57be18ceb"
+      "digest": "sha256:82fd3703f762ad3da4e91b7addf5de0276c476bad563e562dfc7e510b8073432"
     },
     {
       "name": "scdaw-editor",
@@ -621,7 +901,7 @@
       "name": "scdaw-mixer",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-mixer.",
       "url": "../../.agents/scripts/components/scdaw-mixer.js",
-      "digest": "sha256:2bfa9b849e012e750ef08dca14b0127c5450b8ea348e49f5504e9b38d0499ebc"
+      "digest": "sha256:975d32cfba0d8bef2f0f69001497e9c4a9d653932d83a98ed6d7508c5fa97565"
     },
     {
       "name": "scdaw-resize-handle",
@@ -669,7 +949,7 @@
       "name": "scdaw-adapter",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
       "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:8ba8f984c6ddc2042f84511c4075f7ac0772d6749b80ddf97e0967847bdd1e03"
+      "digest": "sha256:ba766f73d8c4cc18e87bb5718242d339c2a190d5ab2141582f1462c9b805993b"
     },
     {
       "name": "scdaw-dawproject",
@@ -681,7 +961,7 @@
       "name": "scdaw-dsp",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-dsp.",
       "url": "../../.agents/scripts/scdaw-dsp.js",
-      "digest": "sha256:5bef5f5a1f362f8daa2030b52be2e71e40f9be9aea91fafe3bbeba67616eff3d"
+      "digest": "sha256:cb6f46b088a870f74285f415541bc1767c72555f2f1276c4e72efd1514447f0a"
     },
     {
       "name": "scdaw-element",
@@ -693,7 +973,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:1140da0f73303d235e1a6bad1bb62411af05032396039b212b2b4b726ccb5500"
+      "digest": "sha256:a570a41b6b738a79953f1763691c4543d3158baed71f87b028d901af593ec249"
     },
     {
       "name": "scdaw-fs",
@@ -729,7 +1009,7 @@
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:8a6b0519bc317a17e45def9c84f5314f267b94859c0e0c28ac87ba389bc9be9d"
+      "digest": "sha256:2b66113b76029b71b80fc1c4127ef90394687444820ab0e4504caac51e37d733"
     },
     {
       "name": "scdaw-signals",
@@ -747,7 +1027,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:f6c0800a573102f6ee4caa05f9d1ab25ce99a5218e1376f0fd909be17ac881bf"
+      "digest": "sha256:9697db58f5a43aeb6ada1d296a560aa3a2de35c2ba931b0bea015057337f1ee8"
     },
     {
       "name": "starter-tools",
@@ -767,10 +1047,12 @@
       "../../.agents/tools/generate_random_number.json",
       "../../.agents/tools/scdaw_add_audio_clip.json",
       "../../.agents/tools/scdaw_add_track.json",
+      "../../.agents/tools/scdaw_apply_groove.json",
       "../../.agents/tools/scdaw_apply_preset.json",
       "../../.agents/tools/scdaw_bounce.json",
       "../../.agents/tools/scdaw_clear_automation.json",
       "../../.agents/tools/scdaw_clear_notes.json",
+      "../../.agents/tools/scdaw_configure_fx.json",
       "../../.agents/tools/scdaw_export_midi.json",
       "../../.agents/tools/scdaw_export_project.json",
       "../../.agents/tools/scdaw_export_stems.json",
@@ -788,8 +1070,10 @@
       "../../.agents/tools/scdaw_remove_track.json",
       "../../.agents/tools/scdaw_render_surface.json",
       "../../.agents/tools/scdaw_reset.json",
+      "../../.agents/tools/scdaw_set_808.json",
       "../../.agents/tools/scdaw_set_audio_clip.json",
       "../../.agents/tools/scdaw_set_automation.json",
+      "../../.agents/tools/scdaw_set_instrument.json",
       "../../.agents/tools/scdaw_set_metronome.json",
       "../../.agents/tools/scdaw_set_track.json",
       "../../.agents/tools/scdaw_set_track_send.json",

@@ -1,7 +1,7 @@
 /**
  * bin/tool-manifest.mjs
  *
- * Single source of truth for all 32 declarative scdaw_* tools.
+ * Single source of truth for all 36 declarative scdaw_* tools.
  * Generates .agents/tools/scdaw_*.json via bin/generate-tools.mjs.
  */
 
@@ -1111,6 +1111,194 @@ export const TOOLS = [
     execution: {
       type: "javascript",
       code: makeBroadcastCode("scdaw_set_metronome"),
+    },
+  },
+  {
+    name: "scdaw_set_instrument",
+    description:
+      "Set the synthesis instrument on an existing track (808, cubed, pluck, tubular, neon, noise-pad, korpus, nano, soundfont, synth, drums).",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        instrument: {
+          type: "string",
+          enum: [
+            "808",
+            "cubed",
+            "pluck",
+            "tubular",
+            "neon",
+            "noise-pad",
+            "korpus",
+            "nano",
+            "soundfont",
+            "synth",
+            "drums",
+          ],
+          description: "Instrument synthesis model",
+        },
+        params: {
+          type: "object",
+          description: "Optional custom instrument parameter overrides",
+        },
+      },
+      required: ["trackId", "instrument"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_instrument"),
+    },
+  },
+  {
+    name: "scdaw_set_808",
+    description:
+      "Configure and shape an authentic 808 sub bass voice with portamento glide, drive, decay, tone, and harmonics presets.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        glide: {
+          type: "number",
+          description: "Portamento slide time in PPQN ticks (0 to 480)",
+        },
+        decay: {
+          type: "number",
+          description:
+            "Sub bass decay envelope duration in seconds (0.1 to 4.0)",
+        },
+        drive: {
+          type: "number",
+          description: "Tanh soft-clip drive factor (0.0 to 1.0)",
+        },
+        tone: {
+          type: "number",
+          description: "Low-pass filter brightness (0.1 to 1.0)",
+        },
+        harmonics: {
+          type: "string",
+          enum: ["clean", "dist", "growl", "grit"],
+          description: "Harmonics saturation preset",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_808"),
+    },
+  },
+  {
+    name: "scdaw_configure_fx",
+    description:
+      "Add, update, or remove an audio effect (autotune, vocoder, maximizer, tidal, transient, sidechain, fold, crusher, delay, reverb, stereoTool) on a track.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        action: {
+          type: "string",
+          enum: ["add", "update", "reset", "remove"],
+          description: "Action to perform on track FX chain",
+        },
+        fxType: {
+          type: "string",
+          enum: [
+            "autotune",
+            "vocoder",
+            "maximizer",
+            "tidal",
+            "transient",
+            "sidechain",
+            "fold",
+            "crusher",
+            "delay",
+            "reverb",
+            "stereoTool",
+          ],
+          description: "Audio effect type",
+        },
+        fxId: {
+          type: "string",
+          description: "Optional existing FX ID for update/remove/reset",
+        },
+        params: {
+          type: "object",
+          description: "Parameters for the effect",
+        },
+      },
+      required: ["trackId", "fxType"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_configure_fx"),
+    },
+  },
+  {
+    name: "scdaw_apply_groove",
+    description:
+      "Apply micro-timing groove templates (Zeitgeist: mpc60, sp1200, swing16, shuffle, laidback, rushed) or humanize timing and velocity on a track.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        template: {
+          type: "string",
+          enum: [
+            "straight",
+            "swing16",
+            "mpc60",
+            "sp1200",
+            "shuffle",
+            "laidback",
+            "rushed",
+            "scurve",
+            "power",
+          ],
+          description: "Groove shuffle template",
+        },
+        amount: {
+          type: "number",
+          description: "Groove displacement amount (0.0 to 1.0)",
+        },
+        timingTicks: {
+          type: "number",
+          description: "Humanize micro-timing jitter range in PPQN ticks",
+        },
+        velocity: {
+          type: "number",
+          description: "Humanize velocity jitter range (0 to 64)",
+        },
+        seed: {
+          type: "number",
+          description: "Deterministic PRNG seed for humanize",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_apply_groove"),
     },
   },
 ];

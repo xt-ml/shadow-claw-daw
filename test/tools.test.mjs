@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const TOOLS_DIR = resolve(ROOT, ".agents/tools");
 
-test("Tools: all 32 tools defined in manifest exist on disk and match schema", () => {
-  assert.equal(TOOLS.length, 32);
+test("Tools: all 36 tools defined in manifest exist on disk and match schema", () => {
+  assert.equal(TOOLS.length, 36);
 
   for (const tool of TOOLS) {
     const filePath = resolve(TOOLS_DIR, `${tool.name}.json`);
@@ -152,6 +152,41 @@ test("Adapter: handleToolDispatch dispatches status, project, transport, and sur
   });
   assert.ok(sendRes.ok);
   assert.equal(sendRes.level, 0.5);
+
+  // Test scdaw_set_instrument, scdaw_set_808, scdaw_configure_fx, scdaw_apply_groove
+  const setInstRes = await handleToolDispatch("scdaw_set_instrument", {
+    trackId: "trk_bass",
+    instrument: "cubed",
+    params: { cutoff: 800 },
+  });
+  assert.ok(setInstRes.ok);
+  assert.equal(setInstRes.instrument, "cubed");
+
+  const set808Res = await handleToolDispatch("scdaw_set_808", {
+    trackId: "trk_bass",
+    glide: 240,
+    decay: 2.0,
+    harmonics: "grit",
+  });
+  assert.ok(set808Res.ok);
+  assert.equal(set808Res.instrument, "808");
+
+  const confFxRes = await handleToolDispatch("scdaw_configure_fx", {
+    trackId: "trk_bass",
+    action: "add",
+    fxType: "maximizer",
+    params: { threshold: -8 },
+  });
+  assert.ok(confFxRes.ok);
+  assert.equal(confFxRes.fx.type, "maximizer");
+
+  const grooveRes = await handleToolDispatch("scdaw_apply_groove", {
+    trackId: "trk_bass",
+    template: "mpc60",
+    amount: 0.75,
+  });
+  assert.ok(grooveRes.ok);
+  assert.equal(grooveRes.fx.template, "mpc60");
 
   const resetRes = await handleToolDispatch("scdaw_reset", {
     scope: "project",

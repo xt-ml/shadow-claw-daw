@@ -253,6 +253,30 @@ export class DawMixerElement extends BaseElement {
         ctx.fillRect(0, 0, w, 4);
       }
     });
+
+    // Render Gain Reduction (GR) meters for compressor / maximizer
+    this.shadowRoot.querySelectorAll(".gr-meter-canvas").forEach((canvas) => {
+      const id = canvas.dataset.track;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      ctx.fillRect(0, 0, w, h);
+
+      const stat =
+        id === "master" ? levels.master : levels.tracks[id] || { peakDb: -100 };
+      let grDb = 0;
+      if (stat.peakDb > -6) {
+        grDb = Math.min(12, (stat.peakDb + 6) * 1.5);
+      }
+      if (grDb > 0.1) {
+        const grH = Math.min(h, (grDb / 12) * h);
+        ctx.fillStyle = "#f97316";
+        ctx.fillRect(0, 0, w, grH);
+      }
+    });
   }
 
   _syncProject(p) {
@@ -460,12 +484,24 @@ export class DawMixerElement extends BaseElement {
               `
                   : "";
 
+              const hasDynamics =
+                Array.isArray(t.fx) &&
+                t.fx.some(
+                  (f) =>
+                    f.type === "compressor" ||
+                    f.type === "maximizer" ||
+                    f.type === "sidechain",
+                );
+
               return `
             <div class="strip ${isSelected ? "strip--selected" : ""}" data-track="${t.id}">
               <div class="strip-name" title="${t.name}">${kindIcon} ${t.name}</div>
               <scdaw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></scdaw-knob>
               <div class="meter-fader-row">
-                <canvas class="meter-canvas" data-track="${t.id}" width="14" height="110"></canvas>
+                <div style="display:flex; gap:2px; height:110px;">
+                  <canvas class="meter-canvas" data-track="${t.id}" width="12" height="110"></canvas>
+                  ${hasDynamics ? `<canvas class="gr-meter-canvas" data-track="${t.id}" width="5" height="110" title="Gain Reduction"></canvas>` : ""}
+                </div>
                 <input type="range" class="vol-slider track-vol" data-track="${t.id}" min="0" max="150" value="${Math.round(t.volume * 100)}" title="Volume (Double-click to reset)" />
               </div>
               ${sendsHtml}
@@ -484,7 +520,10 @@ export class DawMixerElement extends BaseElement {
             <div class="strip-name" style="color:var(--accent);">MASTER</div>
             <div style="height:28px;"></div>
             <div class="meter-fader-row">
-              <canvas class="meter-canvas" data-track="master" width="14" height="110"></canvas>
+              <div style="display:flex; gap:2px; height:110px;">
+                <canvas class="meter-canvas" data-track="master" width="12" height="110"></canvas>
+                <canvas class="gr-meter-canvas" data-track="master" width="5" height="110" title="Master Limiter Gain Reduction"></canvas>
+              </div>
               <input type="range" id="master-fader" class="vol-slider" min="0" max="100" value="${Math.round((p.master.volume ?? 0.8) * 100)}" title="Master Volume (Double-click to reset)" />
             </div>
             <div style="font-size:0.65rem; font-family:var(--mono); color:var(--accent); margin-top:auto;">0 dBFS</div>

@@ -159,3 +159,563 @@ export function generateReverbImpulse(
 
   return { left, right };
 }
+
+/**
+ * Tidal LFO Shaper computer.
+ * Ported from openDAW packages/lib/dsp/src/tidal.ts & crates/dsp/src/tidal.rs.
+ */
+export class TidalComputer {
+  static SLOPE_MULT = 10.0;
+
+  constructor() {
+    this._depth = 1.0;
+    this._slope = 0.0;
+    this._symmetry = 0.5;
+    this._pEx = 1.0;
+    this._invS0 = 2.0;
+    this._invS1 = 2.0;
+  }
+
+  set(depth, slope, symmetry) {
+    this._depth = Math.max(0, Math.min(1, depth));
+    this._slope = Math.max(-1, Math.min(1, slope)) * TidalComputer.SLOPE_MULT;
+    this._symmetry = Math.max(1e-5, Math.min(1 - 1e-5, symmetry));
+    this._pEx = Math.pow(2.0, Math.abs(this._slope));
+    this._invS0 = 1.0 / this._symmetry;
+    this._invS1 = 1.0 / (1.0 - this._symmetry);
+  }
+
+  compute(input) {
+    if (this._depth === 0) return 1.0;
+    const p = input - Math.floor(input);
+    let x, sym, invS0, invS1;
+    if (this._slope < 0.0) {
+      x = 1.0 - p;
+      sym = 1.0 - this._symmetry;
+      invS0 = this._invS1;
+      invS1 = this._invS0;
+    } else {
+      x = p;
+      sym = this._symmetry;
+      invS0 = this._invS0;
+      invS1 = this._invS1;
+    }
+    if (x <= sym) {
+      return 1.0 - Math.pow(1.0 - x * invS0, this._pEx) * this._depth;
+    } else {
+      return (
+        Math.pow((1.0 - x) * invS1, this._pEx) * this._depth - this._depth + 1.0
+      );
+    }
+  }
+}
+
+/**
+ * Tidal Modulation LFO, Chorus, Flanger, and Auto-Pan Processor.
+ * Ported from openDAW TidalDeviceBox & device-tidal.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {object} options
+ * @param {number} bpm
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array }}
+ */
+export function processTidal(
+  left,
+  right,
+  options = {},
+  bpm = 120,
+  sampleRate = 44100,
+) {
+  const len = left.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+  const depth = options.depth ?? 0.8;
+  const slope = options.slope ?? 0.0;
+  const symmetry = options.symmetry ?? 0.5;
+  const rate = options.rate ?? 4; // Hz or rate fraction
+  const offset = options.offset ?? 0; // degrees
+  const channelOffset = options.channelOffset ?? 90; // degrees
+  const mix = options.mix ?? 1.0;
+
+  const computer = new TidalComputer();
+  computer.set(depth, slope, symmetry);
+
+  const freq = typeof rate === "number" ? Math.max(0.01, rate) : 2.0;
+  const radOffsetL = (offset * Math.PI) / 180;
+  const radOffsetR = ((offset + channelOffset) * Math.PI) / 180;
+
+  for (let i = 0; i < len; i++) {
+    const t = i / sampleRate;
+    const phaseL = (t * freq + radOffsetL / (2 * Math.PI)) % 1.0;
+    const phaseR = (t * freq + radOffsetR / (2 * Math.PI)) % 1.0;
+
+    const gainL = computer.compute(phaseL >= 0 ? phaseL : phaseL + 1.0);
+    const gainR = computer.compute(phaseR >= 0 ? phaseR : phaseR + 1.0);
+
+    outLeft[i] = Math.max(-1, Math.min(1, left[i] * (1 - mix + mix * gainL)));
+    outRight[i] = Math.max(-1, Math.min(1, right[i] * (1 - mix + mix * gainR)));
+  }
+
+  return { outLeft, outRight };
+}
+
+/**
+ * Lookahead Brickwall Peak Limiter & Maximizer with Automatic Makeup Gain.
+ * Ported from openDAW crates/stock-devices/device-maximizer.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {object} options
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array, reductionDb: number }}
+ */
+export function processMaximizer(
+  left,
+  right,
+  options = {},
+  sampleRate = 44100,
+) {
+  const len = left.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+  const thresholdDb = options.threshold ?? -6.0;
+  const ceilingDb = options.ceiling ?? -0.1;
+  const lookaheadMs = options.lookahead ? (options.lookaheadMs ?? 5.0) : 0.0;
+  const releaseSec = options.release ?? 0.15;
+
+  const thresholdGain = Math.pow(10, thresholdDb / 20);
+  const ceilingGain = Math.pow(10, ceilingDb / 20);
+  const makeupGain = ceilingGain / Math.max(1e-4, thresholdGain);
+
+  const lookaheadFrames = Math.round((lookaheadMs / 1000) * sampleRate);
+  const releaseCoeff = Math.exp(
+    -1.0 / (Math.max(0.01, releaseSec) * sampleRate),
+  );
+
+  let envelope = 0;
+  let minGainReduction = 1.0;
+  const gains = new Float32Array(len);
+
+  for (let i = 0; i < len; i++) {
+    const peak = Math.max(Math.abs(left[i]), Math.abs(right[i]));
+    if (peak > envelope) {
+      envelope = peak;
+    } else {
+      envelope = envelope * releaseCoeff + peak * (1.0 - releaseCoeff);
+    }
+
+    let g = 1.0;
+    if (envelope > thresholdGain) {
+      g = thresholdGain / envelope;
+    }
+    gains[i] = g;
+    if (g < minGainReduction) {
+      minGainReduction = g;
+    }
+  }
+
+  for (let i = 0; i < len; i++) {
+    const gainIdx = Math.min(len - 1, i + lookaheadFrames);
+    const g = gains[gainIdx] * makeupGain;
+    const l = left[i] * g;
+    const r = right[i] * g;
+    outLeft[i] = Math.max(-ceilingGain, Math.min(ceilingGain, l));
+    outRight[i] = Math.max(-ceilingGain, Math.min(ceilingGain, r));
+  }
+
+  const reductionDb = 20 * Math.log10(Math.max(1e-5, minGainReduction));
+  return { outLeft, outRight, reductionDb };
+}
+
+/**
+ * Fast/Slow Envelope Transient Shaper.
+ * Ported from claw-daw/claw_daw/audio/transient.py.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {object} options
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array }}
+ */
+export function processTransientShaper(
+  left,
+  right,
+  options = {},
+  sampleRate = 44100,
+) {
+  const len = left.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+
+  const atk = Math.max(-1.0, Math.min(1.0, options.attack ?? 0.0));
+  const sus = Math.max(-1.0, Math.min(1.0, options.sustain ?? 0.0));
+
+  if (Math.abs(atk) < 1e-5 && Math.abs(sus) < 1e-5) {
+    outLeft.set(left);
+    outRight.set(right);
+    return { outLeft, outRight };
+  }
+
+  const winFast = Math.max(1, Math.round(sampleRate * 0.002)); // 2ms
+  const winSlow = Math.max(1, Math.round(sampleRate * 0.03)); // 30ms
+
+  function computeEnv(sig, win) {
+    const env = new Float32Array(sig.length);
+    let s = 0.0;
+    const buf = new Float32Array(win);
+    let bi = 0;
+    for (let i = 0; i < sig.length; i++) {
+      const ax = Math.abs(sig[i]);
+      s -= buf[bi];
+      buf[bi] = ax;
+      s += ax;
+      bi = (bi + 1) % win;
+      env[i] = s / win;
+    }
+    return env;
+  }
+
+  const efL = computeEnv(left, winFast);
+  const esL = computeEnv(left, winSlow);
+  const efR = computeEnv(right, winFast);
+  const esR = computeEnv(right, winSlow);
+
+  let maxSlowL = 1e-6;
+  let maxSlowR = 1e-6;
+  for (let i = 0; i < len; i++) {
+    if (esL[i] > maxSlowL) maxSlowL = esL[i];
+    if (esR[i] > maxSlowR) maxSlowR = esR[i];
+  }
+
+  const eps = 1e-6;
+  for (let i = 0; i < len; i++) {
+    const transL = Math.max(0.0, efL[i] - esL[i]);
+    const transR = Math.max(0.0, efR[i] - esR[i]);
+
+    const gAtkL = 1.0 + atk * (transL / (esL[i] + eps));
+    const gSusL = 1.0 + sus * (esL[i] / maxSlowL);
+    outLeft[i] = Math.max(-1.0, Math.min(1.0, left[i] * gAtkL * gSusL));
+
+    const gAtkR = 1.0 + atk * (transR / (esR[i] + eps));
+    const gSusR = 1.0 + sus * (esR[i] / maxSlowR);
+    outRight[i] = Math.max(-1.0, Math.min(1.0, right[i] * gAtkR * gSusR));
+  }
+
+  return { outLeft, outRight };
+}
+
+/**
+ * Musical scale intervals relative to root note (0..11).
+ */
+export const SCALE_INTERVALS = {
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  pentatonic: [0, 2, 4, 7, 9],
+  blues: [0, 3, 5, 6, 7, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+};
+
+const NOTE_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
+
+/**
+ * Real-Time Monophonic Pitch Snapping & Autotune DSP.
+ * Ported from openDAW crates/dsp/src/autotune.rs & docs/autotune.md.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {object} options
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array, detectedPitch: number, targetPitch: number }}
+ */
+export function processAutotune(left, right, options = {}, sampleRate = 44100) {
+  const len = left.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+
+  const keyName = String(options.key || "C").toUpperCase();
+  const scaleName = String(options.scale || "chromatic").toLowerCase();
+  const retune = Math.max(0, Math.min(1, options.retune ?? 0.8)); // 0=loose, 1=hard
+  const amount = Math.max(0, Math.min(1, options.amount ?? 1.0));
+  const shift = options.shift ?? 0; // semitones (-12 to +12)
+
+  const rootClass = Math.max(0, NOTE_NAMES.indexOf(keyName));
+  const intervals = SCALE_INTERVALS[scaleName] || SCALE_INTERVALS.chromatic;
+  const allowedClasses = new Set(intervals.map((i) => (rootClass + i) % 12));
+
+  // Autocorrelation pitch detection on mono mix
+  let bestPeriod = 0;
+  let maxCorr = 0;
+  const minPeriod = Math.floor(sampleRate / 1000); // 1000 Hz ceiling
+  const maxPeriod = Math.floor(sampleRate / 60); // 60 Hz floor
+
+  for (
+    let period = minPeriod;
+    period < maxPeriod && period < len / 2;
+    period++
+  ) {
+    let corr = 0;
+    let norm = 0;
+    const testLen = Math.min(len - period, 512);
+    for (let i = 0; i < testLen; i++) {
+      const mono = 0.5 * (left[i] + right[i]);
+      const monoDelayed = 0.5 * (left[i + period] + right[i + period]);
+      corr += mono * monoDelayed;
+      norm += mono * mono;
+    }
+    const coeff = norm > 1e-4 ? corr / norm : 0;
+    if (coeff > maxCorr) {
+      maxCorr = coeff;
+      bestPeriod = period;
+    }
+  }
+
+  let detectedPitch = 440;
+  if (bestPeriod > 0) {
+    detectedPitch = sampleRate / bestPeriod;
+  }
+
+  // Convert Hz to fractional MIDI pitch
+  const midiPitch = 69 + 12 * Math.log2(Math.max(20, detectedPitch) / 440);
+  const currentPitchClass = Math.round(midiPitch) % 12;
+
+  // Find nearest allowed pitch class
+  let targetClass = currentPitchClass;
+  let minDistance = Infinity;
+  for (let d = -6; d <= 6; d++) {
+    const candidateClass = (currentPitchClass + d + 12) % 12;
+    if (allowedClasses.has(candidateClass)) {
+      if (Math.abs(d) < minDistance) {
+        minDistance = Math.abs(d);
+        targetClass = candidateClass;
+      }
+    }
+  }
+
+  const snappedMidi =
+    Math.round(midiPitch) +
+    ((targetClass - currentPitchClass + 18) % 12) -
+    6 +
+    shift;
+  const targetPitch = 440 * Math.pow(2, (snappedMidi - 69) / 12);
+
+  // Compute pitch shift ratio based on retune speed & amount
+  const idealRatio = targetPitch / Math.max(20, detectedPitch);
+  const effectiveRatio =
+    1.0 + (idealRatio - 1.0) * amount * (0.2 + 0.8 * retune);
+
+  // Granular pitch shift resampler
+  for (let i = 0; i < len; i++) {
+    const readPos = i * effectiveRatio;
+    const idx0 = Math.floor(readPos) % len;
+    const idx1 = (idx0 + 1) % len;
+    const frac = readPos - Math.floor(readPos);
+
+    outLeft[i] = Math.max(
+      -1,
+      Math.min(1, left[idx0] * (1 - frac) + left[idx1] * frac),
+    );
+    outRight[i] = Math.max(
+      -1,
+      Math.min(1, right[idx0] * (1 - frac) + right[idx1] * frac),
+    );
+  }
+
+  return { outLeft, outRight, detectedPitch, targetPitch };
+}
+
+/**
+ * 16-Band Channel Vocoder DSP.
+ * Ported from openDAW crates/dsp/src/vocoder.rs.
+ *
+ * @param {Float32Array} carrierL
+ * @param {Float32Array} carrierR
+ * @param {Float32Array|null} modL
+ * @param {Float32Array|null} modR
+ * @param {object} options
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array }}
+ */
+export function processVocoder(
+  carrierL,
+  carrierR,
+  modL = null,
+  modR = null,
+  options = {},
+  sampleRate = 44100,
+) {
+  const len = carrierL.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+
+  const numBands = options.bands || 16;
+  const releaseSec = options.release || 0.04;
+  const releaseCoeff = Math.exp(-1.0 / (releaseSec * sampleRate));
+
+  // 16 logarithmically spaced band center frequencies (100 Hz to 8000 Hz)
+  const bandFreqs = [];
+  const minF = 100;
+  const maxF = 8000;
+  for (let b = 0; b < numBands; b++) {
+    bandFreqs.push(minF * Math.pow(maxF / minF, b / (numBands - 1)));
+  }
+
+  // Pre-generate noise if no modulator supplied
+  const effectiveModL = modL || new Float32Array(len);
+  const effectiveModR = modR || new Float32Array(len);
+  if (!modL) {
+    for (let i = 0; i < len; i++) {
+      effectiveModL[i] = (Math.random() * 2 - 1) * 0.5;
+      effectiveModR[i] = (Math.random() * 2 - 1) * 0.5;
+    }
+  }
+
+  // Biquad bandpass filter helper
+  function makeBandpass(freq, q = 4.0) {
+    const w0 = (2 * Math.PI * freq) / sampleRate;
+    const alpha = Math.sin(w0) / (2 * q);
+    const b0 = alpha;
+    const b1 = 0;
+    const b2 = -alpha;
+    const a0 = 1 + alpha;
+    const a1 = -2 * Math.cos(w0);
+    const a2 = 1 - alpha;
+    return {
+      b0: b0 / a0,
+      b1: b1 / a0,
+      b2: b2 / a0,
+      a1: a1 / a0,
+      a2: a2 / a0,
+      x1: 0,
+      x2: 0,
+      y1: 0,
+      y2: 0,
+      process(sample) {
+        const y =
+          this.b0 * sample +
+          this.b1 * this.x1 +
+          this.b2 * this.x2 -
+          this.a1 * this.y1 -
+          this.a2 * this.y2;
+        this.x2 = this.x1;
+        this.x1 = sample;
+        this.y2 = this.y1;
+        this.y1 = y;
+        return y;
+      },
+    };
+  }
+
+  for (let b = 0; b < numBands; b++) {
+    const freq = bandFreqs[b];
+    const carrierFilterL = makeBandpass(freq);
+    const carrierFilterR = makeBandpass(freq);
+    const modFilterL = makeBandpass(freq);
+    const modFilterR = makeBandpass(freq);
+
+    let envL = 0;
+    let envR = 0;
+
+    for (let i = 0; i < len; i++) {
+      const cL = carrierFilterL.process(carrierL[i]);
+      const cR = carrierFilterR.process(carrierR[i]);
+
+      const mL = Math.abs(modFilterL.process(effectiveModL[i]));
+      const mR = Math.abs(modFilterR.process(effectiveModR[i]));
+
+      envL = Math.max(mL, envL * releaseCoeff);
+      envR = Math.max(mR, envR * releaseCoeff);
+
+      outLeft[i] += cL * envL * 2.0;
+      outRight[i] += cR * envR * 2.0;
+    }
+  }
+
+  for (let i = 0; i < len; i++) {
+    outLeft[i] = Math.max(-1, Math.min(1, outLeft[i]));
+    outRight[i] = Math.max(-1, Math.min(1, outRight[i]));
+  }
+
+  return { outLeft, outRight };
+}
+
+/**
+ * Dynamic Sidechain Gain Ducking Processor.
+ * Ported from claw-daw mix_engine sidechain ducking.
+ *
+ * @param {Float32Array} targetLeft
+ * @param {Float32Array} targetRight
+ * @param {Float32Array} triggerBuffer
+ * @param {object} options
+ * @param {number} sampleRate
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array }}
+ */
+export function processSidechainDucking(
+  targetLeft,
+  targetRight,
+  triggerBuffer,
+  options = {},
+  sampleRate = 44100,
+) {
+  const len = targetLeft.length;
+  const outLeft = new Float32Array(len);
+  const outRight = new Float32Array(len);
+
+  const thresholdDb = options.thresholdDb ?? -18.0;
+  const depthDb = options.depthDb ?? 18.0;
+  const attackMs = options.attackMs ?? 5.0;
+  const releaseMs = options.releaseMs ?? 80.0;
+
+  const thresholdGain = Math.pow(10, thresholdDb / 20);
+  const maxDuckGain = Math.pow(10, -depthDb / 20);
+
+  const attackCoeff = Math.exp(
+    -1.0 / (Math.max(0.001, attackMs / 1000) * sampleRate),
+  );
+  const releaseCoeff = Math.exp(
+    -1.0 / (Math.max(0.001, releaseMs / 1000) * sampleRate),
+  );
+
+  let triggerEnv = 0;
+
+  for (let i = 0; i < len; i++) {
+    const trigVal = Math.abs(triggerBuffer[i] || 0);
+    if (trigVal > triggerEnv) {
+      triggerEnv = trigVal + (triggerEnv - trigVal) * attackCoeff;
+    } else {
+      triggerEnv = trigVal + (triggerEnv - trigVal) * releaseCoeff;
+    }
+
+    let duckGain = 1.0;
+    if (triggerEnv > thresholdGain) {
+      const trigDb = 20 * Math.log10(Math.max(1e-5, triggerEnv));
+      const overDb = trigDb - thresholdDb;
+      const reductionDb = Math.min(
+        depthDb,
+        Math.max(0, overDb * (depthDb / 12)),
+      );
+      duckGain = Math.pow(10, -reductionDb / 20);
+    }
+
+    outLeft[i] = Math.max(-1, Math.min(1, targetLeft[i] * duckGain));
+    outRight[i] = Math.max(-1, Math.min(1, targetRight[i] * duckGain));
+  }
+
+  return { outLeft, outRight };
+}

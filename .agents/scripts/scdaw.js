@@ -763,9 +763,17 @@ export function applyCommand(project, name, params = {}) {
       if (!track) throw new Error(`Track not found: ${params.trackId}`);
 
       const fxType = params.fxType;
-      const isMidi = ["arpeggio", "pitch", "velocity", "zeitgeist"].includes(
-        fxType,
-      );
+      const isMidi = [
+        "arpeggio",
+        "pitch",
+        "velocity",
+        "zeitgeist",
+        "groove",
+        "notefilter",
+        "filter",
+        "chord",
+        "humanize",
+      ].includes(fxType);
       const fxListKey = isMidi ? "midiFx" : "fx";
       track[fxListKey] = track[fxListKey] || [];
 
@@ -1153,6 +1161,179 @@ export function applyCommand(project, name, params = {}) {
   }
 }
 
+/**
+ * Chord Voicings (semitone intervals above root note).
+ */
+export const CHORD_VOICINGS = Object.freeze({
+  octave: [0, 12],
+  power: [0, 7, 12],
+  triad: [0, 4, 7],
+  major: [0, 4, 7],
+  minor: [0, 3, 7],
+  "7th": [0, 4, 7, 10],
+  maj7: [0, 4, 7, 11],
+  min7: [0, 3, 7, 10],
+  sus2: [0, 2, 7],
+  sus4: [0, 5, 7],
+});
+
+/**
+ * Filter MIDI notes by key range and velocity split zones.
+ * Ported from openDAW NoteFilter / Zone device.
+ *
+ * @param {Array<object>} notes
+ * @param {object} options
+ * @returns {Array<object>}
+ */
+export function applyNoteFilter(notes, options = {}) {
+  const minPitch = options.minPitch ?? 0;
+  const maxPitch = options.maxPitch ?? 127;
+  const minVel = options.minVelocity ?? 0.01;
+  const maxVel = options.maxVelocity ?? 1.0;
+
+  return notes.filter((n) => {
+    const pitch = n.pitch ?? 60;
+    const vel = n.velocity ?? 0.8;
+    return (
+      pitch >= minPitch && pitch <= maxPitch && vel >= minVel && vel <= maxVel
+    );
+  });
+}
+
+/**
+ * Expands notes into multi-voice chords with guitar-style strum delay.
+ * Ported from claw-daw & openDAW chord devices.
+ *
+ * @param {Array<object>} notes
+ * @param {object} options
+ * @returns {Array<object>}
+ */
+export function applyChordStrum(notes, options = {}) {
+  const type = String(
+    options.type || options.chordType || "triad",
+  ).toLowerCase();
+  const intervals = CHORD_VOICINGS[type] || CHORD_VOICINGS.triad;
+  const strumTicks = Math.max(0, Number(options.strumTicks || 0));
+  const direction = String(options.direction || "up").toLowerCase();
+
+  const out = [];
+  for (const n of notes) {
+    const chordPitches = intervals.map((intv) =>
+      Math.max(0, Math.min(127, n.pitch + intv)),
+    );
+    if (direction === "down") {
+      chordPitches.reverse();
+    }
+    for (let i = 0; i < chordPitches.length; i++) {
+      const offset = i * strumTicks;
+      out.push({
+        ...n,
+        pitch: chordPitches[i],
+        position: Math.max(0, n.position + offset),
+        duration: Math.max(PPQN.SemiQuaver / 2, n.duration - offset),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Applies micro-timing groove displacement using classic templates.
+ * Ported from openDAW Zeitgeist Groove Engine & GrooveCurves.
+ *
+ * @param {Array<object>} notes
+ * @param {object} options
+ * @returns {Array<object>}
+ */
+export function applyZeitgeistGroove(notes, options = {}) {
+  const template = String(options.template || "swing16").toLowerCase();
+  const amount = Math.max(0, Math.min(1.0, options.amount ?? 0.5));
+  if (amount === 0 || template === "straight") {
+    return [...notes];
+  }
+
+  return notes.map((n) => {
+    let newPos = n.position;
+    const beatPos = newPos % PPQN.Quarter;
+    const normPhase = beatPos / PPQN.Quarter;
+
+    if (template === "mpc60") {
+      if (beatPos >= 180 && beatPos <= 300) {
+        newPos += Math.round(amount * 110);
+      }
+    } else if (template === "sp1200") {
+      if (beatPos >= 180 && beatPos <= 300) {
+        newPos += Math.round(amount * 90);
+      }
+    } else if (template === "swing16") {
+      if (beatPos >= 180 && beatPos <= 300) {
+        newPos += Math.round(amount * 120);
+      }
+    } else if (template === "shuffle") {
+      if (beatPos >= 180 && beatPos <= 300) {
+        newPos += Math.round(amount * 160);
+      }
+    } else if (template === "laidback") {
+      if (beatPos > 0) {
+        newPos += Math.round(amount * 35);
+      }
+    } else if (template === "rushed") {
+      if (beatPos > 0) {
+        newPos = Math.max(0, newPos - Math.round(amount * 35));
+      }
+    } else if (template === "scurve") {
+      const warpedPhase =
+        normPhase < 0.5
+          ? 0.5 - 0.5 * Math.pow(1.0 - 2.0 * normPhase, 2.0)
+          : 0.5 + 0.5 * Math.pow(2.0 * normPhase - 1.0, 2.0);
+      const shift = (warpedPhase - normPhase) * PPQN.Quarter * amount;
+      newPos = Math.max(0, Math.round(newPos + shift));
+    } else if (template === "power") {
+      const warpedPhase = 1.0 - Math.pow(1.0 - normPhase, 2.0);
+      const shift = (warpedPhase - normPhase) * PPQN.Quarter * amount;
+      newPos = Math.max(0, Math.round(newPos + shift));
+    }
+
+    return { ...n, position: Math.max(0, newPos) };
+  });
+}
+
+/**
+ * Deterministic humanization adding micro-timing and velocity deviations.
+ * Ported from claw-daw/claw_daw/util/groove.py.
+ *
+ * @param {Array<object>} notes
+ * @param {object} options
+ * @returns {Array<object>}
+ */
+export function applyHumanize(notes, options = {}) {
+  const timingTicks = Math.max(0, Number(options.timingTicks || 0));
+  const velJitter = Math.max(0, Number(options.velocity || 0));
+  const seed = Number(options.seed ?? 42);
+
+  if (timingTicks === 0 && velJitter === 0) {
+    return [...notes];
+  }
+
+  let s = (seed ^ 0x6d2b79f5) >>> 0;
+  function rnd() {
+    s = Math.imul(s ^ (s >>> 15), s | 1);
+    s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
+    return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
+  }
+
+  return notes.map((n) => {
+    const dt = timingTicks > 0 ? Math.round((rnd() * 2 - 1) * timingTicks) : 0;
+    const dv = velJitter > 0 ? ((rnd() * 2 - 1) * velJitter) / 127 : 0;
+
+    return {
+      ...n,
+      position: Math.max(0, n.position + dt),
+      velocity: Math.max(0.01, Math.min(1.0, n.velocity + dv)),
+    };
+  });
+}
+
 export function resolveTrackNotes(
   project,
   track,
@@ -1165,10 +1346,22 @@ export function resolveTrackNotes(
   let trackNotes = track.notes || [];
 
   if (bakeMidiFx && Array.isArray(track.midiFx) && track.midiFx.length > 0) {
-    const arpFx = track.midiFx.find((f) => f.type === "arpeggio");
-    const pitchFx = track.midiFx.find((f) => f.type === "pitch");
-    const velFx = track.midiFx.find((f) => f.type === "velocity");
+    // 1. Note Filter
+    const filterFx = track.midiFx.find(
+      (f) => f.type === "notefilter" || f.type === "filter",
+    );
+    if (filterFx) {
+      trackNotes = applyNoteFilter(trackNotes, filterFx);
+    }
 
+    // 2. Chord / Strummer
+    const chordFx = track.midiFx.find((f) => f.type === "chord");
+    if (chordFx && trackNotes.length > 0) {
+      trackNotes = applyChordStrum(trackNotes, chordFx);
+    }
+
+    // 3. Arpeggiator
+    const arpFx = track.midiFx.find((f) => f.type === "arpeggio");
     if (arpFx && trackNotes.length > 0) {
       const ratePulses = Math.max(
         PPQN.SemiQuaver / 2,
@@ -1206,6 +1399,8 @@ export function resolveTrackNotes(
       trackNotes = arpeggiatedNotes;
     }
 
+    // 4. Pitch Transpose
+    const pitchFx = track.midiFx.find((f) => f.type === "pitch");
     if (pitchFx) {
       const offset = (pitchFx.semitones || 0) + (pitchFx.octaves || 0) * 12;
       trackNotes = trackNotes.map((n) => ({
@@ -1214,6 +1409,8 @@ export function resolveTrackNotes(
       }));
     }
 
+    // 5. Velocity Adjust
+    const velFx = track.midiFx.find((f) => f.type === "velocity");
     if (velFx) {
       trackNotes = trackNotes.map((n) => {
         let v = n.velocity * (1 + (velFx.drive || 0));
@@ -1222,6 +1419,20 @@ export function resolveTrackNotes(
         }
         return { ...n, velocity: Math.max(0.01, Math.min(1.0, v)) };
       });
+    }
+
+    // 6. Zeitgeist Groove Engine
+    const zeitFx = track.midiFx.find(
+      (f) => f.type === "zeitgeist" || f.type === "groove",
+    );
+    if (zeitFx) {
+      trackNotes = applyZeitgeistGroove(trackNotes, zeitFx);
+    }
+
+    // 7. Humanizer
+    const humanFx = track.midiFx.find((f) => f.type === "humanize");
+    if (humanFx) {
+      trackNotes = applyHumanize(trackNotes, humanFx);
     }
   }
 
