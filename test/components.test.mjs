@@ -1889,6 +1889,66 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
   );
 });
 
+test("scdaw-timeline: track header enforces strict overflow containment, max-width, and non-overlapping controls", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+
+  await scdaw.resetProject({ template: "empty" });
+
+  const addRes = await scdaw.sendCommand("add_track", {
+    kind: "audio",
+    name: "Audio 1",
+  });
+
+  const timeline = new DawTimelineElement();
+  timeline.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelectorAll: () => [],
+  };
+  timeline.render();
+  const html = timeline.shadowRoot.innerHTML;
+
+  // 1. Verify stylesheet guarantees overflow containment and max-width on track-header
+  assert.match(
+    html,
+    /\.scdaw-timeline__track-header,\s*\.track-header\s*\{[^}]*max-width:\s*var\(--track-header-w\)/,
+    "Track header must declare max-width: var(--track-header-w) to prevent expanding into lane area",
+  );
+  assert.match(
+    html,
+    /\.scdaw-timeline__track-header,\s*\.track-header\s*\{[^}]*overflow:\s*hidden/,
+    "Track header must declare overflow: hidden to contain all child controls",
+  );
+
+  // 2. Verify controls container wraps and respects 100% max-width
+  assert.match(
+    html,
+    /\.scdaw-timeline__controls\s*\{[^}]*flex-wrap:\s*wrap/,
+    "Track controls container must enable flex-wrap: wrap",
+  );
+  assert.match(
+    html,
+    /\.scdaw-timeline__controls\s*\{[^}]*max-width:\s*100%/,
+    "Track controls container must declare max-width: 100%",
+  );
+
+  // 3. Verify markup separates track title and delete button into .scdaw-timeline__track-top
+  assert.match(
+    html,
+    /class="[^"]*scdaw-timeline__track-top[^"]*"[\s\S]*?class="[^"]*delete-track-btn[^"]*"[^>]*aria-label="Delete Audio 1"/,
+    "Delete button must reside in .scdaw-timeline__track-top alongside track title",
+  );
+
+  // 4. Verify playback & mixing buttons reside in .scdaw-timeline__controls
+  assert.match(
+    html,
+    /class="[^"]*scdaw-timeline__controls[^"]*"[\s\S]*?class="[^"]*record-arm-btn[^"]*"[\s\S]*?class="[^"]*import-audio-btn[^"]*"[\s\S]*?class="[^"]*mute-btn[^"]*"[\s\S]*?class="[^"]*solo-btn[^"]*"/,
+    "Track mixing controls must reside together inside .scdaw-timeline__controls",
+  );
+});
+
 test("scdaw ground-up responsive toolbar & container queries: flattened sibling toolbar groups, zero view-switcher scrollbar/overlap, @supports-isolated @media fallbacks, and full custom element container query + ARIA compliance", async () => {
   const [
     workbenchContent,

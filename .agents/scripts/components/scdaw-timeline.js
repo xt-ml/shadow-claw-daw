@@ -153,7 +153,7 @@ export class DawTimelineElement extends BaseElement {
           box-sizing: border-box;
           container-type: inline-size;
           container-name: scdaw-timeline;
-          --track-header-w: 120px;
+          --track-header-w: 136px;
         }
 
         @container scdaw-timeline (min-width: 520px) {
@@ -273,7 +273,9 @@ export class DawTimelineElement extends BaseElement {
         .track-header {
           width: var(--track-header-w);
           min-width: var(--track-header-w);
-          padding: 0.35rem 0.5rem;
+          max-width: var(--track-header-w);
+          overflow: hidden;
+          padding: 0.35rem 0.45rem;
           background: var(--bg-card);
           border-right: 1px solid var(--border);
           display: flex;
@@ -286,6 +288,15 @@ export class DawTimelineElement extends BaseElement {
           z-index: 2;
         }
 
+        .scdaw-timeline__track-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+          width: 100%;
+          min-width: 0;
+        }
+
         .scdaw-timeline__track-name,
         .track-name {
           font-size: 0.76rem;
@@ -293,6 +304,82 @@ export class DawTimelineElement extends BaseElement {
           text-overflow: ellipsis;
           overflow: hidden;
           white-space: nowrap;
+          min-width: 0;
+          flex: 1 1 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .scdaw-timeline__track-title {
+          text-overflow: ellipsis;
+          overflow: hidden;
+          white-space: nowrap;
+          min-width: 0;
+        }
+
+        .scdaw-timeline__track-icon {
+          flex-shrink: 0;
+        }
+
+        .scdaw-timeline__btn--delete {
+          flex-shrink: 0;
+          width: 18px;
+          height: 18px;
+          min-width: 18px;
+          padding: 0;
+          font-size: 0.65rem;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 3px;
+          opacity: 0.65;
+          transition: opacity 0.12s ease;
+        }
+
+        .scdaw-timeline__btn--delete:hover,
+        .scdaw-timeline__btn--delete:focus-visible {
+          opacity: 1;
+        }
+
+        .scdaw-timeline__controls {
+          display: flex;
+          gap: 3px;
+          align-items: center;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+          flex-wrap: wrap;
+        }
+
+        .scdaw-timeline__btn {
+          height: 20px;
+          min-width: 20px;
+          padding: 0 4px;
+          font-size: 0.68rem;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          box-sizing: border-box;
+          border-radius: 3px;
+        }
+
+        .scdaw-timeline__btn--arm {
+          min-width: 26px;
+          padding: 0 3px;
+        }
+
+        .scdaw-timeline__track-count {
+          font-size: 0.62rem;
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          flex-shrink: 1;
+          margin-left: auto;
         }
 
         .scdaw-timeline__lane,
@@ -355,7 +442,9 @@ export class DawTimelineElement extends BaseElement {
         .scdaw-timeline__automation-header {
           width: var(--track-header-w);
           min-width: var(--track-header-w);
-          padding: 0.3rem 0.5rem;
+          max-width: var(--track-header-w);
+          overflow: hidden;
+          padding: 0.3rem 0.45rem;
           background: var(--bg-card);
           border-right: 1px solid var(--border);
           display: flex;
@@ -593,21 +682,26 @@ export class DawTimelineElement extends BaseElement {
                   return `
                 <div class="scdaw-timeline__track track-row ${isSelected ? "scdaw-timeline__track--selected track-row--selected" : ""}" data-track="${t.id}" role="listitem" aria-current="${isSelected ? "true" : "false"}">
                   <div class="scdaw-timeline__track-header track-header">
-                    <div class="scdaw-timeline__track-name track-name" title="${t.name}">${icon} ${t.name}</div>
-                    <div style="display:flex; gap:4px; align-items:center;">
+                    <div class="scdaw-timeline__track-top">
+                      <div class="scdaw-timeline__track-name track-name" title="${t.name} (${countLabel})">
+                        <span class="scdaw-timeline__track-icon" aria-hidden="true">${icon}</span>
+                        <span class="scdaw-timeline__track-title">${t.name}</span>
+                      </div>
+                      <button type="button" class="btn btn-icon btn-danger delete-track-btn scdaw-timeline__btn--delete" data-track="${t.id}" aria-label="Delete ${t.name}" title="Delete ${t.name}">✕</button>
+                    </div>
+                    <div class="scdaw-timeline__controls">
                       ${
                         t.kind === "audio"
                           ? `
-                        <button type="button" class="btn btn-icon ${t.recordArm ? "btn-danger" : ""} record-arm-btn" data-track="${t.id}" aria-label="${t.recordArm ? `Disarm recording for ${t.name}` : `Arm recording for ${t.name}`}" aria-pressed="${Boolean(t.recordArm)}" title="${t.recordArm ? "Disarm recording" : "Record arm"}">● R</button>
-                        <button type="button" class="btn btn-icon import-audio-btn" data-track="${t.id}" aria-label="Import audio file into ${t.name}" title="Import WAV or Audio File">📂</button>
+                        <button type="button" class="btn btn-icon ${t.recordArm ? "btn-danger" : ""} record-arm-btn scdaw-timeline__btn scdaw-timeline__btn--arm" data-track="${t.id}" aria-label="${t.recordArm ? `Disarm recording for ${t.name}` : `Arm recording for ${t.name}`}" aria-pressed="${Boolean(t.recordArm)}" title="${t.recordArm ? "Disarm recording" : "Record arm"}">● R</button>
+                        <button type="button" class="btn btn-icon import-audio-btn scdaw-timeline__btn" data-track="${t.id}" aria-label="Import audio file into ${t.name}" title="Import WAV or Audio File">📂</button>
                       `
                           : ""
                       }
-                      <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
-                      <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
-                      <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
-                      <button type="button" class="btn btn-icon btn-danger delete-track-btn" data-track="${t.id}" aria-label="Delete ${t.name}" title="Delete ${t.name}">✕</button>
-                      <span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${countLabel}</span>
+                      <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} scdaw-timeline__btn mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
+                      <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} scdaw-timeline__btn solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
+                      <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} scdaw-timeline__btn auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
+                      <span class="scdaw-timeline__track-count" title="${countLabel}">${countLabel}</span>
                     </div>
                   </div>
                   <div class="scdaw-timeline__lane lane-area">
