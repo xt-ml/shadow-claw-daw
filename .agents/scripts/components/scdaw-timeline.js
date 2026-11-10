@@ -523,6 +523,7 @@ export class DawTimelineElement extends BaseElement {
                       <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
                       <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
                       <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
+                      <button type="button" class="btn btn-icon btn-danger delete-track-btn" data-track="${t.id}" aria-label="Delete ${t.name}" title="Delete ${t.name}">✕</button>
                       <span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${countLabel}</span>
                     </div>
                   </div>
@@ -657,6 +658,19 @@ export class DawTimelineElement extends BaseElement {
           this._expandedAutomation.add(id);
         }
         this.render();
+      });
+    });
+
+    // Delete Track
+    this.shadowRoot.querySelectorAll(".delete-track-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation?.();
+        const id = btn.dataset.track;
+        const currentProj = scdaw.getProject();
+        const t = currentProj.tracks.find((x) => x.id === id);
+        if (t) {
+          await scdaw.sendCommand("remove_track", { trackId: id });
+        }
       });
     });
 

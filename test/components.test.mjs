@@ -1801,6 +1801,10 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
     timeline.shadowRoot.innerHTML,
     /class="[^"]*import-audio-btn[^"]*"[^>]*aria-label="Import audio file into Lead Vocal"/,
   );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*delete-track-btn[^"]*"[^>]*aria-label="Delete Lead Vocal"/,
+  );
 
   // Toggle automation lane
   assert.equal(timeline._expandedAutomation.has(audioTrackId), false);
