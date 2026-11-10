@@ -248,6 +248,26 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("manage_fx", params);
     }
 
+    case "scdaw_set_automation": {
+      return await scdaw.sendCommand("set_automation", params);
+    }
+
+    case "scdaw_clear_automation": {
+      return await scdaw.sendCommand("clear_automation", params);
+    }
+
+    case "scdaw_add_audio_clip": {
+      return await scdaw.sendCommand("add_audio_clip", params);
+    }
+
+    case "scdaw_set_audio_clip": {
+      return await scdaw.sendCommand("set_audio_clip", params);
+    }
+
+    case "scdaw_set_track_send": {
+      return await scdaw.sendCommand("set_track_send", params);
+    }
+
     case "scdaw_render_surface": {
       const el = params.element || "workbench";
       const tagMap = {

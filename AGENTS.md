@@ -8,7 +8,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
 
 - **Assistant Name**: `ShadowClaw DAW` (`Daw`)
 - **Prefix Isolation**:
-  - Tools prefix: `scdaw_*` (25 declarative tools)
+  - Tools prefix: `scdaw_*` (30 declarative tools)
   - Custom Elements prefix: `scdaw-*` (11 modular Web Components)
   - Broadcast Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
   - Pinned workbench: `pages/main/index.html` (`/main/`)
@@ -28,11 +28,11 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - All BroadcastChannels must start with `scdaw-`.
 
 3. **Pure Logic, Storage & Transports Separation**:
-   - Core musical math, PPQN conversions (`PPQN.Quarter = 960`), project validation, transaction reducers, and WAV encoding live in `.agents/scripts/scdaw.js` (zero DOM / Web Audio dependencies, 100% unit tested).
-   - Parameter schemas, curated presets, and custom DSP curves/processors live in `.agents/scripts/scdaw-schema.js`, `.agents/scripts/scdaw-presets.js`, and `.agents/scripts/scdaw-dsp.js`.
-   - SMF MIDI codec, DAWproject v1.0 XML/ZIP interchange, zero-dependency ZIP archive encoding/decoding, and OPFS conversation storage live in `.agents/scripts/scdaw-midi.js`, `.agents/scripts/scdaw-dawproject.js`, `.agents/scripts/scdaw-zip.js`, and `.agents/scripts/scdaw-fs.js`.
+   - Core musical math, PPQN conversions (`PPQN.Quarter = 960`), project validation, transaction reducers, audio clip scheduling, continuous parameter automation interpolation (`automationValueAt`), and WAV encoding live in `.agents/scripts/scdaw.js` (zero DOM / Web Audio dependencies, 100% unit tested).
+   - Parameter schemas, automatable parameter definitions (`AUTOMATABLE_PARAMS`), curated presets, and custom DSP curves/processors live in `.agents/scripts/scdaw-schema.js`, `.agents/scripts/scdaw-presets.js`, and `.agents/scripts/scdaw-dsp.js`.
+   - SMF MIDI codec, DAWproject v1.0 XML/ZIP interchange (including Points automation lanes and embedded Audio sample stems), zero-dependency ZIP archive encoding/decoding, and OPFS conversation storage live in `.agents/scripts/scdaw-midi.js`, `.agents/scripts/scdaw-dawproject.js`, `.agents/scripts/scdaw-zip.js`, and `.agents/scripts/scdaw-fs.js`.
    - Reactive signal primitives live in `.agents/scripts/scdaw-signals.js`.
-   - Audio graph creation, instrument synthesis (`Vaporisateur` synth & `Playfield` drums), lookahead scheduling, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
+   - Audio graph creation, instrument synthesis (`Vaporisateur` synth & `Playfield` drums), timeline audio clip buffer playback, real-time lookahead scheduling, parameter ramping (`linearRampToValueAtTime`), auxiliary send/bus routing, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
    - UI Web Components live in `.agents/scripts/scdaw-element.js` and `.agents/scripts/components/scdaw-*.js`.
    - Worker-to-main IPC bridge and WebMCP registration live in `.agents/scripts/scdaw-adapter.js`.
 
@@ -44,7 +44,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - When checking Web IDL interfaces such as `LaunchParams`, always test property existence with `"files" in window.LaunchParams.prototype` rather than invoking prototype getters directly.
 
 5. **Declarative Tools & WebMCP**:
-   - Single source of truth for all 25 tools is `bin/tool-manifest.mjs`.
+   - Single source of truth for all 30 tools is `bin/tool-manifest.mjs`.
    - Generated into `.agents/tools/*.json` via `npm run build:tools` (`bin/generate-tools.mjs`).
    - Includes WebMCP boolean annotations (`readOnlyHint`, `consequentialHint`).
 

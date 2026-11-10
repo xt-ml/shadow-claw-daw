@@ -35,6 +35,8 @@ export class DawTimelineElement extends BaseElement {
       this.attachShadow({ mode: "open" });
     }
     this._rafId = null;
+    this._expandedAutomation = new Set();
+    this._selectedAutoParam = new Map();
   }
 
   connectedCallback() {
@@ -267,6 +269,65 @@ export class DawTimelineElement extends BaseElement {
           background: rgba(148, 163, 184, 0.12);
         }
 
+        .scdaw-timeline__clip--audio {
+          background: rgba(167, 139, 250, 0.25);
+          border: 1px solid #a78bfa;
+        }
+
+        .scdaw-timeline__automation-row {
+          display: flex;
+          border-bottom: 1px solid var(--border-subtle);
+          background: rgba(0, 0, 0, 0.35);
+          min-height: 44px;
+        }
+
+        .scdaw-timeline__automation-header {
+          width: var(--track-header-w);
+          min-width: var(--track-header-w);
+          padding: 0.3rem 0.5rem;
+          background: var(--bg-card);
+          border-right: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          box-sizing: border-box;
+          position: sticky;
+          left: 0;
+          z-index: 2;
+        }
+
+        .scdaw-timeline__auto-select {
+          flex: 1;
+          font-size: 0.68rem;
+          background: var(--bg-input, #12181a);
+          color: var(--text, #f1f5f9);
+          border: 1px solid var(--border);
+          border-radius: 3px;
+          padding: 2px 4px;
+        }
+
+        .scdaw-timeline__automation-lane {
+          flex: 1;
+          position: relative;
+          height: 44px;
+          background: rgba(0, 0, 0, 0.2);
+          cursor: crosshair;
+        }
+
+        .scdaw-timeline__auto-svg {
+          width: 100%;
+          height: 100%;
+          display: block;
+        }
+
+        .scdaw-timeline__auto-point {
+          cursor: pointer;
+          transition: r 0.1s ease;
+        }
+        .scdaw-timeline__auto-point:hover {
+          r: 6;
+        }
+
         .scdaw-timeline__playhead,
         .playhead {
           position: absolute;
@@ -287,6 +348,7 @@ export class DawTimelineElement extends BaseElement {
           <div class="scdaw-timeline__actions">
             <button id="add-drums-btn" class="btn btn-icon" aria-label="Add drum track">+ Drums</button>
             <button id="add-synth-btn" class="btn btn-icon" aria-label="Add synth track">+ Synth</button>
+            <button id="add-audio-btn" class="btn btn-icon" aria-label="Add audio track">+ Audio</button>
           </div>
         </div>
 
@@ -307,26 +369,159 @@ export class DawTimelineElement extends BaseElement {
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
             ${(() => {
               const hasSolo = p.tracks.some((trk) => trk.solo);
+              const totalBeats = (p.lengthBars || 1) * 4;
+
               return p.tracks
                 .map((t) => {
                   const isSelected = scdaw.selectedTrackId?.get() === t.id;
                   const isSilenced = Boolean(t.mute || (hasSolo && !t.solo));
+                  const isAutoExpanded = this._expandedAutomation.has(t.id);
+                  const icon =
+                    t.kind === "drums"
+                      ? "🥁"
+                      : t.kind === "audio"
+                        ? "🎙️"
+                        : "🎹";
+                  const countLabel =
+                    t.kind === "audio"
+                      ? `${t.audioClips?.length || 0} clips`
+                      : `${t.notes.length} notes`;
+
+                  const currentParam =
+                    this._selectedAutoParam.get(t.id) || "volume";
+                  const points =
+                    (t.automation && t.automation[currentParam]) || [];
+
+                  const mapValToY = (val) => {
+                    if (currentParam === "volume") {
+                      return (
+                        100 -
+                        Math.max(0, Math.min(100, (Number(val) / 1.5) * 100))
+                      );
+                    }
+                    if (currentParam === "pan") {
+                      return (
+                        100 -
+                        Math.max(
+                          0,
+                          Math.min(100, ((Number(val) + 1) / 2) * 100),
+                        )
+                      );
+                    }
+                    if (currentParam === "cutoff") {
+                      return (
+                        100 -
+                        Math.max(0, Math.min(100, (Number(val) / 20000) * 100))
+                      );
+                    }
+                    return 50;
+                  };
+
+                  let svgContent = "";
+                  if (points.length > 0) {
+                    const coords = points.map((pt) => {
+                      const x =
+                        (Math.max(0, Math.min(totalBeats, pt.time)) /
+                          totalBeats) *
+                        100;
+                      const y = mapValToY(pt.value);
+                      return { x, y, pt };
+                    });
+                    const polyPoints = coords
+                      .map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+                      .join(" ");
+                    svgContent = `
+                      <polyline points="${polyPoints}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" />
+                      ${coords
+                        .map(
+                          (c) => `
+                        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" class="scdaw-timeline__auto-point auto-point" data-track="${t.id}" data-param="${currentParam}" data-time="${c.pt.time}" />
+                      `,
+                        )
+                        .join("")}
+                    `;
+                  }
+
+                  let laneClipsHtml = "";
+                  if (t.kind === "audio") {
+                    if (
+                      Array.isArray(t.audioClips) &&
+                      t.audioClips.length > 0
+                    ) {
+                      laneClipsHtml = t.audioClips
+                        .map((clip) => {
+                          const leftPct =
+                            (Math.max(0, clip.time || 0) / totalBeats) * 100;
+                          const widthPct = Math.min(
+                            100 - leftPct,
+                            Math.max(
+                              3,
+                              ((clip.duration || 4) / totalBeats) * 100,
+                            ),
+                          );
+                          return `
+                            <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}"
+                                 style="left:${leftPct}%; width:${widthPct}%;"
+                                 role="button"
+                                 tabindex="0"
+                                 aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats">
+                              <span style="margin-right:4px;" aria-hidden="true">🎙</span>
+                              <span>${clip.name}</span>
+                            </div>
+                          `;
+                        })
+                        .join("");
+                    } else {
+                      laneClipsHtml = `
+                        <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block" style="left:0%; width:100%; opacity:0.5;">
+                          <span>(Empty Audio Track)</span>
+                        </div>
+                      `;
+                    }
+                  } else {
+                    laneClipsHtml = `
+                      <div class="scdaw-timeline__clip clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}" style="left:0%; width:100%;">
+                        <span>${t.name} Pattern${t.mute ? " (Muted)" : ""}</span>
+                      </div>
+                    `;
+                  }
+
                   return `
                 <div class="scdaw-timeline__track track-row ${isSelected ? "scdaw-timeline__track--selected track-row--selected" : ""}" data-track="${t.id}" role="listitem" aria-current="${isSelected ? "true" : "false"}">
                   <div class="scdaw-timeline__track-header track-header">
-                    <div class="scdaw-timeline__track-name track-name" title="${t.name}">${t.kind === "drums" ? "🥁" : "🎹"} ${t.name}</div>
+                    <div class="scdaw-timeline__track-name track-name" title="${t.name}">${icon} ${t.name}</div>
                     <div style="display:flex; gap:4px; align-items:center;">
                       <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
                       <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
-                      <span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${t.notes.length} notes</span>
+                      <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
+                      <span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${countLabel}</span>
                     </div>
                   </div>
                   <div class="scdaw-timeline__lane lane-area">
-                    <div class="scdaw-timeline__clip clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}" style="left:0%; width:100%;">
-                      <span>${t.name} Pattern${t.mute ? " (Muted)" : ""}</span>
-                    </div>
+                    ${laneClipsHtml}
                   </div>
                 </div>
+                ${
+                  isAutoExpanded
+                    ? `
+                  <div class="scdaw-timeline__automation-row automation-row" data-track="${t.id}">
+                    <div class="scdaw-timeline__automation-header">
+                      <select class="scdaw-timeline__auto-select auto-param-select" data-track="${t.id}" aria-label="Automation parameter for ${t.name}">
+                        <option value="volume" ${currentParam === "volume" ? "selected" : ""}>Volume</option>
+                        <option value="pan" ${currentParam === "pan" ? "selected" : ""}>Pan</option>
+                        ${t.kind === "synth" ? `<option value="cutoff" ${currentParam === "cutoff" ? "selected" : ""}>Cutoff</option>` : ""}
+                      </select>
+                      <button type="button" class="btn btn-icon clear-auto-btn" data-track="${t.id}" data-param="${currentParam}" aria-label="Clear ${currentParam} automation for ${t.name}" title="Clear points">✕</button>
+                    </div>
+                    <div class="scdaw-timeline__automation-lane auto-lane" data-track="${t.id}" data-param="${currentParam}" title="Click to add automation point" role="application" aria-label="${currentParam} automation curve for ${t.name}">
+                      <svg class="scdaw-timeline__auto-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        ${svgContent}
+                      </svg>
+                    </div>
+                  </div>
+                `
+                    : ""
+                }
               `;
                 })
                 .join("");
@@ -360,6 +555,12 @@ export class DawTimelineElement extends BaseElement {
         scdaw.sendCommand("add_track", { kind: "synth", name: "Lead Synth" });
       });
 
+    this.shadowRoot
+      .getElementById("add-audio-btn")
+      ?.addEventListener("click", () => {
+        scdaw.sendCommand("add_track", { kind: "audio", name: "Audio Track" });
+      });
+
     // Mute & Solo
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -378,6 +579,101 @@ export class DawTimelineElement extends BaseElement {
         const currentProj = scdaw.getProject();
         const t = currentProj.tracks.find((x) => x.id === id);
         if (t) scdaw.sendCommand("set_track", { trackId: id, solo: !t.solo });
+      });
+    });
+
+    // Automation Toggle
+    this.shadowRoot.querySelectorAll(".auto-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
+        const id = btn.dataset.track;
+        if (this._expandedAutomation.has(id)) {
+          this._expandedAutomation.delete(id);
+        } else {
+          this._expandedAutomation.add(id);
+        }
+        this.render();
+      });
+    });
+
+    // Automation Param Select
+    this.shadowRoot.querySelectorAll(".auto-param-select").forEach((sel) => {
+      sel.addEventListener("change", (e) => {
+        const id = sel.dataset.track;
+        this._selectedAutoParam.set(id, e.target.value);
+        this.render();
+      });
+    });
+
+    // Clear Automation
+    this.shadowRoot.querySelectorAll(".clear-auto-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
+        const trackId = btn.dataset.track;
+        const param = btn.dataset.param;
+        scdaw.sendCommand("clear_automation", { trackId, param });
+      });
+    });
+
+    // Click on Automation Lane to Add/Update Point
+    this.shadowRoot.querySelectorAll(".auto-lane").forEach((lane) => {
+      lane.addEventListener("click", (e) => {
+        if (e.target.closest?.(".auto-point")) {
+          // Click on point to delete it
+          const ptEl = e.target.closest(".auto-point");
+          const trackId = ptEl.dataset.track;
+          const param = ptEl.dataset.param;
+          const time = Number(ptEl.dataset.time);
+          const currentProj = scdaw.getProject();
+          const trk = currentProj.tracks.find((x) => x.id === trackId);
+          if (trk?.automation?.[param]) {
+            const filtered = trk.automation[param].filter(
+              (p) => Math.abs(p.time - time) > 0.001,
+            );
+            scdaw.sendCommand("set_automation", {
+              trackId,
+              param,
+              points: filtered,
+            });
+          }
+          return;
+        }
+
+        const rect = lane.getBoundingClientRect?.() || {
+          left: 0,
+          top: 0,
+          width: 100,
+          height: 44,
+        };
+        const xNorm = Math.max(
+          0,
+          Math.min(1, (e.clientX - rect.left) / (rect.width || 1)),
+        );
+        const yNorm = Math.max(
+          0,
+          Math.min(1, 1 - (e.clientY - rect.top) / (rect.height || 1)),
+        );
+
+        const currentProj = scdaw.getProject();
+        const totalBeats = (currentProj.lengthBars || 1) * 4;
+        const time = Math.round(xNorm * totalBeats * 4) / 4;
+        const param = lane.dataset.param;
+
+        let value = yNorm;
+        if (param === "volume") {
+          value = Math.round(yNorm * 1.5 * 100) / 100;
+        } else if (param === "pan") {
+          value = Math.round((yNorm * 2 - 1) * 100) / 100;
+        } else if (param === "cutoff") {
+          value = Math.round(yNorm * 20000);
+        }
+
+        scdaw.sendCommand("set_automation", {
+          trackId: lane.dataset.track,
+          param,
+          time,
+          value,
+        });
       });
     });
   }

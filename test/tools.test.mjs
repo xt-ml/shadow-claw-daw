@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const TOOLS_DIR = resolve(ROOT, ".agents/tools");
 
-test("Tools: all 25 tools defined in manifest exist on disk and match schema", () => {
-  assert.equal(TOOLS.length, 25);
+test("Tools: all 30 tools defined in manifest exist on disk and match schema", () => {
+  assert.equal(TOOLS.length, 30);
 
   for (const tool of TOOLS) {
     const filePath = resolve(TOOLS_DIR, `${tool.name}.json`);
@@ -100,6 +100,58 @@ test("Adapter: handleToolDispatch dispatches status, project, transport, and sur
   });
   assert.ok(fxRes.ok);
   assert.equal(fxRes.fx.type, "delay");
+
+  // Test scdaw_set_automation & scdaw_clear_automation
+  const autoRes = await handleToolDispatch("scdaw_set_automation", {
+    trackId: "trk_bass",
+    param: "cutoff",
+    time: 1.0,
+    value: 1500,
+  });
+  assert.ok(autoRes.ok);
+  assert.equal(autoRes.param, "cutoff");
+
+  const clearAutoRes = await handleToolDispatch("scdaw_clear_automation", {
+    trackId: "trk_bass",
+    param: "cutoff",
+  });
+  assert.ok(clearAutoRes.ok);
+
+  // Test scdaw_add_audio_clip & scdaw_set_audio_clip
+  const addTrackRes = await handleToolDispatch("scdaw_add_track", {
+    kind: "audio",
+    name: "Vox",
+  });
+  assert.equal(addTrackRes.kind, "audio");
+
+  const addClipRes = await handleToolDispatch("scdaw_add_audio_clip", {
+    trackId: addTrackRes.trackId,
+    clip: {
+      id: "clip_test_1",
+      name: "Test Take",
+      time: 0,
+      duration: 2,
+    },
+  });
+  assert.ok(addClipRes.ok);
+  assert.equal(addClipRes.clipId, "clip_test_1");
+
+  const setClipRes = await handleToolDispatch("scdaw_set_audio_clip", {
+    trackId: addTrackRes.trackId,
+    clipId: "clip_test_1",
+    patch: { gain: 0.8 },
+  });
+  assert.ok(setClipRes.ok);
+  assert.equal(setClipRes.clip.gain, 0.8);
+
+  // Test scdaw_set_track_send
+  const sendRes = await handleToolDispatch("scdaw_set_track_send", {
+    trackId: "trk_drums",
+    targetTrackId: "trk_bass",
+    level: 0.5,
+  });
+  assert.ok(sendRes.ok);
+  assert.equal(sendRes.level, 0.5);
 
   const resetRes = await handleToolDispatch("scdaw_reset", {
     scope: "project",

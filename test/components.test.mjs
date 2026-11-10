@@ -1705,6 +1705,117 @@ test("scdaw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .
   );
 });
 
+test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation lanes with ARIA compliance", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+
+  await scdaw.resetProject({ template: "empty" });
+
+  // Add an audio track with a clip
+  const addRes = await scdaw.sendCommand("add_track", {
+    kind: "audio",
+    name: "Lead Vocal",
+  });
+  const audioTrackId = addRes.trackId;
+
+  await scdaw.sendCommand("add_audio_clip", {
+    trackId: audioTrackId,
+    clip: {
+      id: "clip_vox_chorus",
+      name: "Vocal Chorus",
+      time: 1,
+      duration: 2,
+    },
+  });
+
+  // Set an automation point
+  await scdaw.sendCommand("set_automation", {
+    trackId: audioTrackId,
+    param: "volume",
+    time: 1,
+    value: 0.9,
+  });
+
+  const timeline = new DawTimelineElement();
+  let addAudioBtn = null;
+  let autoBtn = null;
+
+  const makeBtnMock = () => {
+    const listeners = new Map();
+    const btn = {
+      dataset: { track: audioTrackId, param: "volume" },
+      addEventListener: (evt, fn) => listeners.set(evt, fn),
+      click: () =>
+        listeners.get("click")?.({
+          target: btn,
+          currentTarget: btn,
+          stopPropagation() {},
+          preventDefault() {},
+        }),
+    };
+    return btn;
+  };
+
+  timeline.shadowRoot = {
+    innerHTML: "",
+    getElementById: (id) => {
+      if (id === "add-audio-btn") {
+        addAudioBtn = makeBtnMock();
+        return addAudioBtn;
+      }
+      return null;
+    },
+    querySelectorAll: (sel) => {
+      if (sel === ".auto-btn") {
+        autoBtn = makeBtnMock();
+        return [autoBtn];
+      }
+      return [];
+    },
+  };
+
+  timeline.render();
+
+  // Verify presence of Add Audio button
+  assert.ok(addAudioBtn, "#add-audio-btn element exists in timeline");
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /id="add-audio-btn"[^>]*aria-label="Add audio track"/,
+  );
+
+  // Verify audio track and audio clip rendered with ARIA attributes
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*scdaw-timeline__clip--audio[^"]*"[^>]*role="button"[^>]*aria-label="Audio clip Vocal Chorus/,
+  );
+
+  // Toggle automation lane
+  assert.equal(timeline._expandedAutomation.has(audioTrackId), false);
+  autoBtn.click();
+  assert.equal(timeline._expandedAutomation.has(audioTrackId), true);
+
+  // Verify automation row and controls rendered
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    new RegExp(
+      `class="[^"]*automation-row[^"]*"[^>]*data-track="${audioTrackId}"`,
+    ),
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*auto-param-select[^"]*"[^>]*aria-label="Automation parameter for Lead Vocal"/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*auto-lane[^"]*"[^>]*role="application"/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /class="[^"]*scdaw-timeline__auto-svg[^"]*"/,
+  );
+});
+
 test("scdaw ground-up responsive toolbar & container queries: flattened sibling toolbar groups, zero view-switcher scrollbar/overlap, @supports-isolated @media fallbacks, and full custom element container query + ARIA compliance", async () => {
   const [
     workbenchContent,

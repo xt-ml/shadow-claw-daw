@@ -120,6 +120,11 @@
     "scdaw_reset",
     "scdaw_apply_preset",
     "scdaw_panic",
-    "scdaw_manage_fx"
+    "scdaw_manage_fx",
+    "scdaw_set_automation",
+    "scdaw_clear_automation",
+    "scdaw_add_audio_clip",
+    "scdaw_set_audio_clip",
+    "scdaw_set_track_send"
   ]
 }

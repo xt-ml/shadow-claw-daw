@@ -18,6 +18,7 @@ import {
   peakAndRms,
   encodeWav,
   createHistory,
+  automationValueAt,
 } from "../.agents/scripts/scdaw.js";
 
 test("PPQN: conforms to openDAW constants and conversions", () => {
@@ -287,4 +288,209 @@ test("createHistory: manages snapshot undo stack up to limit", () => {
   assert.deepEqual(history.undo(), { v: 30 });
   assert.deepEqual(history.undo(), { v: 20 });
   assert.equal(history.canUndo(), false);
+});
+
+test("automationValueAt: interpolates parameter values across time accurately", () => {
+  const trackWithAuto = {
+    id: "trk_bass",
+    volume: 0.8,
+    automation: {
+      volume: [
+        { time: 0, value: 0.2 },
+        { time: 2, value: 1.0 },
+        { time: 4, value: 0.0 },
+      ],
+      cutoff: [
+        { time: 1, value: 400 },
+        { time: 3, value: 2000 },
+      ],
+    },
+  };
+
+  // Default fallback when param has no automation
+  assert.equal(automationValueAt(trackWithAuto, "pan", 0, 0.0), 0.0);
+  assert.equal(
+    automationValueAt({ id: "trk_clean" }, "volume", 960, 0.75),
+    0.75,
+  );
+
+  // Clamping before first point (time < 0)
+  assert.equal(automationValueAt(trackWithAuto, "volume", 0), 0.2);
+
+  // Exact point match (time = 2 beats = 1920 PPQN)
+  assert.equal(automationValueAt(trackWithAuto, "volume", 1920), 1.0);
+
+  // Linear interpolation midpoint (time = 1 beat = 960 PPQN)
+  // between (0, 0.2) and (2, 1.0) -> 0.2 + (1.0 - 0.2) * 0.5 = 0.6
+  assert.equal(
+    Math.round(automationValueAt(trackWithAuto, "volume", 960) * 100) / 100,
+    0.6,
+  );
+
+  // Midpoint between 2 and 4 beats (time = 3 beats = 2880 PPQN)
+  // between (2, 1.0) and (4, 0.0) -> 0.5
+  assert.equal(
+    Math.round(automationValueAt(trackWithAuto, "volume", 2880) * 100) / 100,
+    0.5,
+  );
+
+  // Clamping after last point (time >= 4 beats = 3840 PPQN)
+  assert.equal(automationValueAt(trackWithAuto, "volume", 4000), 0.0);
+
+  // Cutoff before first point (time < 1 beat)
+  assert.equal(automationValueAt(trackWithAuto, "cutoff", 0), 400);
+  // Cutoff midpoint (time = 2 beats) -> 400 + (2000 - 400) * 0.5 = 1200
+  assert.equal(automationValueAt(trackWithAuto, "cutoff", 1920), 1200);
+  // Cutoff after last point (time >= 3 beats)
+  assert.equal(automationValueAt(trackWithAuto, "cutoff", 3500), 2000);
+});
+
+test("applyCommand: set_automation and clear_automation manage automation lanes", () => {
+  const p = createProject();
+  const trackId = p.tracks[0].id;
+
+  // Set points as array
+  const res1 = applyCommand(p, "set_automation", {
+    trackId,
+    param: "volume",
+    points: [
+      { time: 2, value: 0.9 },
+      { time: 0, value: 0.1 },
+    ],
+  });
+  assert.equal(res1.result.ok, true);
+  assert.equal(res1.result.param, "volume");
+  assert.equal(res1.result.pointCount, 2);
+
+  // Verify points were sorted by time
+  const autoPoints = res1.project.tracks[0].automation.volume;
+  assert.equal(autoPoints[0].time, 0);
+  assert.equal(autoPoints[0].value, 0.1);
+  assert.equal(autoPoints[1].time, 2);
+  assert.equal(autoPoints[1].value, 0.9);
+
+  // Add single point
+  const res2 = applyCommand(res1.project, "set_automation", {
+    trackId,
+    param: "volume",
+    time: 1,
+    value: 0.5,
+  });
+  assert.equal(res2.result.pointCount, 3);
+  const updatedPoints = res2.project.tracks[0].automation.volume;
+  assert.equal(updatedPoints[1].time, 1);
+  assert.equal(updatedPoints[1].value, 0.5);
+
+  // Clear single param automation
+  const res3 = applyCommand(res2.project, "clear_automation", {
+    trackId,
+    param: "volume",
+  });
+  assert.equal(res3.result.ok, true);
+  assert.deepEqual(res3.project.tracks[0].automation.volume, []);
+
+  // Clear all track automation
+  const res4 = applyCommand(res2.project, "clear_automation", {
+    trackId,
+  });
+  assert.equal(res4.result.ok, true);
+  assert.deepEqual(res4.project.tracks[0].automation, {});
+});
+
+test("applyCommand: audio tracks and audio clips management", () => {
+  const p = createProject("empty");
+
+  // Add audio track
+  const res1 = applyCommand(p, "add_track", {
+    name: "Vocals",
+    kind: "audio",
+  });
+  assert.equal(res1.result.kind, "audio");
+  const audioTrackId = res1.result.trackId;
+  const audioTrack = res1.project.tracks.find((t) => t.id === audioTrackId);
+  assert.ok(audioTrack);
+  assert.equal(audioTrack.kind, "audio");
+  assert.deepEqual(audioTrack.audioClips, []);
+
+  // Add audio clip
+  const clipPayload = {
+    id: "clip_vocal_lead",
+    name: "Lead Vocal Take 1",
+    sample: "sample_vocal_lead.wav",
+    time: 0,
+    duration: 4,
+    offset: 0,
+    gain: 1.0,
+  };
+  const res2 = applyCommand(res1.project, "add_audio_clip", {
+    trackId: audioTrackId,
+    clip: clipPayload,
+  });
+  assert.equal(res2.result.ok, true);
+  assert.equal(res2.result.clipId, "clip_vocal_lead");
+  const trkWithClip = res2.project.tracks.find((t) => t.id === audioTrackId);
+  assert.equal(trkWithClip.audioClips.length, 1);
+  assert.equal(trkWithClip.audioClips[0].name, "Lead Vocal Take 1");
+
+  // Update audio clip
+  const res3 = applyCommand(res2.project, "set_audio_clip", {
+    trackId: audioTrackId,
+    clipId: "clip_vocal_lead",
+    patch: {
+      time: 1.0,
+      gain: 0.85,
+    },
+  });
+  assert.equal(res3.result.ok, true);
+  const updatedClip = res3.project.tracks.find((t) => t.id === audioTrackId)
+    .audioClips[0];
+  assert.equal(updatedClip.time, 1.0);
+  assert.equal(updatedClip.gain, 0.85);
+
+  // Remove audio clip
+  const res4 = applyCommand(res3.project, "remove_audio_clip", {
+    trackId: audioTrackId,
+    clipId: "clip_vocal_lead",
+  });
+  assert.equal(res4.result.ok, true);
+  const trkAfterRemove = res4.project.tracks.find((t) => t.id === audioTrackId);
+  assert.equal(trkAfterRemove.audioClips.length, 0);
+});
+
+test("applyCommand: sends and return routing management", () => {
+  const p = createProject();
+  const trk1 = p.tracks[0].id;
+  const trk2 = p.tracks[1].id;
+
+  // Set send
+  const res1 = applyCommand(p, "set_track_send", {
+    trackId: trk1,
+    targetTrackId: trk2,
+    level: 0.45,
+  });
+  assert.equal(res1.result.ok, true);
+  assert.equal(res1.result.level, 0.45);
+  const trackWithSend = res1.project.tracks.find((t) => t.id === trk1);
+  assert.equal(trackWithSend.sends.length, 1);
+  assert.equal(trackWithSend.sends[0].targetTrackId, trk2);
+  assert.equal(trackWithSend.sends[0].level, 0.45);
+
+  // Update existing send level
+  const res2 = applyCommand(res1.project, "set_track_send", {
+    trackId: trk1,
+    targetTrackId: trk2,
+    level: 0.75,
+  });
+  assert.equal(
+    res2.project.tracks.find((t) => t.id === trk1).sends[0].level,
+    0.75,
+  );
+
+  // Remove send
+  const res3 = applyCommand(res2.project, "remove_track_send", {
+    trackId: trk1,
+    targetTrackId: trk2,
+  });
+  assert.equal(res3.result.ok, true);
+  assert.equal(res3.project.tracks.find((t) => t.id === trk1).sends.length, 0);
 });

@@ -441,14 +441,34 @@ export class DawMixerElement extends BaseElement {
           ${p.tracks
             .map((t) => {
               const isSelected = scdaw.selectedTrackId?.get() === t.id;
+              const kindIcon =
+                t.kind === "drums" ? "🥁" : t.kind === "audio" ? "🎙️" : "🎹";
+              const sendsHtml =
+                Array.isArray(t.sends) && t.sends.length > 0
+                  ? `
+                <div class="scdaw-mixer__sends-list" style="display:flex; flex-direction:column; gap:2px; width:100%; font-size:0.6rem; margin-top:2px;" aria-label="Sends">
+                  ${t.sends
+                    .map((s) => {
+                      const tgt = p.tracks.find(
+                        (x) => x.id === s.targetTrackId,
+                      );
+                      const tgtName = tgt ? tgt.name : "Aux";
+                      return `<div style="display:flex; justify-content:space-between; color:var(--accent); font-family:var(--mono); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;" title="Send to ${tgtName}: ${Math.round(s.level * 100)}%"><span>→${tgtName.slice(0, 4)}:</span><span>${Math.round(s.level * 100)}%</span></div>`;
+                    })
+                    .join("")}
+                </div>
+              `
+                  : "";
+
               return `
             <div class="strip ${isSelected ? "strip--selected" : ""}" data-track="${t.id}">
-              <div class="strip-name">${t.name}</div>
+              <div class="strip-name" title="${t.name}">${kindIcon} ${t.name}</div>
               <scdaw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></scdaw-knob>
               <div class="meter-fader-row">
                 <canvas class="meter-canvas" data-track="${t.id}" width="14" height="110"></canvas>
                 <input type="range" class="vol-slider track-vol" data-track="${t.id}" min="0" max="150" value="${Math.round(t.volume * 100)}" title="Volume (Double-click to reset)" />
               </div>
+              ${sendsHtml}
               <div style="display:flex; gap:3px;">
                 <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}">M</button>
                 <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}">S</button>

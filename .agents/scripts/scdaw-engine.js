@@ -24,6 +24,7 @@ import {
   serializeProject,
   deserializeProject,
   createHistory,
+  automationValueAt,
 } from "./scdaw.js";
 import { encodeZip } from "./scdaw-zip.js";
 import { encodeMidiFile, midiToProject } from "./scdaw-midi.js";
@@ -71,6 +72,7 @@ export class DawEngine extends EventTarget {
     this._lastSchedulePpqn = 0;
     this._lastScheduleAudioTime = 0;
     this._activeVoices = new Set();
+    this._sampleCache = new Map();
 
     this._initAudioContext();
     this._initSchedulerClock();
@@ -202,6 +204,11 @@ export class DawEngine extends EventTarget {
     const activeIds = new Set(p.tracks.map((t) => t.id));
     for (const [id, nodes] of this.graph.tracks) {
       if (!activeIds.has(id)) {
+        if (nodes.sends) {
+          for (const sendObj of nodes.sends.values()) {
+            sendObj.gainNode.disconnect();
+          }
+        }
         nodes.gain.disconnect();
         this.graph.tracks.delete(id);
       }
@@ -227,7 +234,7 @@ export class DawEngine extends EventTarget {
         }
         analyser.connect(this.graph.masterGain);
 
-        nodes = { gain, panner, analyser };
+        nodes = { gain, panner, analyser, sends: new Map() };
         this.graph.tracks.set(track.id, nodes);
       }
 
@@ -237,6 +244,44 @@ export class DawEngine extends EventTarget {
       nodes.gain.gain.setValueAtTime(effectiveVol, this.ctx.currentTime);
       if (nodes.panner && nodes.panner.pan) {
         nodes.panner.pan.setValueAtTime(track.pan || 0, this.ctx.currentTime);
+      }
+    }
+
+    // Configure auxiliary sends & routing
+    for (const track of p.tracks) {
+      const nodes = this.graph.tracks.get(track.id);
+      if (!nodes) continue;
+      if (!nodes.sends) nodes.sends = new Map();
+
+      const activeSendTargets = new Set();
+      if (Array.isArray(track.sends)) {
+        for (const send of track.sends) {
+          activeSendTargets.add(send.targetTrackId);
+          const targetNodes = this.graph.tracks.get(send.targetTrackId);
+          if (!targetNodes) continue;
+
+          let sendObj = nodes.sends.get(send.targetTrackId);
+          if (!sendObj) {
+            const gainNode = this.ctx.createGain();
+            nodes.gain.connect(gainNode);
+            gainNode.connect(targetNodes.gain);
+            sendObj = { gainNode };
+            nodes.sends.set(send.targetTrackId, sendObj);
+          }
+          const effectiveLevel =
+            track.mute || (hasSolo && !track.solo) ? 0 : (send.level ?? 0);
+          sendObj.gainNode.gain.setValueAtTime(
+            effectiveLevel,
+            this.ctx.currentTime,
+          );
+        }
+      }
+
+      for (const [targetId, sendObj] of nodes.sends) {
+        if (!activeSendTargets.has(targetId)) {
+          sendObj.gainNode.disconnect();
+          nodes.sends.delete(targetId);
+        }
       }
     }
   }
@@ -348,6 +393,7 @@ export class DawEngine extends EventTarget {
     const deltaPulses = secondsToPulses(deltaSec, bpm);
     let fromPpqn = this._lastSchedulePpqn;
     let toPpqn = fromPpqn + deltaPulses;
+    const nextPos = toPpqn % totalPulses;
 
     // Schedule audio voices in lookahead window (100ms)
     const lookaheadPulses = secondsToPulses(0.1, bpm);
@@ -358,9 +404,22 @@ export class DawEngine extends EventTarget {
     );
 
     if (this.ctx && this.graph) {
+      const hasSolo = p.tracks.some((t) => t.solo);
+
       for (const ev of events) {
         const nodes = this.graph.tracks.get(ev.trackId);
         if (nodes) {
+          const track = p.tracks.find((t) => t.id === ev.trackId);
+          if (track && track.automation?.cutoff?.length > 0) {
+            const autoCutoff = automationValueAt(
+              track,
+              "cutoff",
+              ev.position,
+              ev.trackParams?.cutoff ?? 1200,
+            );
+            ev.trackParams = { ...(ev.trackParams || {}), cutoff: autoCutoff };
+          }
+
           const deltaEvPulses =
             (ev.position - fromPpqn + totalPulses) % totalPulses;
           const evTime = Math.max(
@@ -386,9 +445,90 @@ export class DawEngine extends EventTarget {
           }
         }
       }
+
+      // Schedule audio clips for audio tracks
+      for (const track of p.tracks) {
+        if (track.kind === "audio" && Array.isArray(track.audioClips)) {
+          const nodes = this.graph.tracks.get(track.id);
+          if (!nodes || track.mute || (hasSolo && !track.solo)) continue;
+          for (const clip of track.audioClips) {
+            const clipStartPulses = Math.round((clip.time || 0) * PPQN.Quarter);
+            const clipDurPulses = Math.round(
+              (clip.duration || 4) * PPQN.Quarter,
+            );
+            const deltaEvPulses =
+              (clipStartPulses - fromPpqn + totalPulses) % totalPulses;
+            if (deltaEvPulses < lookaheadPulses) {
+              const evTime = Math.max(
+                nowAudio,
+                nowAudio + pulsesToSeconds(deltaEvPulses, bpm),
+              );
+              const source = this.ctx.createBufferSource();
+              const sampleBuf =
+                this._sampleCache.get(clip.sample) ||
+                (this.ctx.createBuffer
+                  ? this.ctx.createBuffer(
+                      2,
+                      Math.max(1, Math.round(this.ctx.sampleRate * 0.1)),
+                      this.ctx.sampleRate,
+                    )
+                  : null);
+              if (sampleBuf) source.buffer = sampleBuf;
+              const clipGain = this.ctx.createGain();
+              clipGain.gain.setValueAtTime(
+                clip.gain ?? 1.0,
+                this.ctx.currentTime,
+              );
+              source.connect(clipGain);
+              clipGain.connect(nodes.gain);
+              const durSec = pulsesToSeconds(clipDurPulses, bpm);
+              source.start(evTime, clip.offset || 0, durSec);
+              this._activeVoices.add(source);
+              const origEnded = source.onended;
+              source.onended = () => {
+                this._activeVoices.delete(source);
+                if (typeof origEnded === "function") origEnded();
+              };
+            }
+          }
+        }
+      }
+
+      // Continuous parameter automation ramping (volume & pan)
+      for (const track of p.tracks) {
+        const nodes = this.graph.tracks.get(track.id);
+        if (!nodes || !track.automation) continue;
+        if (
+          Array.isArray(track.automation.volume) &&
+          track.automation.volume.length > 0
+        ) {
+          const targetVol =
+            track.mute || (hasSolo && !track.solo)
+              ? 0
+              : automationValueAt(
+                  track,
+                  "volume",
+                  nextPos,
+                  track.volume ?? 0.8,
+                );
+          nodes.gain.gain.linearRampToValueAtTime(targetVol, nowAudio + 0.05);
+        }
+        if (
+          Array.isArray(track.automation.pan) &&
+          track.automation.pan.length > 0 &&
+          nodes.panner?.pan
+        ) {
+          const targetPan = automationValueAt(
+            track,
+            "pan",
+            nextPos,
+            track.pan ?? 0,
+          );
+          nodes.panner.pan.linearRampToValueAtTime(targetPan, nowAudio + 0.05);
+        }
+      }
     }
 
-    const nextPos = toPpqn % totalPulses;
     this._lastSchedulePpqn = nextPos;
 
     const bar = Math.floor(nextPos / PPQN.Bar) + 1;
@@ -470,6 +610,7 @@ export class DawEngine extends EventTarget {
     compressor.connect(offlineCtx.destination);
 
     const trackGains = new Map();
+    const trackPanners = new Map();
     const hasSolo = p.tracks.some((t) => t.solo);
     for (const track of p.tracks) {
       const effectiveVol =
@@ -486,16 +627,76 @@ export class DawEngine extends EventTarget {
         gain.connect(panner);
         panner.pan.setValueAtTime(track.pan || 0, 0);
         panner.connect(masterGain);
+        trackPanners.set(track.id, panner);
       } else {
         gain.connect(masterGain);
       }
       trackGains.set(track.id, gain);
     }
 
-    // Schedule voices using resolved notes (honoring MIDI FX and swing)
+    // Configure sends in offline graph
+    for (const track of p.tracks) {
+      if (Array.isArray(track.sends)) {
+        const gainNode = trackGains.get(track.id);
+        for (const send of track.sends) {
+          const targetGainNode = trackGains.get(send.targetTrackId);
+          if (gainNode && targetGainNode) {
+            const sendGain = offlineCtx.createGain();
+            const effSendLevel =
+              track.mute || (hasSolo && !track.solo) ? 0 : (send.level ?? 0);
+            sendGain.gain.setValueAtTime(effSendLevel, 0);
+            gainNode.connect(sendGain);
+            sendGain.connect(targetGainNode);
+          }
+        }
+      }
+    }
+
+    // Apply continuous parameter automation curves in offline graph
+    for (const track of p.tracks) {
+      if (!track.automation) continue;
+      const gainNode = trackGains.get(track.id);
+      const pannerNode = trackPanners.get(track.id);
+
+      if (
+        gainNode &&
+        Array.isArray(track.automation.volume) &&
+        track.automation.volume.length > 0
+      ) {
+        for (let l = 0; l < loops; l++) {
+          const loopOffsetPulses = l * totalPulses;
+          for (const pt of track.automation.volume) {
+            const ptPulses = Math.round(pt.time * PPQN.Quarter);
+            const when = pulsesToSeconds(loopOffsetPulses + ptPulses, bpm);
+            const val =
+              track.mute || (hasSolo && !track.solo) ? 0 : Number(pt.value);
+            gainNode.gain.linearRampToValueAtTime(val, when);
+          }
+        }
+      }
+
+      if (
+        pannerNode &&
+        Array.isArray(track.automation.pan) &&
+        track.automation.pan.length > 0
+      ) {
+        for (let l = 0; l < loops; l++) {
+          const loopOffsetPulses = l * totalPulses;
+          for (const pt of track.automation.pan) {
+            const ptPulses = Math.round(pt.time * PPQN.Quarter);
+            const when = pulsesToSeconds(loopOffsetPulses + ptPulses, bpm);
+            pannerNode.pan.linearRampToValueAtTime(Number(pt.value), when);
+          }
+        }
+      }
+    }
+
+    // Schedule voices using resolved notes (honoring MIDI FX, cutoff automation, and swing)
     for (const track of p.tracks) {
       if (track.mute || (hasSolo && !track.solo)) continue;
       const gainNode = trackGains.get(track.id);
+
+      // Schedule synth/drum notes
       const resolvedNotes = resolveTrackNotes(p, track, {
         loops,
         bakeMidiFx: true,
@@ -504,12 +705,22 @@ export class DawEngine extends EventTarget {
 
       for (const note of resolvedNotes) {
         const when = pulsesToSeconds(note.position, bpm);
+        let trackParams = track.params;
+        if (track.automation?.cutoff?.length > 0) {
+          const autoCutoff = automationValueAt(
+            track,
+            "cutoff",
+            note.position % totalPulses,
+            trackParams?.cutoff ?? 1200,
+          );
+          trackParams = { ...(trackParams || {}), cutoff: autoCutoff };
+        }
         triggerInstrumentVoice(
           offlineCtx,
           gainNode,
           {
             trackKind: track.kind || track.type,
-            trackParams: track.params,
+            trackParams,
             trackVolume: track.volume,
             trackPan: track.pan,
             note,
@@ -517,6 +728,40 @@ export class DawEngine extends EventTarget {
           when,
           bpm,
         );
+      }
+
+      // Schedule audio clips on audio tracks
+      if (track.kind === "audio" && Array.isArray(track.audioClips)) {
+        for (let l = 0; l < loops; l++) {
+          const loopOffsetPulses = l * totalPulses;
+          for (const clip of track.audioClips) {
+            const clipStartPulses = Math.round((clip.time || 0) * PPQN.Quarter);
+            const clipDurPulses = Math.round(
+              (clip.duration || 4) * PPQN.Quarter,
+            );
+            const when = pulsesToSeconds(
+              loopOffsetPulses + clipStartPulses,
+              bpm,
+            );
+            const source = offlineCtx.createBufferSource();
+            const sampleBuf =
+              this._sampleCache.get(clip.sample) ||
+              (offlineCtx.createBuffer
+                ? offlineCtx.createBuffer(
+                    2,
+                    Math.max(1, Math.round(sampleRate * 0.1)),
+                    sampleRate,
+                  )
+                : null);
+            if (sampleBuf) source.buffer = sampleBuf;
+            const clipGain = offlineCtx.createGain();
+            clipGain.gain.setValueAtTime(clip.gain ?? 1.0, 0);
+            source.connect(clipGain);
+            clipGain.connect(gainNode);
+            const durSec = pulsesToSeconds(clipDurPulses, bpm);
+            source.start(when, clip.offset || 0, durSec);
+          }
+        }
       }
     }
 

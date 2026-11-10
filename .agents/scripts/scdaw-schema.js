@@ -76,6 +76,41 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
 
 export const DRUM_PARAM_SCHEMA = Object.freeze({});
 
+export const AUTOMATABLE_PARAMS = Object.freeze({
+  volume: Object.freeze({
+    scope: "track",
+    default: 0.8,
+    min: 0.0,
+    max: 1.5,
+    unit: "linear",
+    label: "Volume",
+  }),
+  pan: Object.freeze({
+    scope: "track",
+    default: 0.0,
+    min: -1.0,
+    max: 1.0,
+    unit: "pan",
+    label: "Pan",
+  }),
+  cutoff: Object.freeze({
+    scope: "synth",
+    default: 1200,
+    min: 20,
+    max: 20000,
+    unit: "Hz",
+    label: "Cutoff",
+  }),
+  resonance: Object.freeze({
+    scope: "synth",
+    default: 2.0,
+    min: 0.1,
+    max: 30.0,
+    unit: "Q",
+    label: "Resonance",
+  }),
+});
+
 export const FX_SCHEMAS = Object.freeze({
   fold: Object.freeze({
     driveDb: { default: 0, min: 0, max: 24, step: 0.5, unit: "dB" },
@@ -217,7 +252,12 @@ export function migrateProject(project) {
       track.id = `trk_${Math.random().toString(36).slice(2, 8)}`;
     }
     if (!track.color) {
-      track.color = track.kind === "drums" ? "#f59e0b" : "#80d4db";
+      track.color =
+        track.kind === "drums"
+          ? "#f59e0b"
+          : track.kind === "audio"
+            ? "#a78bfa"
+            : "#80d4db";
     }
     if (!track.channelRole) {
       track.channelRole = CHANNEL_ROLES.REGULAR;
@@ -225,6 +265,11 @@ export function migrateProject(project) {
     if (!Array.isArray(track.fx)) track.fx = [];
     if (!Array.isArray(track.midiFx)) track.midiFx = [];
     if (!Array.isArray(track.notes)) track.notes = [];
+    if (!Array.isArray(track.audioClips)) track.audioClips = [];
+    if (!Array.isArray(track.sends)) track.sends = [];
+    if (!track.automation || typeof track.automation !== "object") {
+      track.automation = {};
+    }
     if (track.volume === undefined) track.volume = 0.8;
     if (track.pan === undefined) track.pan = 0.0;
     if (track.mute === undefined) track.mute = false;

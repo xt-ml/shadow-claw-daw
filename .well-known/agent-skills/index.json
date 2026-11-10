@@ -180,6 +180,83 @@
       ]
     },
     {
+      "name": "scdaw-audio-clip",
+      "type": "skill-md",
+      "description": "Manage audio tracks, arrange audio clips, set clip offsets and gains, and configure auxiliary track sends for bus processing.",
+      "url": "../../.agents/skills/scdaw-audio-clip/SKILL.md",
+      "digest": "sha256:68392c002d5b953994ec3cca920f7ce85fd669e6ef6a0c6fb83649e73d1cf8d1",
+      "tools": [
+        {
+          "name": "scdaw_add_audio_clip",
+          "url": "../../.agents/tools/scdaw_add_audio_clip.json",
+          "digest": "sha256:68973bd9e0d297c372a69ffe500bc4895405d83f8638ca214c3c5c3f1ea6f75f"
+        },
+        {
+          "name": "scdaw_add_track",
+          "url": "../../.agents/tools/scdaw_add_track.json",
+          "digest": "sha256:e742d22512c64b8806e9960d7183637487ccdcebe875bc0d8db92d68d7ae80ec"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_set_audio_clip",
+          "url": "../../.agents/tools/scdaw_set_audio_clip.json",
+          "digest": "sha256:2ace3ebcca05a4df774bd420c2e36a05bc789abe5c0330a246a4d6dbd9b08f47"
+        },
+        {
+          "name": "scdaw_set_track_send",
+          "url": "../../.agents/tools/scdaw_set_track_send.json",
+          "digest": "sha256:e123b7207d2227580cc54002528acaa89c0aad5d8ff1726226c0420eb1fb7bed"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "scdaw",
+          "url": "../../.agents/scripts/scdaw.js",
+          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+        }
+      ]
+    },
+    {
+      "name": "scdaw-automate",
+      "type": "skill-md",
+      "description": "Create, edit, and clear continuous parameter automation envelopes (volume fades, pan sweeps, and filter cutoff modulation) on DAW tracks.",
+      "url": "../../.agents/skills/scdaw-automate/SKILL.md",
+      "digest": "sha256:b67caf4f0e8fe70d8a894862dfceb3965138690ee10541593bc57be5bc6534c8",
+      "tools": [
+        {
+          "name": "scdaw_clear_automation",
+          "url": "../../.agents/tools/scdaw_clear_automation.json",
+          "digest": "sha256:c9dab01f7987613dea3edfa20dbbfafb8fb523b91087684294790929a560c758"
+        },
+        {
+          "name": "scdaw_get_project",
+          "url": "../../.agents/tools/scdaw_get_project.json",
+          "digest": "sha256:bc251c616bc3f357950f1e25866e63ac01f760c7c2e19b4810bf75e902f57d61"
+        },
+        {
+          "name": "scdaw_set_automation",
+          "url": "../../.agents/tools/scdaw_set_automation.json",
+          "digest": "sha256:c8c04211195cbf8079b6a02f43ce176b80810223158da87d4eb35504a3fb0a4a"
+        },
+        {
+          "name": "scdaw_set_track",
+          "url": "../../.agents/tools/scdaw_set_track.json",
+          "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+        }
+      ],
+      "scripts": [
+        {
+          "name": "scdaw",
+          "url": "../../.agents/scripts/scdaw.js",
+          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
+        }
+      ]
+    },
+    {
       "name": "scdaw-doctor",
       "type": "skill-md",
       "description": "Diagnose workbench connectivity, browser audio autoplay unlock state, and leader election.",
@@ -201,7 +278,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:5fa23bdc20952bc5afc1002ef634808711520ef10d94129e05013ff4725b47b7"
+          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
         }
       ]
     },
@@ -232,7 +309,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:5fa23bdc20952bc5afc1002ef634808711520ef10d94129e05013ff4725b47b7"
+          "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
         }
       ]
     },
@@ -272,6 +349,12 @@
       "digest": "sha256:daf69f22c7c852b10122ef06812f760d97a31dde098450e41a4b4a65549c030c"
     },
     {
+      "name": "scdaw_add_audio_clip",
+      "description": "Add an audio clip (sample, vocal take, stem) to an audio track at a specified time position in beats.",
+      "url": "../../.agents/tools/scdaw_add_audio_clip.json",
+      "digest": "sha256:68973bd9e0d297c372a69ffe500bc4895405d83f8638ca214c3c5c3f1ea6f75f"
+    },
+    {
       "name": "scdaw_add_track",
       "description": "Add a new instrument track ('drums' or 'synth') with custom name and initial synthesis parameters.",
       "url": "../../.agents/tools/scdaw_add_track.json",
@@ -288,6 +371,12 @@
       "description": "Render project offline into a WAV audio file (16-bit, 24-bit, or 32-bit Float) via OfflineAudioContext, initiating browser download and returning audio metadata.",
       "url": "../../.agents/tools/scdaw_bounce.json",
       "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+    },
+    {
+      "name": "scdaw_clear_automation",
+      "description": "Clear continuous automation points for a specific track parameter, or clear all automation for the track if no parameter is specified.",
+      "url": "../../.agents/tools/scdaw_clear_automation.json",
+      "digest": "sha256:c9dab01f7987613dea3edfa20dbbfafb8fb523b91087684294790929a560c758"
     },
     {
       "name": "scdaw_clear_notes",
@@ -392,10 +481,28 @@
       "digest": "sha256:f19cfce300c91811696586dd9a573ab266a25072f547b46702c739249f6a3dc4"
     },
     {
+      "name": "scdaw_set_audio_clip",
+      "description": "Update properties (time, duration, offset, gain, name) of an existing audio clip on an audio track.",
+      "url": "../../.agents/tools/scdaw_set_audio_clip.json",
+      "digest": "sha256:2ace3ebcca05a4df774bd420c2e36a05bc789abe5c0330a246a4d6dbd9b08f47"
+    },
+    {
+      "name": "scdaw_set_automation",
+      "description": "Set or update continuous parameter automation points (time in beats, value) for a track parameter such as 'volume', 'pan', or 'cutoff'.",
+      "url": "../../.agents/tools/scdaw_set_automation.json",
+      "digest": "sha256:c8c04211195cbf8079b6a02f43ce176b80810223158da87d4eb35504a3fb0a4a"
+    },
+    {
       "name": "scdaw_set_track",
       "description": "Adjust track mixing parameters (volume, pan, mute, solo) or synthesis parameters (waveform, cutoff, resonance, ADSR).",
       "url": "../../.agents/tools/scdaw_set_track.json",
       "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
+    },
+    {
+      "name": "scdaw_set_track_send",
+      "description": "Configure an auxiliary send routing level (0.0 to 1.0) from a source track to a destination track or submix.",
+      "url": "../../.agents/tools/scdaw_set_track_send.json",
+      "digest": "sha256:e123b7207d2227580cc54002528acaa89c0aad5d8ff1726226c0420eb1fb7bed"
     },
     {
       "name": "scdaw_set_transport",
@@ -451,7 +558,7 @@
       "name": "scdaw-mixer",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-mixer.",
       "url": "../../.agents/scripts/components/scdaw-mixer.js",
-      "digest": "sha256:0a2f9dd398d9a3c2e228336890badc2db22fdf4598a89c75b57a4a974f1108d7"
+      "digest": "sha256:2bfa9b849e012e750ef08dca14b0127c5450b8ea348e49f5504e9b38d0499ebc"
     },
     {
       "name": "scdaw-resize-handle",
@@ -481,7 +588,7 @@
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:94eaf91c0781b91252d181c6cf2a1a88a0a3b91ba9b4df58a1e27b1726009c35"
+      "digest": "sha256:0562a8e8e5742467c945ba2306e3c260cac4f3b3e9933a03beb399ede7ecbc78"
     },
     {
       "name": "scdaw-transport",
@@ -499,7 +606,7 @@
       "name": "scdaw-adapter",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
       "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:39a3cce2dcbfed78a2c53f6a2f8785ddf65c2533fdae144ced2b9fc302f2811f"
+      "digest": "sha256:a0a54a38fee6c8c10771a722795bfe056a07bd51c458b8036c1ea1c9870a77ee"
     },
     {
       "name": "scdaw-dawproject",
@@ -523,7 +630,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:93227495e4af02c5a09f317f8171fe1863f1b1914d378bd7b5fd2a60b4e1b91e"
+      "digest": "sha256:c397360abdb05c18682137b27481a7f41d339bf3a61e3aeda6511feaf279b843"
     },
     {
       "name": "scdaw-fs",
@@ -553,7 +660,7 @@
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:a7496fb494f963b09d3eeccda75a84b08bc55525b0b501e2228aee729804ba37"
+      "digest": "sha256:d332d61854435be056f85b9674ed7ab2f22955dcb8e228500ddc5c3250262412"
     },
     {
       "name": "scdaw-signals",
@@ -571,7 +678,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:5fa23bdc20952bc5afc1002ef634808711520ef10d94129e05013ff4725b47b7"
+      "digest": "sha256:97e16fc413794901278e7b800bf50142c70af1791f57bd07e20e16fdb94f3c53"
     },
     {
       "name": "starter-tools",
@@ -589,9 +696,11 @@
   "dependencies": {
     "tools": [
       "../../.agents/tools/generate_random_number.json",
+      "../../.agents/tools/scdaw_add_audio_clip.json",
       "../../.agents/tools/scdaw_add_track.json",
       "../../.agents/tools/scdaw_apply_preset.json",
       "../../.agents/tools/scdaw_bounce.json",
+      "../../.agents/tools/scdaw_clear_automation.json",
       "../../.agents/tools/scdaw_clear_notes.json",
       "../../.agents/tools/scdaw_export_midi.json",
       "../../.agents/tools/scdaw_export_project.json",
@@ -609,7 +718,10 @@
       "../../.agents/tools/scdaw_remove_track.json",
       "../../.agents/tools/scdaw_render_surface.json",
       "../../.agents/tools/scdaw_reset.json",
+      "../../.agents/tools/scdaw_set_audio_clip.json",
+      "../../.agents/tools/scdaw_set_automation.json",
       "../../.agents/tools/scdaw_set_track.json",
+      "../../.agents/tools/scdaw_set_track_send.json",
       "../../.agents/tools/scdaw_set_transport.json",
       "../../.agents/tools/scdaw_stop.json",
       "../../.agents/tools/scdaw_undo.json",

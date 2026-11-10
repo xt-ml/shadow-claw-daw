@@ -12,6 +12,7 @@ import {
   TRACK_MIX_SCHEMA,
   SYNTH_PARAM_SCHEMA,
   DRUM_PARAM_SCHEMA,
+  AUTOMATABLE_PARAMS,
   getDefaultParams,
   migrateProject,
 } from "./scdaw-schema.js";
@@ -26,6 +27,7 @@ export {
   TRACK_MIX_SCHEMA,
   SYNTH_PARAM_SCHEMA,
   DRUM_PARAM_SCHEMA,
+  AUTOMATABLE_PARAMS,
   getDefaultParams,
   migrateProject,
   INSTRUMENT_PRESETS,
@@ -358,8 +360,12 @@ export function validateProject(project) {
     for (const [idx, trk] of project.tracks.entries()) {
       if (!trk.id || typeof trk.id !== "string")
         errors.push(`Track[${idx}] missing id`);
-      if (trk.kind !== "drums" && trk.kind !== "synth") {
-        errors.push(`Track[${idx}] kind must be 'drums' or 'synth'`);
+      if (
+        trk.kind !== "drums" &&
+        trk.kind !== "synth" &&
+        trk.kind !== "audio"
+      ) {
+        errors.push(`Track[${idx}] kind must be 'drums', 'synth', or 'audio'`);
       }
       if (!Array.isArray(trk.notes)) {
         errors.push(`Track[${idx}] notes must be an array`);
@@ -367,6 +373,20 @@ export function validateProject(project) {
         errors.push(
           `Track[${idx}] has too many notes (${trk.notes.length} > 512)`,
         );
+      }
+      if (trk.audioClips !== undefined && !Array.isArray(trk.audioClips)) {
+        errors.push(`Track[${idx}] audioClips must be an array`);
+      }
+      if (
+        trk.automation !== undefined &&
+        (typeof trk.automation !== "object" ||
+          trk.automation === null ||
+          Array.isArray(trk.automation))
+      ) {
+        errors.push(`Track[${idx}] automation must be an object`);
+      }
+      if (trk.sends !== undefined && !Array.isArray(trk.sends)) {
+        errors.push(`Track[${idx}] sends must be an array`);
       }
     }
   }
@@ -401,6 +421,46 @@ export function normalizeNotes(units, notes) {
 
     return { position, duration, pitch, velocity };
   });
+}
+
+export function automationValueAt(
+  track,
+  paramName,
+  ppqn,
+  defaultValue = undefined,
+) {
+  if (!track || !track.automation) {
+    return defaultValue !== undefined
+      ? defaultValue
+      : (track?.[paramName] ?? track?.params?.[paramName] ?? 0);
+  }
+  const points = track.automation[paramName];
+  if (!Array.isArray(points) || points.length === 0) {
+    return defaultValue !== undefined
+      ? defaultValue
+      : (track?.[paramName] ?? track?.params?.[paramName] ?? 0);
+  }
+
+  const timeInBeats = ppqn / PPQN.Quarter;
+
+  if (timeInBeats <= points[0].time) {
+    return points[0].value;
+  }
+  if (timeInBeats >= points[points.length - 1].time) {
+    return points[points.length - 1].value;
+  }
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    if (timeInBeats >= p0.time && timeInBeats <= p1.time) {
+      if (p1.time === p0.time) return p0.value;
+      const frac = (timeInBeats - p0.time) / (p1.time - p0.time);
+      return p0.value + (p1.value - p0.value) * frac;
+    }
+  }
+
+  return points[points.length - 1].value;
 }
 
 export function applyCommand(project, name, params = {}) {
@@ -447,11 +507,20 @@ export function applyCommand(project, name, params = {}) {
       if (next.tracks.length >= 8) {
         throw new Error("Cannot add track: maximum 8 tracks reached");
       }
-      const kind = params.kind === "drums" ? "drums" : "synth";
+      const kind =
+        params.kind === "drums"
+          ? "drums"
+          : params.kind === "audio"
+            ? "audio"
+            : "synth";
       const id = `trk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const name =
         params.name ||
-        (kind === "drums" ? "Drums" : `Synth ${next.tracks.length + 1}`);
+        (kind === "drums"
+          ? "Drums"
+          : kind === "audio"
+            ? `Audio ${next.tracks.length + 1}`
+            : `Synth ${next.tracks.length + 1}`);
       const newTrack = {
         id,
         name,
@@ -474,6 +543,9 @@ export function applyCommand(project, name, params = {}) {
               }
             : params.params || {},
         notes: [],
+        audioClips: kind === "audio" ? [] : undefined,
+        automation: {},
+        sends: [],
       };
       next.tracks.push(newTrack);
       return { project: next, result: { trackId: id, name, kind } };
@@ -826,6 +898,190 @@ export function applyCommand(project, name, params = {}) {
           step,
           velocity,
           updated,
+        },
+      };
+    }
+
+    case "set_automation": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const param = params.param;
+      if (!param || typeof param !== "string") {
+        throw new Error("set_automation requires a valid param name");
+      }
+      track.automation = track.automation || {};
+
+      if (Array.isArray(params.points)) {
+        track.automation[param] = [...params.points]
+          .map((pt) => ({
+            time: Number(pt.time || 0),
+            value: Number(pt.value || 0),
+          }))
+          .sort((a, b) => a.time - b.time);
+      } else if (params.time !== undefined && params.value !== undefined) {
+        track.automation[param] = track.automation[param] || [];
+        const t = Number(params.time);
+        const v = Number(params.value);
+        const existingIdx = track.automation[param].findIndex(
+          (p) => Math.abs(p.time - t) < 0.0001,
+        );
+        if (existingIdx !== -1) {
+          track.automation[param][existingIdx].value = v;
+        } else {
+          track.automation[param].push({ time: t, value: v });
+          track.automation[param].sort((a, b) => a.time - b.time);
+        }
+      } else {
+        throw new Error(
+          "set_automation requires points array or time/value pair",
+        );
+      }
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          param,
+          pointCount: track.automation[param].length,
+        },
+      };
+    }
+
+    case "clear_automation": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      if (params.param) {
+        if (track.automation) {
+          track.automation[params.param] = [];
+        }
+      } else {
+        track.automation = {};
+      }
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          param: params.param || "all",
+        },
+      };
+    }
+
+    case "add_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+
+      const rawClip = params.clip || {};
+      const clipId =
+        rawClip.id ||
+        `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const clip = {
+        id: clipId,
+        name: rawClip.name || "Audio Clip",
+        sample: rawClip.sample || "",
+        time: Number(rawClip.time ?? 0),
+        duration: Number(rawClip.duration ?? 4),
+        offset: Number(rawClip.offset ?? 0),
+        gain: Number(rawClip.gain ?? 1.0),
+      };
+
+      track.audioClips.push(clip);
+      track.audioClips.sort((a, b) => a.time - b.time);
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "set_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      if (params.patch && typeof params.patch === "object") {
+        if (params.patch.name !== undefined)
+          clip.name = String(params.patch.name);
+        if (params.patch.sample !== undefined)
+          clip.sample = String(params.patch.sample);
+        if (params.patch.time !== undefined)
+          clip.time = Number(params.patch.time);
+        if (params.patch.duration !== undefined)
+          clip.duration = Number(params.patch.duration);
+        if (params.patch.offset !== undefined)
+          clip.offset = Number(params.patch.offset);
+        if (params.patch.gain !== undefined)
+          clip.gain = Math.max(0, Math.min(2.0, Number(params.patch.gain)));
+        track.audioClips.sort((a, b) => a.time - b.time);
+      }
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "remove_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const initialLen = track.audioClips.length;
+      track.audioClips = track.audioClips.filter((c) => c.id !== params.clipId);
+      if (track.audioClips.length === initialLen) {
+        throw new Error(`Audio clip not found: ${params.clipId}`);
+      }
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: params.clipId },
+      };
+    }
+
+    case "set_track_send": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const target = next.tracks.find((t) => t.id === params.targetTrackId);
+      if (!target)
+        throw new Error(`Target track not found: ${params.targetTrackId}`);
+
+      track.sends = track.sends || [];
+      const level = Math.max(0, Math.min(1.0, Number(params.level ?? 0)));
+      const existing = track.sends.find(
+        (s) => s.targetTrackId === params.targetTrackId,
+      );
+      if (existing) {
+        existing.level = level;
+      } else {
+        track.sends.push({ targetTrackId: params.targetTrackId, level });
+      }
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          targetTrackId: params.targetTrackId,
+          level,
+        },
+      };
+    }
+
+    case "remove_track_send": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.sends = track.sends || [];
+      track.sends = track.sends.filter(
+        (s) => s.targetTrackId !== params.targetTrackId,
+      );
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          targetTrackId: params.targetTrackId,
         },
       };
     }

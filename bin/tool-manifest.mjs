@@ -1,7 +1,7 @@
 /**
  * bin/tool-manifest.mjs
  *
- * Single source of truth for all 16 declarative scdaw_* tools.
+ * Single source of truth for all 30 declarative scdaw_* tools.
  * Generates .agents/tools/scdaw_*.json via bin/generate-tools.mjs.
  */
 
@@ -868,6 +868,198 @@ export const TOOLS = [
     execution: {
       type: "javascript",
       code: makeBroadcastCode("scdaw_manage_fx"),
+    },
+  },
+  {
+    name: "scdaw_set_automation",
+    description:
+      "Set or update continuous parameter automation points (time in beats, value) for a track parameter such as 'volume', 'pan', or 'cutoff'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        param: {
+          type: "string",
+          description:
+            "Target parameter name ('volume', 'pan', 'cutoff', etc.)",
+        },
+        points: {
+          type: "array",
+          description: "List of automation points { time, value }",
+          items: {
+            type: "object",
+            properties: {
+              time: {
+                type: "number",
+                description: "Point time in musical beats",
+              },
+              value: {
+                type: "number",
+                description: "Target parameter value at this time",
+              },
+            },
+            required: ["time", "value"],
+          },
+        },
+        time: {
+          type: "number",
+          description:
+            "Point time in musical beats (when setting a single point)",
+        },
+        value: {
+          type: "number",
+          description: "Point value (when setting a single point)",
+        },
+      },
+      required: ["trackId", "param"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_automation"),
+    },
+  },
+  {
+    name: "scdaw_clear_automation",
+    description:
+      "Clear continuous automation points for a specific track parameter, or clear all automation for the track if no parameter is specified.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        param: {
+          type: "string",
+          description:
+            "Specific parameter name to clear (omitted to clear all parameters on track)",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_clear_automation"),
+    },
+  },
+  {
+    name: "scdaw_add_audio_clip",
+    description:
+      "Add an audio clip (sample, vocal take, stem) to an audio track at a specified time position in beats.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target audio track ID" },
+        clip: {
+          type: "object",
+          description: "Audio clip configuration",
+          properties: {
+            id: { type: "string", description: "Unique clip ID (optional)" },
+            name: { type: "string", description: "Clip label / name" },
+            sample: {
+              type: "string",
+              description: "Sample file name or URI reference",
+            },
+            time: {
+              type: "number",
+              description: "Clip start position in musical beats",
+            },
+            duration: {
+              type: "number",
+              description: "Clip playback duration in beats",
+            },
+            offset: {
+              type: "number",
+              description: "Source audio offset in seconds",
+            },
+            gain: {
+              type: "number",
+              description: "Clip gain multiplier (default 1.0)",
+            },
+          },
+          required: ["name"],
+        },
+      },
+      required: ["trackId", "clip"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_add_audio_clip"),
+    },
+  },
+  {
+    name: "scdaw_set_audio_clip",
+    description:
+      "Update properties (time, duration, offset, gain, name) of an existing audio clip on an audio track.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Target track ID" },
+        clipId: { type: "string", description: "Audio clip ID" },
+        patch: {
+          type: "object",
+          description: "Patch object containing updated clip properties",
+          properties: {
+            name: { type: "string" },
+            sample: { type: "string" },
+            time: { type: "number" },
+            duration: { type: "number" },
+            offset: { type: "number" },
+            gain: { type: "number" },
+          },
+        },
+      },
+      required: ["trackId", "clipId", "patch"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_audio_clip"),
+    },
+  },
+  {
+    name: "scdaw_set_track_send",
+    description:
+      "Configure an auxiliary send routing level (0.0 to 1.0) from a source track to a destination track or submix.",
+    input_schema: {
+      type: "object",
+      properties: {
+        trackId: { type: "string", description: "Source track ID" },
+        targetTrackId: {
+          type: "string",
+          description: "Target destination track or bus ID",
+        },
+        level: {
+          type: "number",
+          description: "Send level multiplier (0.0 to 1.0)",
+        },
+      },
+      required: ["trackId", "targetTrackId", "level"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_set_track_send"),
     },
   },
 ];
