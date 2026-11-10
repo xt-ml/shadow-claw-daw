@@ -29,6 +29,64 @@ export function computeTimelineTicks(bars = 2, signature = [4, 4]) {
   return ticks;
 }
 
+/**
+ * Computes non-overlapping lane rows for clips on a timeline track.
+ * Used to arrange multiple takes or overlapping clips without visual masking.
+ *
+ * @param {Array<{ id?: string, name?: string, time?: number, duration?: number }>} clips
+ * @returns {Array<{ clip: any, rowIndex: number, rowCount: number }>}
+ */
+export function computeClipOverlapLayout(clips = []) {
+  if (!Array.isArray(clips) || clips.length === 0) return [];
+
+  const items = clips.map((clip, origIndex) => ({
+    clip,
+    origIndex,
+    start: Number(clip.time || 0),
+    end: Number(clip.time || 0) + Number(clip.duration || 4),
+    rowIndex: 0,
+    rowCount: 1,
+  }));
+
+  // Sort by start time ascending, then longer duration first
+  items.sort((a, b) => a.start - b.start || b.end - a.end);
+
+  const laneEndTimes = [];
+  for (const item of items) {
+    let placed = false;
+    for (let r = 0; r < laneEndTimes.length; r++) {
+      if (laneEndTimes[r] <= item.start) {
+        item.rowIndex = r;
+        laneEndTimes[r] = item.end;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      item.rowIndex = laneEndTimes.length;
+      laneEndTimes.push(item.end);
+    }
+  }
+
+  // Calculate local maximum overlapping row count for each clip
+  for (const item of items) {
+    const overlapping = items.filter(
+      (other) => item.start < other.end && item.end > other.start,
+    );
+    const maxRowInCluster = Math.max(...overlapping.map((o) => o.rowIndex));
+    item.rowCount = maxRowInCluster + 1;
+  }
+
+  // Restore original ordering
+  items.sort((a, b) => a.origIndex - b.origIndex);
+
+  return items.map(({ clip, rowIndex, rowCount }) => ({
+    clip,
+    rowIndex,
+    rowCount,
+  }));
+}
+
 export class DawTimelineElement extends BaseElement {
   constructor() {
     super();
@@ -273,6 +331,18 @@ export class DawTimelineElement extends BaseElement {
         .scdaw-timeline__clip--audio {
           background: rgba(167, 139, 250, 0.25);
           border: 1px solid #a78bfa;
+          bottom: auto;
+        }
+
+        .scdaw-timeline__clip--stacked {
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+          border: 1px solid var(--scdaw-primary-light, #a78bfa);
+        }
+
+        .scdaw-timeline__clip--stacked:hover,
+        .scdaw-timeline__clip--stacked:focus-visible {
+          z-index: 10 !important;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
         }
 
         .scdaw-timeline__automation-row {
@@ -449,8 +519,9 @@ export class DawTimelineElement extends BaseElement {
                       Array.isArray(t.audioClips) &&
                       t.audioClips.length > 0
                     ) {
-                      laneClipsHtml = t.audioClips
-                        .map((clip) => {
+                      const layout = computeClipOverlapLayout(t.audioClips);
+                      laneClipsHtml = layout
+                        .map(({ clip, rowIndex, rowCount }) => {
                           const leftPct =
                             (Math.max(0, clip.time || 0) / totalBeats) * 100;
                           const widthPct = Math.min(
@@ -460,6 +531,16 @@ export class DawTimelineElement extends BaseElement {
                               ((clip.duration || 4) / totalBeats) * 100,
                             ),
                           );
+
+                          let topStyle = "top: 4px; height: calc(100% - 8px);";
+                          if (rowCount > 1) {
+                            const rowHeightPct = (100 / rowCount).toFixed(2);
+                            const topPct = (
+                              rowIndex *
+                              (100 / rowCount)
+                            ).toFixed(2);
+                            topStyle = `top: calc(${topPct}% + 1px); height: calc(${rowHeightPct}% - 2px);`;
+                          }
 
                           let waveformSvg = "";
                           const sampleBuf = scdaw.getSample?.(clip.sample);
@@ -479,15 +560,17 @@ export class DawTimelineElement extends BaseElement {
                             `;
                           }
 
+                          const isStacked = rowCount > 1;
                           return `
-                            <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""}"
-                                 style="left:${leftPct}%; width:${widthPct}%; position:absolute;"
+                            <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""} ${isStacked ? "scdaw-timeline__clip--stacked" : ""}"
+                                 style="left:${leftPct}%; width:${widthPct}%; ${topStyle} position:absolute; z-index:${rowIndex + 1};"
                                  role="button"
                                  tabindex="0"
-                                 aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats">
+                                 title="${clip.name} (Beat ${(clip.time || 0) + 1}, ${clip.duration} beats${isStacked ? ` — Layer ${rowIndex + 1} of ${rowCount}` : ""})"
+                                 aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats${isStacked ? `, Layer ${rowIndex + 1} of ${rowCount}` : ""}">
                               ${waveformSvg}
                               <span style="margin-right:4px; z-index:1;" aria-hidden="true">🎙</span>
-                              <span style="z-index:1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">${clip.name}</span>
+                              <span style="z-index:1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:${rowCount > 1 ? "0.72rem" : "0.85rem"};">${clip.name}</span>
                             </div>
                           `;
                         })

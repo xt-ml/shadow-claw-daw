@@ -1681,25 +1681,59 @@ export class DawEngine extends EventTarget {
     };
   }
 
-  async startRecording(trackId = null, { stream = null } = {}) {
+  async startRecording(
+    trackId = null,
+    { stream = null, mode = "auto", startBeat = null } = {},
+  ) {
     if (this._recording) throw new Error("Already recording");
     const p = this.project.get();
     let targetTrack = null;
+
     if (trackId) {
       targetTrack = p.tracks.find((t) => t.id === trackId);
     } else {
-      targetTrack = p.tracks.find((t) => t.recordArm && t.kind === "audio");
-    }
-    if (!targetTrack) {
-      targetTrack = p.tracks.find((t) => t.kind === "audio");
+      // 1. Prefer currently selected track if it is an audio track
+      const selId = this.selectedTrackId.get();
+      if (selId) {
+        targetTrack = p.tracks.find(
+          (t) => t.id === selId && t.kind === "audio",
+        );
+      }
+      // 2. Otherwise check for an armed audio track
       if (!targetTrack) {
-        const addRes = await this.sendCommand("add_track", {
-          kind: "audio",
-          name: "Audio 1",
+        targetTrack = p.tracks.find((t) => t.recordArm && t.kind === "audio");
+      }
+      // 3. Otherwise find first audio track
+      if (!targetTrack) {
+        targetTrack = p.tracks.find((t) => t.kind === "audio");
+      }
+    }
+
+    // If mode is 'new_track' or if no audio track exists, create a new track
+    if (mode === "new_track" || !targetTrack) {
+      const audioTracks = p.tracks.filter((t) => t.kind === "audio");
+      const baseName = targetTrack
+        ? targetTrack.name.replace(/ \(Take \d+\)$/, "")
+        : "Audio";
+      const trackName = `${baseName} (Take ${audioTracks.length + 1})`;
+      const addRes = await this.sendCommand("add_track", {
+        kind: "audio",
+        name: trackName,
+      });
+      targetTrack = this.project
+        .get()
+        .tracks.find((t) => t.id === addRes.trackId);
+    }
+
+    this.selectTrack(targetTrack.id);
+
+    // Disarm other audio tracks to keep single-track arm clarity
+    for (const t of this.project.get().tracks) {
+      if (t.kind === "audio" && t.recordArm && t.id !== targetTrack.id) {
+        await this.sendCommand("set_track_record_arm", {
+          trackId: t.id,
+          armed: false,
         });
-        targetTrack = this.project
-          .get()
-          .tracks.find((t) => t.id === addRes.trackId);
       }
     }
 
@@ -1708,20 +1742,52 @@ export class DawEngine extends EventTarget {
       armed: true,
     });
 
+    let effectiveStartBeat = startBeat;
+    if (effectiveStartBeat === null || effectiveStartBeat === undefined) {
+      if (
+        mode === "append" &&
+        Array.isArray(targetTrack.audioClips) &&
+        targetTrack.audioClips.length > 0
+      ) {
+        effectiveStartBeat = Math.max(
+          0,
+          ...targetTrack.audioClips.map(
+            (c) => (c.time || 0) + (c.duration || 4),
+          ),
+        );
+      } else {
+        effectiveStartBeat = Math.floor(
+          (this.state.get().positionPpqn || 0) / PPQN.Quarter,
+        );
+      }
+    }
+
+    if (effectiveStartBeat > 0) {
+      const targetPpqn = effectiveStartBeat * PPQN.Quarter;
+      const bar = Math.floor(targetPpqn / PPQN.Bar) + 1;
+      const beat = Math.floor((targetPpqn % PPQN.Bar) / PPQN.Quarter) + 1;
+      const step = Math.floor(targetPpqn / PPQN.SemiQuaver);
+      this._updateState({
+        positionPpqn: targetPpqn,
+        bar,
+        beat,
+        step,
+      });
+      this._lastSchedulePpqn = targetPpqn;
+    }
+
     this._recorder = new AudioRecorder({ audioContext: this.ctx });
     await this._recorder.start(stream);
     this._recording = true;
     this._recordingTrackId = targetTrack.id;
-    this._recordingStartBeat = Math.floor(
-      (this.state.get().positionPpqn || 0) / PPQN.Quarter,
-    );
+    this._recordingStartBeat = effectiveStartBeat;
 
     if (!this.state.get().playing) {
       await this.play();
     }
 
     this._updateState({ recording: true });
-    return { ok: true, trackId: targetTrack.id };
+    return { ok: true, trackId: targetTrack.id, startBeat: effectiveStartBeat };
   }
 
   async stopRecording() {
@@ -1742,16 +1808,27 @@ export class DawEngine extends EventTarget {
 
     let clipResult = null;
     if (trackId && recResult.buffer && recResult.buffer.byteLength > 44) {
+      const p = this.project.get();
+      const trk = p.tracks.find((t) => t.id === trackId);
+      const existingClips = trk?.audioClips || [];
+      const takeName = `Take ${existingClips.length + 1}`;
+
       clipResult = await this.importAudioFile(trackId, recResult.buffer, {
-        name: `Take ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`,
+        name: takeName,
         time: startBeat,
       });
+      return {
+        ok: true,
+        trackId,
+        clipResult,
+        recResult,
+      };
     }
 
     return {
-      ok: true,
+      ok: false,
       trackId,
-      clipResult,
+      message: "Recording was too short to capture audio (< 100ms).",
       recResult,
     };
   }

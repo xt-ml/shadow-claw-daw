@@ -9,8 +9,32 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
+import { PPQN } from "../scdaw.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+
+/**
+ * Checks whether starting recording on a track at a specific beat position
+ * would collide with existing audio clips and therefore warrant prompting the user.
+ *
+ * @param {Object} options
+ * @param {Object} [options.targetTrack] - Audio track to evaluate
+ * @param {number} [options.currentBeat=0] - Playhead beat position
+ * @returns {boolean} True if an existing clip overlaps currentBeat
+ */
+export function shouldPromptRecordOptions({ targetTrack, currentBeat = 0 }) {
+  if (!targetTrack || targetTrack.kind !== "audio") return false;
+  if (
+    !Array.isArray(targetTrack.audioClips) ||
+    targetTrack.audioClips.length === 0
+  )
+    return false;
+  return targetTrack.audioClips.some((c) => {
+    const start = Number(c.time || 0);
+    const end = start + Number(c.duration || 4);
+    return currentBeat >= start && currentBeat < end;
+  });
+}
 
 export function formatPosition(bar = 1, beat = 1, step = 0) {
   const padBar = String(bar).padStart(3, "0");
@@ -530,6 +554,82 @@ export class DawTransportElement extends BaseElement {
             }
           }
         }
+        dialog:modal {
+          max-width: 440px;
+          width: 90vw;
+          background: var(--scdaw-surface, #1e293b);
+          border: 1px solid var(--scdaw-border, #334155);
+          border-radius: 8px;
+          color: var(--scdaw-text, #f8fafc);
+          padding: 0;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+        }
+
+        dialog::backdrop {
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(2px);
+        }
+
+        .scdaw-dialog__form {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 16px;
+        }
+
+        .scdaw-dialog__header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid var(--scdaw-border, #334155);
+          padding-bottom: 8px;
+        }
+
+        .scdaw-dialog__title {
+          margin: 0;
+          font-size: 1rem;
+          font-weight: 600;
+          color: var(--scdaw-text, #f8fafc);
+        }
+
+        .scdaw-dialog__desc {
+          margin: 0;
+          font-size: 0.85rem;
+          color: var(--scdaw-text-secondary, #94a3b8);
+          line-height: 1.4;
+        }
+
+        .scdaw-dialog__actions-vertical {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin: 8px 0;
+        }
+
+        .scdaw-dialog__btn {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          text-align: left;
+          padding: 8px 12px;
+          gap: 2px;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+
+        .scdaw-dialog__btn-sub {
+          font-size: 0.72rem;
+          opacity: 0.8;
+          font-weight: normal;
+        }
+
+        .scdaw-dialog__footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          border-top: 1px solid var(--scdaw-border, #334155);
+          padding-top: 8px;
+        }
       </style>
       <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
@@ -573,7 +673,130 @@ export class DawTransportElement extends BaseElement {
           </div>
         </div>
       </div>
+
+      <dialog id="scdaw-rec-dialog" class="scdaw-dialog" aria-labelledby="rec-dialog-title" aria-modal="true">
+        <form method="dialog" class="scdaw-dialog__form">
+          <div class="scdaw-dialog__header">
+            <h3 id="rec-dialog-title" class="scdaw-dialog__title">🎙️ Audio Recording Options</h3>
+            <button type="button" id="rec-dialog-close" class="btn btn-icon" aria-label="Close dialog">✕</button>
+          </div>
+          <div class="scdaw-dialog__body">
+            <p id="rec-dialog-desc" class="scdaw-dialog__desc">
+              Track already has audio. What would you like to do?
+            </p>
+            <div class="scdaw-dialog__actions-vertical">
+              <button type="button" id="rec-opt-new" class="btn btn-primary scdaw-dialog__btn" autofocus>
+                <span>➕ <strong>New Audio Track</strong></span>
+                <span id="rec-opt-new-sub" class="scdaw-dialog__btn-sub">Create a new track and record cleanly</span>
+              </button>
+              <button type="button" id="rec-opt-append" class="btn scdaw-dialog__btn">
+                <span>⏩ <strong>Append After Audio</strong></span>
+                <span id="rec-opt-append-sub" class="scdaw-dialog__btn-sub">Start recording after existing clips</span>
+              </button>
+              <button type="button" id="rec-opt-overdub" class="btn scdaw-dialog__btn">
+                <span>🎙 <strong>Overdub on This Track</strong></span>
+                <span id="rec-opt-overdub-sub" class="scdaw-dialog__btn-sub">Layer as an overlapping take on this track</span>
+              </button>
+            </div>
+          </div>
+          <div class="scdaw-dialog__footer">
+            <button type="button" id="rec-dialog-cancel" class="btn">Cancel</button>
+          </div>
+        </form>
+      </dialog>
     `;
+
+    const dialog = this.shadowRoot.getElementById("scdaw-rec-dialog");
+    const descEl = this.shadowRoot.getElementById("rec-dialog-desc");
+    const newSubEl = this.shadowRoot.getElementById("rec-opt-new-sub");
+    const appendSubEl = this.shadowRoot.getElementById("rec-opt-append-sub");
+    const overdubSubEl = this.shadowRoot.getElementById("rec-opt-overdub-sub");
+
+    let pendingTargetTrack = null;
+
+    const openRecordDialog = (targetTrack, currentBeat) => {
+      pendingTargetTrack = targetTrack;
+      const audioTracks = scdaw
+        .getProject()
+        .tracks.filter((t) => t.kind === "audio");
+      const nextTakeName = `${targetTrack.name.replace(/ \(Take \d+\)$/, "")} (Take ${audioTracks.length + 1})`;
+      const endBeat = Math.max(
+        0,
+        ...(targetTrack.audioClips || []).map(
+          (c) => (c.time || 0) + (c.duration || 4),
+        ),
+      );
+
+      if (descEl) {
+        descEl.textContent = `Track "${targetTrack.name}" already has audio at beat ${currentBeat + 1}. What would you like to do?`;
+      }
+      if (newSubEl) {
+        newSubEl.textContent = `Create "${nextTakeName}" and record cleanly`;
+      }
+      if (appendSubEl) {
+        appendSubEl.textContent = `Start recording at beat ${endBeat + 1} after existing audio`;
+      }
+      if (overdubSubEl) {
+        overdubSubEl.textContent = `Layer as an overlapping take on "${targetTrack.name}"`;
+      }
+
+      if (dialog && typeof dialog.showModal === "function") {
+        dialog.showModal();
+        this.shadowRoot.getElementById("rec-opt-new")?.focus();
+      }
+    };
+
+    this.shadowRoot
+      .getElementById("rec-dialog-close")
+      ?.addEventListener("click", () => dialog?.close());
+    this.shadowRoot
+      .getElementById("rec-dialog-cancel")
+      ?.addEventListener("click", () => dialog?.close());
+
+    this.shadowRoot
+      .getElementById("rec-opt-new")
+      ?.addEventListener("click", async () => {
+        dialog?.close();
+        if (pendingTargetTrack) {
+          try {
+            await scdaw.startRecording(pendingTargetTrack.id, {
+              mode: "new_track",
+            });
+          } catch (err) {
+            console.error("Recording error:", err);
+          }
+        }
+      });
+
+    this.shadowRoot
+      .getElementById("rec-opt-append")
+      ?.addEventListener("click", async () => {
+        dialog?.close();
+        if (pendingTargetTrack) {
+          try {
+            await scdaw.startRecording(pendingTargetTrack.id, {
+              mode: "append",
+            });
+          } catch (err) {
+            console.error("Recording error:", err);
+          }
+        }
+      });
+
+    this.shadowRoot
+      .getElementById("rec-opt-overdub")
+      ?.addEventListener("click", async () => {
+        dialog?.close();
+        if (pendingTargetTrack) {
+          try {
+            await scdaw.startRecording(pendingTargetTrack.id, {
+              mode: "overdub",
+            });
+          } catch (err) {
+            console.error("Recording error:", err);
+          }
+        }
+      });
 
     this.shadowRoot
       .getElementById("play-btn")
@@ -588,16 +811,44 @@ export class DawTransportElement extends BaseElement {
       ?.addEventListener("click", async () => {
         const state = scdaw.getState();
         if (state.recording) {
-          await scdaw.stopRecording();
+          const res = await scdaw.stopRecording();
+          if (!res.ok && res.message) {
+            console.warn(res.message);
+          }
         } else {
-          try {
-            await scdaw.startRecording();
-          } catch (err) {
-            console.error("Recording error:", err);
-            scdaw.requestDialog?.({
-              title: "Recording Error",
-              body: err.message || "Failed to start audio recording",
-            });
+          const p = scdaw.getProject();
+          let targetTrack = null;
+          const selId = scdaw.selectedTrackId?.get();
+          if (selId) {
+            targetTrack = p.tracks.find(
+              (t) => t.id === selId && t.kind === "audio",
+            );
+          }
+          if (!targetTrack) {
+            targetTrack = p.tracks.find(
+              (t) => t.recordArm && t.kind === "audio",
+            );
+          }
+          if (!targetTrack) {
+            targetTrack = p.tracks.find((t) => t.kind === "audio");
+          }
+
+          const currentBeat = Math.floor(
+            (scdaw.state.get().positionPpqn || 0) / PPQN.Quarter,
+          );
+
+          if (shouldPromptRecordOptions({ targetTrack, currentBeat })) {
+            openRecordDialog(targetTrack, currentBeat);
+          } else {
+            try {
+              await scdaw.startRecording(targetTrack?.id);
+            } catch (err) {
+              console.error("Recording error:", err);
+              scdaw.requestDialog?.({
+                title: "Recording Error",
+                body: err.message || "Failed to start audio recording",
+              });
+            }
           }
         }
       });

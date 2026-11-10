@@ -33,6 +33,7 @@ import {
   setupTransportWheelControls,
   calculateBpmDragValue,
   setupBpmDragControl,
+  shouldPromptRecordOptions,
 } from "../.agents/scripts/components/scdaw-transport.js";
 import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
 import {
@@ -958,6 +959,62 @@ test("scdaw-transport: setupBpmDragControl binds touch/pointer drag events, capt
   });
   assert.equal(mockInput.focused, true);
   assert.equal(mockInput.selected, true);
+});
+
+test("scdaw-transport: shouldPromptRecordOptions identifies overlapping clips at current playhead", () => {
+  const synthTrack = { kind: "synth", name: "Lead", notes: [] };
+  assert.equal(
+    shouldPromptRecordOptions({ targetTrack: synthTrack, currentBeat: 0 }),
+    false,
+  );
+
+  const emptyAudioTrack = { kind: "audio", name: "Vocals", audioClips: [] };
+  assert.equal(
+    shouldPromptRecordOptions({ targetTrack: emptyAudioTrack, currentBeat: 0 }),
+    false,
+  );
+
+  const audioTrackWithClip = {
+    kind: "audio",
+    name: "Vocals",
+    audioClips: [{ id: "c1", name: "Take 1", time: 0, duration: 4 }],
+  };
+
+  // Beat 0 overlaps (0 <= 0 < 4)
+  assert.equal(
+    shouldPromptRecordOptions({
+      targetTrack: audioTrackWithClip,
+      currentBeat: 0,
+    }),
+    true,
+  );
+
+  // Beat 2 overlaps (0 <= 2 < 4)
+  assert.equal(
+    shouldPromptRecordOptions({
+      targetTrack: audioTrackWithClip,
+      currentBeat: 2,
+    }),
+    true,
+  );
+
+  // Beat 4 does not overlap (clip ends at 4)
+  assert.equal(
+    shouldPromptRecordOptions({
+      targetTrack: audioTrackWithClip,
+      currentBeat: 4,
+    }),
+    false,
+  );
+
+  // Beat 8 does not overlap
+  assert.equal(
+    shouldPromptRecordOptions({
+      targetTrack: audioTrackWithClip,
+      currentBeat: 8,
+    }),
+    false,
+  );
 });
 
 test("scdaw-statusbar: formats audio telemetry, project summary, and bounce status", () => {

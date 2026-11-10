@@ -11,6 +11,7 @@ import {
   AudioRecorder,
   computeWaveformPeaks,
 } from "../.agents/scripts/scdaw-recorder.js";
+import { computeClipOverlapLayout } from "../.agents/scripts/components/scdaw-timeline.js";
 
 test("AudioRecorder: tracks recording lifecycle, gathers PCM, and encodes WAV", async () => {
   const fakeCtx = new FakeAudioContext();
@@ -191,6 +192,178 @@ test("DawEngine: startRecording and stopRecording captures audio and adds clip",
     const track = engine.getProject().tracks.find((t) => t.id === trackId);
     assert.equal(track.audioClips.length, 1);
     assert.ok(track.audioClips[0].name.startsWith("Take"));
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("computeClipOverlapLayout: allocates non-colliding rows for overlapping takes", () => {
+  const clips = [
+    { id: "c1", name: "Take 1", time: 0, duration: 4 },
+    { id: "c2", name: "Take 2", time: 0, duration: 4 },
+    { id: "c3", name: "Take 3", time: 4, duration: 4 },
+  ];
+
+  const layout = computeClipOverlapLayout(clips);
+  assert.equal(layout.length, 3);
+
+  // c1 and c2 overlap at beat 0-4, so both have rowCount 2
+  const l1 = layout.find((l) => l.clip.id === "c1");
+  const l2 = layout.find((l) => l.clip.id === "c2");
+  const l3 = layout.find((l) => l.clip.id === "c3");
+
+  assert.equal(l1.rowCount, 2);
+  assert.equal(l2.rowCount, 2);
+  assert.notEqual(l1.rowIndex, l2.rowIndex);
+  assert.ok(l1.rowIndex >= 0 && l1.rowIndex < 2);
+  assert.ok(l2.rowIndex >= 0 && l2.rowIndex < 2);
+
+  // c3 is isolated at beat 4-8, so rowCount is 1 and rowIndex is 0
+  assert.equal(l3.rowCount, 1);
+  assert.equal(l3.rowIndex, 0);
+});
+
+test("DawEngine: startRecording targets selected track when it is an audio track", async () => {
+  const fakeCtx = new FakeAudioContext();
+  const p0 = createProject({ title: "Target Selection Test" });
+  const res1 = applyCommand(p0, "add_track", {
+    kind: "audio",
+    name: "Audio 1",
+  });
+  const res2 = applyCommand(res1.project, "add_track", {
+    kind: "audio",
+    name: "Audio 2",
+  });
+  const track1Id = res1.result.trackId;
+  const track2Id = res2.result.trackId;
+
+  // Arm track 1 initially
+  const res3 = applyCommand(res2.project, "set_track_record_arm", {
+    trackId: track1Id,
+    armed: true,
+  });
+
+  const engine = new DawEngine({
+    audioContext: fakeCtx,
+    project: res3.project,
+  });
+
+  // User selects Track 2 in the UI
+  engine.selectTrack(track2Id);
+
+  const mockTrack = { stop() {} };
+  const mockStream = { getAudioTracks: () => [mockTrack] };
+
+  try {
+    // Calling startRecording without explicit trackId must prioritize selectedTrackId!
+    const startRes = await engine.startRecording(null, { stream: mockStream });
+    assert.equal(startRes.trackId, track2Id);
+    assert.equal(engine.selectedTrackId.get(), track2Id);
+
+    // Track 2 must now be armed, Track 1 disarmed
+    const p = engine.getProject();
+    assert.equal(p.tracks.find((t) => t.id === track2Id).recordArm, true);
+    assert.equal(p.tracks.find((t) => t.id === track1Id).recordArm, false);
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine: startRecording with mode 'new_track' creates a new audio track and arms it", async () => {
+  const fakeCtx = new FakeAudioContext();
+  const p0 = createProject({ title: "New Track Mode Test" });
+  const res1 = applyCommand(p0, "add_track", {
+    kind: "audio",
+    name: "Lead Vox",
+  });
+  const track1Id = res1.result.trackId;
+
+  const engine = new DawEngine({
+    audioContext: fakeCtx,
+    project: res1.project,
+  });
+
+  const mockTrack = { stop() {} };
+  const mockStream = { getAudioTracks: () => [mockTrack] };
+
+  try {
+    const startRes = await engine.startRecording(track1Id, {
+      stream: mockStream,
+      mode: "new_track",
+    });
+    assert.ok(startRes.ok);
+    assert.notEqual(startRes.trackId, track1Id);
+
+    const p = engine.getProject();
+    const newTrack = p.tracks.find((t) => t.id === startRes.trackId);
+    assert.ok(newTrack);
+    assert.equal(newTrack.kind, "audio");
+    assert.ok(
+      newTrack.name.includes("Take 2") || newTrack.name.includes("Audio 2"),
+    );
+    assert.equal(newTrack.recordArm, true);
+    assert.equal(
+      Boolean(p.tracks.find((t) => t.id === track1Id).recordArm),
+      false,
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine: startRecording with mode 'append' starts recording after existing clips", async () => {
+  const fakeCtx = new FakeAudioContext();
+  const p0 = createProject({ title: "Append Mode Test" });
+  const res1 = applyCommand(p0, "add_track", { kind: "audio", name: "Guitar" });
+  const trackId = res1.result.trackId;
+
+  // Add an existing clip from beat 0 to 4
+  const res2 = applyCommand(res1.project, "add_audio_clip", {
+    trackId,
+    clip: { id: "clip1", name: "Riff 1", time: 0, duration: 4 },
+  });
+
+  const engine = new DawEngine({
+    audioContext: fakeCtx,
+    project: res2.project,
+  });
+
+  const mockTrack = { stop() {} };
+  const mockStream = { getAudioTracks: () => [mockTrack] };
+
+  try {
+    const startRes = await engine.startRecording(trackId, {
+      stream: mockStream,
+      mode: "append",
+    });
+    assert.ok(startRes.ok);
+    assert.equal(startRes.startBeat, 4);
+    assert.equal(engine._recordingStartBeat, 4);
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine: stopRecording returns informative message when recording was too short", async () => {
+  const fakeCtx = new FakeAudioContext();
+  const p0 = createProject({ title: "Short Recording Test" });
+  const res1 = applyCommand(p0, "add_track", { kind: "audio", name: "Voice" });
+  const trackId = res1.result.trackId;
+
+  const engine = new DawEngine({
+    audioContext: fakeCtx,
+    project: res1.project,
+  });
+
+  const mockTrack = { stop() {} };
+  const mockStream = { getAudioTracks: () => [mockTrack] };
+
+  try {
+    await engine.startRecording(trackId, { stream: mockStream });
+    // Stop immediately without feeding any PCM chunks
+    const stopRes = await engine.stopRecording();
+    assert.equal(stopRes.ok, false);
+    assert.ok(stopRes.message.includes("too short"));
   } finally {
     await engine.stop();
   }
