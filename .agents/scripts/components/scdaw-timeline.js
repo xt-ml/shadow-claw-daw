@@ -105,21 +105,39 @@ export function calculateClipDragPosition({
   laneWidth = 400,
   totalBeats = 16,
   snap = 1,
+  snapMode = "magnetic",
+  snapThresholdPx = 10,
   shiftKey = false,
 }) {
   if (laneWidth <= 0 || totalBeats <= 0) return Math.max(0, startBeat);
   const pixelsPerBeat = laneWidth / totalBeats;
   const deltaBeats = deltaX / pixelsPerBeat;
   const rawBeat = startBeat + deltaBeats;
-
-  const effectiveSnap = shiftKey ? 0.25 : snap;
-  const snapped = Math.round(rawBeat / effectiveSnap) * effectiveSnap;
   const maxBeat = Math.max(0, totalBeats - 0.25);
-  return Math.max(0, Math.min(maxBeat, Number(snapped.toFixed(3))));
+
+  if (shiftKey || snapMode === "none" || snapMode === "off" || snap <= 0) {
+    return Math.max(0, Math.min(maxBeat, Number(rawBeat.toFixed(3))));
+  }
+
+  if (snapMode === "grid") {
+    const snapped = Math.round(rawBeat / snap) * snap;
+    return Math.max(0, Math.min(maxBeat, Number(snapped.toFixed(3))));
+  }
+
+  // Magnetic snap to beat/grid line within threshold, otherwise continuous free positioning
+  const nearestBeat = Math.round(rawBeat / snap) * snap;
+  const distPx = Math.abs(rawBeat - nearestBeat) * pixelsPerBeat;
+  if (distPx <= snapThresholdPx) {
+    return Math.max(0, Math.min(maxBeat, Number(nearestBeat.toFixed(3))));
+  }
+
+  return Math.max(0, Math.min(maxBeat, Number(rawBeat.toFixed(3))));
 }
 
 /**
  * Calculates updated clip time, duration, and audio sample offset when trimming/resizing edges.
+ * Supports magnetic snapping to beats/bars within a pixel threshold, while allowing
+ * free, continuous duration and start trimming at any point.
  *
  * @param {Object} options
  * @param {number} options.startTime - Clip start beat
@@ -131,7 +149,9 @@ export function calculateClipDragPosition({
  * @param {"left"|"right"} [options.edge="right"] - Which handle is being dragged
  * @param {number} [options.bpm=120] - Tempo in beats per minute
  * @param {number} [options.snap=1] - Snap division in beats
- * @param {boolean} [options.shiftKey=false] - Fine snap when true
+ * @param {"magnetic"|"grid"|"none"|"off"} [options.snapMode="magnetic"] - Snapping mode
+ * @param {number} [options.snapThresholdPx=10] - Magnetic snap window in pixels
+ * @param {boolean} [options.shiftKey=false] - Free trimming bypass when true
  * @returns {{ time: number, duration: number, offset: number }}
  */
 export function calculateClipResize({
@@ -144,6 +164,8 @@ export function calculateClipResize({
   edge = "right",
   bpm = 120,
   snap = 1,
+  snapMode = "magnetic",
+  snapThresholdPx = 10,
   shiftKey = false,
 }) {
   if (laneWidth <= 0 || totalBeats <= 0) {
@@ -151,13 +173,29 @@ export function calculateClipResize({
   }
   const pixelsPerBeat = laneWidth / totalBeats;
   const deltaBeats = deltaX / pixelsPerBeat;
-  const effectiveSnap = shiftKey ? 0.25 : snap;
+  const isSnapOff =
+    shiftKey || snapMode === "none" || snapMode === "off" || snap <= 0;
 
   if (edge === "right") {
-    const rawDur = startDuration + deltaBeats;
-    const snappedDur = Math.round(rawDur / effectiveSnap) * effectiveSnap;
     const maxDur = Math.max(0.25, totalBeats - startTime);
-    const clampedDur = Math.max(0.25, Math.min(maxDur, snappedDur));
+    const baseDuration = Math.min(startDuration, maxDur);
+    const rawDur = baseDuration + deltaBeats;
+
+    let targetDur = rawDur;
+    if (!isSnapOff) {
+      if (snapMode === "grid") {
+        targetDur = Math.round(rawDur / snap) * snap;
+      } else {
+        const rawEndBeat = startTime + rawDur;
+        const nearestEndBeat = Math.round(rawEndBeat / snap) * snap;
+        const distPx = Math.abs(rawEndBeat - nearestEndBeat) * pixelsPerBeat;
+        if (distPx <= snapThresholdPx) {
+          targetDur = nearestEndBeat - startTime;
+        }
+      }
+    }
+
+    const clampedDur = Math.max(0.25, Math.min(maxDur, targetDur));
     return {
       time: startTime,
       duration: Number(clampedDur.toFixed(3)),
@@ -165,11 +203,25 @@ export function calculateClipResize({
     };
   }
 
-  // Left edge trim: moving right delays start time, shortens duration, and advances sample offset
-  const snappedDelta = Math.round(deltaBeats / effectiveSnap) * effectiveSnap;
+  // Left edge trim:
+  // Moving right delays start time, shortens duration, and advances sample offset.
+  let targetDelta = deltaBeats;
+  if (!isSnapOff) {
+    if (snapMode === "grid") {
+      targetDelta = Math.round(deltaBeats / snap) * snap;
+    } else {
+      const rawTime = startTime + deltaBeats;
+      const nearestTime = Math.round(rawTime / snap) * snap;
+      const distPx = Math.abs(rawTime - nearestTime) * pixelsPerBeat;
+      if (distPx <= snapThresholdPx) {
+        targetDelta = nearestTime - startTime;
+      }
+    }
+  }
+
   const maxDelta = startDuration - 0.25;
   const minDelta = -startTime;
-  const clampedDelta = Math.max(minDelta, Math.min(maxDelta, snappedDelta));
+  const clampedDelta = Math.max(minDelta, Math.min(maxDelta, targetDelta));
 
   const newTime = Math.max(0, startTime + clampedDelta);
   const newDuration = Math.max(0.25, startDuration - clampedDelta);
@@ -219,7 +271,9 @@ export function calculateClipKeyboardNudge({
       return { action: "resize", duration: Number(nextDur.toFixed(3)) };
     }
     if (key === "ArrowLeft") {
-      const nextDur = Math.max(0.25, currentDuration - step);
+      const maxDur = Math.max(0.25, totalBeats - currentBeat);
+      const baseDur = Math.min(currentDuration, maxDur);
+      const nextDur = Math.max(0.25, baseDur - step);
       return { action: "resize", duration: Number(nextDur.toFixed(3)) };
     }
     return null;
@@ -236,6 +290,138 @@ export function calculateClipKeyboardNudge({
   }
 
   return null;
+}
+
+/**
+ * Calculates new track index when dragging track reorder handle vertically.
+ *
+ * @param {Object} options
+ * @param {number} options.currentIndex - Current track index (0-based)
+ * @param {number} options.deltaY - Vertical pointer displacement in pixels
+ * @param {number} [options.rowHeight=48] - Track row height in pixels
+ * @param {number} options.totalTracks - Total number of tracks
+ * @returns {number} Clamped target track index
+ */
+export function calculateTrackReorderIndex({
+  currentIndex = 0,
+  deltaY = 0,
+  rowHeight = 48,
+  totalTracks = 1,
+}) {
+  if (totalTracks <= 1 || rowHeight <= 0) return currentIndex;
+  const rowsMoved = Math.round(deltaY / rowHeight);
+  const targetIndex = currentIndex + rowsMoved;
+  return Math.max(0, Math.min(totalTracks - 1, targetIndex));
+}
+
+/**
+ * Binds touch-friendly, mobile-first pointer dragging and keyboard accessibility
+ * on a timeline track reorder grab handle.
+ *
+ * @param {Object} options
+ * @param {HTMLElement} options.handleEl
+ * @param {HTMLElement} options.trackRowEl
+ * @param {string} options.trackId
+ * @param {number} options.index
+ * @param {number} options.totalTracks
+ * @param {number} [options.rowHeight=48]
+ * @param {Function} options.onReorder
+ * @returns {Function} Cleanup function
+ */
+export function setupTrackReorderInteraction({
+  handleEl,
+  trackRowEl,
+  trackId,
+  index,
+  totalTracks,
+  rowHeight = 48,
+  onReorder,
+}) {
+  if (!handleEl) return () => {};
+
+  let isDragging = false;
+  let startY = 0;
+  let targetIndex = index;
+
+  const onPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.stopPropagation?.();
+    isDragging = true;
+    startY = e.clientY;
+    targetIndex = index;
+
+    try {
+      handleEl.setPointerCapture?.(e.pointerId);
+    } catch {}
+
+    trackRowEl?.classList?.add("scdaw-timeline__track--reordering");
+    if (trackRowEl?.style) {
+      trackRowEl.style.zIndex = "10";
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault?.();
+    const deltaY = e.clientY - startY;
+    if (trackRowEl?.style) {
+      trackRowEl.style.transform = `translateY(${deltaY}px)`;
+    }
+    targetIndex = calculateTrackReorderIndex({
+      currentIndex: index,
+      deltaY,
+      rowHeight: trackRowEl?.getBoundingClientRect?.()?.height || rowHeight,
+      totalTracks,
+    });
+  };
+
+  const onPointerUp = (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    trackRowEl?.classList?.remove("scdaw-timeline__track--reordering");
+    if (trackRowEl?.style) {
+      trackRowEl.style.transform = "";
+      trackRowEl.style.zIndex = "";
+    }
+
+    try {
+      handleEl.releasePointerCapture?.(e.pointerId);
+    } catch {}
+
+    if (targetIndex !== index && typeof onReorder === "function") {
+      onReorder(targetIndex);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      if (index > 0 && typeof onReorder === "function") {
+        onReorder(index - 1);
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      if (index < totalTracks - 1 && typeof onReorder === "function") {
+        onReorder(index + 1);
+      }
+    }
+  };
+
+  handleEl.addEventListener("pointerdown", onPointerDown);
+  handleEl.addEventListener("pointermove", onPointerMove);
+  handleEl.addEventListener("pointerup", onPointerUp);
+  handleEl.addEventListener("pointercancel", onPointerUp);
+  handleEl.addEventListener("keydown", onKeyDown);
+
+  return () => {
+    handleEl.removeEventListener("pointerdown", onPointerDown);
+    handleEl.removeEventListener("pointermove", onPointerMove);
+    handleEl.removeEventListener("pointerup", onPointerUp);
+    handleEl.removeEventListener("pointercancel", onPointerUp);
+    handleEl.removeEventListener("keydown", onKeyDown);
+  };
 }
 
 /**
@@ -260,6 +446,9 @@ export function setupClipInteraction({
   trackId,
   totalBeats = 16,
   bpm = 120,
+  snapMode = "beat",
+  beatsPerBar = 4,
+  snapThresholdPx = 10,
   onUpdate,
   onRemove,
 }) {
@@ -272,6 +461,10 @@ export function setupClipInteraction({
   let startBeat = Number(clip.time || 0);
   let startDuration = Number(clip.duration || 4);
   let startOffset = Number(clip.offset || 0);
+
+  const snapGrid = snapMode === "bar" ? beatsPerBar : 1;
+  const effectiveSnapMode =
+    snapMode === "off" || snapMode === "none" ? "none" : "magnetic";
 
   const getLaneWidth = () => {
     if (laneEl && typeof laneEl.getBoundingClientRect === "function") {
@@ -333,11 +526,15 @@ export function setupClipInteraction({
         deltaX,
         laneWidth,
         totalBeats,
+        snap: snapGrid,
+        snapMode: effectiveSnapMode,
+        snapThresholdPx,
         shiftKey: Boolean(e.shiftKey),
       });
       const leftPct = (nextTime / totalBeats) * 100;
       clipEl.style.left = `${leftPct}%`;
       clipEl.setAttribute("aria-valuenow", String(nextTime));
+      clipEl.title = `${clip.name} (Beat ${(nextTime + 1).toFixed(2)}, ${clip.duration} beats)`;
     } else if (interactionMode === "resize-right") {
       const res = calculateClipResize({
         startTime: startBeat,
@@ -347,10 +544,16 @@ export function setupClipInteraction({
         laneWidth,
         totalBeats,
         edge: "right",
+        bpm,
+        snap: snapGrid,
+        snapMode: effectiveSnapMode,
+        snapThresholdPx,
         shiftKey: Boolean(e.shiftKey),
       });
       const widthPct = (res.duration / totalBeats) * 100;
       clipEl.style.width = `${widthPct}%`;
+      clipEl.setAttribute("aria-valuenow", String(res.duration));
+      clipEl.title = `${clip.name} (Beat ${(startBeat + 1).toFixed(2)}, ${res.duration.toFixed(2)} beats)`;
     } else if (interactionMode === "resize-left") {
       const res = calculateClipResize({
         startTime: startBeat,
@@ -361,6 +564,9 @@ export function setupClipInteraction({
         totalBeats,
         edge: "left",
         bpm,
+        snap: snapGrid,
+        snapMode: effectiveSnapMode,
+        snapThresholdPx,
         shiftKey: Boolean(e.shiftKey),
       });
       const leftPct = (res.time / totalBeats) * 100;
@@ -368,6 +574,7 @@ export function setupClipInteraction({
       clipEl.style.left = `${leftPct}%`;
       clipEl.style.width = `${widthPct}%`;
       clipEl.setAttribute("aria-valuenow", String(res.time));
+      clipEl.title = `${clip.name} (Beat ${(res.time + 1).toFixed(2)}, ${res.duration.toFixed(2)} beats)`;
     }
   };
 
@@ -393,6 +600,9 @@ export function setupClipInteraction({
           deltaX,
           laneWidth,
           totalBeats,
+          snap: snapGrid,
+          snapMode: effectiveSnapMode,
+          snapThresholdPx,
           shiftKey: Boolean(e.shiftKey),
         });
         if (nextTime !== startBeat) {
@@ -407,6 +617,10 @@ export function setupClipInteraction({
           laneWidth,
           totalBeats,
           edge: "right",
+          bpm,
+          snap: snapGrid,
+          snapMode: effectiveSnapMode,
+          snapThresholdPx,
           shiftKey: Boolean(e.shiftKey),
         });
         if (res.duration !== startDuration) {
@@ -422,13 +636,12 @@ export function setupClipInteraction({
           totalBeats,
           edge: "left",
           bpm,
+          snap: snapGrid,
+          snapMode: effectiveSnapMode,
+          snapThresholdPx,
           shiftKey: Boolean(e.shiftKey),
         });
-        if (
-          res.time !== startBeat ||
-          res.duration !== startDuration ||
-          res.offset !== startOffset
-        ) {
+        if (res.time !== startBeat || res.duration !== startDuration) {
           onUpdate?.({
             time: res.time,
             duration: res.duration,
@@ -555,6 +768,7 @@ export class DawTimelineElement extends BaseElement {
     this._rafId = null;
     this._expandedAutomation = new Set();
     this._selectedAutoParam = new Map();
+    this._snapMode = "beat";
   }
 
   connectedCallback() {
@@ -614,6 +828,9 @@ export class DawTimelineElement extends BaseElement {
           container-type: inline-size;
           container-name: scdaw-timeline;
           --track-header-w: 136px;
+          --timeline-gutter-width: 16px;
+          --timeline-gutter-l: var(--timeline-gutter-width);
+          --timeline-gutter-r: var(--timeline-gutter-width);
         }
 
         @container scdaw-timeline (min-width: 520px) {
@@ -679,7 +896,8 @@ export class DawTimelineElement extends BaseElement {
           height: 24px;
           border-bottom: 1px solid var(--border);
           background: var(--bg-elevated);
-          margin-left: var(--track-header-w);
+          margin-left: calc(var(--track-header-w) + var(--timeline-gutter-l, 16px));
+          margin-right: var(--timeline-gutter-r, 16px);
           min-width: 280px;
         }
 
@@ -755,6 +973,91 @@ export class DawTimelineElement extends BaseElement {
           gap: 4px;
           width: 100%;
           min-width: 0;
+        }
+
+        .scdaw-timeline__reorder-group {
+          display: inline-flex;
+          align-items: center;
+          gap: 1px;
+          flex-shrink: 0;
+        }
+
+        .scdaw-timeline__reorder-handle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          height: 20px;
+          cursor: grab;
+          cursor: -webkit-grab;
+          touch-action: none;
+          user-select: none;
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+          font-size: 0.72rem;
+          font-weight: 700;
+          line-height: 1;
+          padding: 0;
+          background: transparent;
+          border: none;
+          border-radius: 2px;
+          transition: color 0.12s ease, background 0.12s ease;
+        }
+
+        .scdaw-timeline__reorder-handle:hover,
+        .scdaw-timeline__reorder-handle:focus-visible {
+          color: var(--accent, #6366f1);
+          background: rgba(255, 255, 255, 0.08);
+          outline: none;
+        }
+
+        .scdaw-timeline__reorder-handle:active {
+          cursor: grabbing;
+          cursor: -webkit-grabbing;
+        }
+
+        .scdaw-timeline__nudge-buttons {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+
+        .scdaw-timeline__nudge-btn,
+        .scdaw-timeline__nudge-btn--up,
+        .scdaw-timeline__nudge-btn--down {
+          width: 13px;
+          height: 10px;
+          padding: 0;
+          margin: 0;
+          border: none;
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--shadow-claw-text-secondary, #94a3b8);
+          font-size: 0.46rem;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border-radius: 2px;
+          touch-action: manipulation;
+          transition: background 0.1s ease, color 0.1s ease;
+        }
+
+        .scdaw-timeline__nudge-btn:hover:not(:disabled),
+        .scdaw-timeline__nudge-btn:focus-visible:not(:disabled) {
+          background: var(--accent, #6366f1);
+          color: #ffffff;
+          outline: none;
+        }
+
+        .scdaw-timeline__nudge-btn:disabled {
+          opacity: 0.25;
+          cursor: not-allowed;
+        }
+
+        .scdaw-timeline__track--reordering {
+          opacity: 0.75;
+          background: rgba(99, 102, 241, 0.15) !important;
+          outline: 1px dashed var(--accent, #6366f1);
         }
 
         .scdaw-timeline__track-name,
@@ -848,6 +1151,8 @@ export class DawTimelineElement extends BaseElement {
           position: relative;
           background: rgba(0, 0, 0, 0.15);
           min-width: 160px;
+          margin-left: var(--timeline-gutter-l, 16px);
+          margin-right: var(--timeline-gutter-r, 16px);
         }
 
         .scdaw-timeline__clip,
@@ -901,24 +1206,37 @@ export class DawTimelineElement extends BaseElement {
           position: absolute;
           top: 0;
           bottom: 0;
-          width: 8px;
+          width: 14px;
           cursor: ew-resize;
-          z-index: 3;
-          opacity: 0;
-          transition: opacity 0.1s ease, background 0.1s ease;
+          z-index: 5;
+          opacity: 0.65;
+          transition: opacity 0.12s ease, background 0.12s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          touch-action: none;
+        }
+
+        .scdaw-timeline__clip-handle::after {
+          content: "";
+          width: 2px;
+          height: 14px;
+          border-radius: 1px;
+          background: rgba(255, 255, 255, 0.45);
+          pointer-events: none;
         }
 
         .scdaw-timeline__clip-handle--left {
           left: 0;
-          border-top-left-radius: 3px;
-          border-bottom-left-radius: 3px;
+          border-top-left-radius: 4px;
+          border-bottom-left-radius: 4px;
           border-left: 3px solid var(--accent, #6366f1);
         }
 
         .scdaw-timeline__clip-handle--right {
           right: 0;
-          border-top-right-radius: 3px;
-          border-bottom-right-radius: 3px;
+          border-top-right-radius: 4px;
+          border-bottom-right-radius: 4px;
           border-right: 3px solid var(--accent, #6366f1);
         }
 
@@ -927,9 +1245,15 @@ export class DawTimelineElement extends BaseElement {
         .scdaw-timeline__clip-handle:hover,
         .scdaw-timeline__clip-handle:focus-visible,
         .scdaw-timeline__clip--resizing .scdaw-timeline__clip-handle {
-          opacity: 0.9;
-          background: rgba(255, 255, 255, 0.25);
+          opacity: 1;
+          background: rgba(255, 255, 255, 0.22);
           outline: none;
+        }
+
+        .scdaw-timeline__clip-handle:hover::after,
+        .scdaw-timeline__clip-handle:focus-visible::after,
+        .scdaw-timeline__clip--resizing .scdaw-timeline__clip-handle::after {
+          background: #ffffff;
         }
 
         .scdaw-timeline__clip--stacked {
@@ -982,6 +1306,8 @@ export class DawTimelineElement extends BaseElement {
           position: relative;
           height: 44px;
           background: rgba(0, 0, 0, 0.2);
+          margin-left: var(--timeline-gutter-l, 16px);
+          margin-right: var(--timeline-gutter-r, 16px);
           cursor: crosshair;
         }
 
@@ -1015,6 +1341,15 @@ export class DawTimelineElement extends BaseElement {
           <div class="scdaw-timeline__title-group">
             <span style="font-weight:700; font-size:0.8rem;">⏱ Timeline</span>
             <span class="badge">${p.lengthBars} Bars (${p.signature.join("/")})</span>
+            <button
+              id="timeline-snap-btn"
+              type="button"
+              class="btn btn-icon scdaw-timeline__snap-btn"
+              data-snap="${this._snapMode || "beat"}"
+              aria-label="Timeline snap: ${this._snapMode || "beat"}. Click to cycle: Beat, Bar, Off"
+              title="Snap mode: ${this._snapMode || "beat"}. Click to toggle: Beat (magnetic snap), Bar (bar snap), Off (free)">
+              🧲 ${this._snapMode === "off" ? "Off" : this._snapMode === "bar" ? "Bar" : "Beat"}
+            </button>
           </div>
           <div class="scdaw-timeline__actions">
             <button id="add-drums-btn" class="btn btn-icon" aria-label="Add drum track">+ Drums</button>
@@ -1043,7 +1378,9 @@ export class DawTimelineElement extends BaseElement {
               const totalBeats = (p.lengthBars || 1) * 4;
 
               return p.tracks
-                .map((t) => {
+                .map((t, idx) => {
+                  const isFirst = idx === 0;
+                  const isLast = idx === p.tracks.length - 1;
                   const isSelected = scdaw.selectedTrackId?.get() === t.id;
                   const isSilenced = Boolean(t.mute || (hasSolo && !t.solo));
                   const isAutoExpanded = this._expandedAutomation.has(t.id);
@@ -1198,6 +1535,39 @@ export class DawTimelineElement extends BaseElement {
                 <div class="scdaw-timeline__track track-row ${isSelected ? "scdaw-timeline__track--selected track-row--selected" : ""}" data-track="${t.id}" role="listitem" aria-current="${isSelected ? "true" : "false"}">
                   <div class="scdaw-timeline__track-header track-header">
                     <div class="scdaw-timeline__track-top">
+                      <div class="scdaw-timeline__reorder-group" role="group" aria-label="Reorder ${t.name}">
+                        <button
+                          type="button"
+                          class="scdaw-timeline__reorder-handle btn-icon"
+                          data-track="${t.id}"
+                          data-index="${idx}"
+                          aria-label="Drag to reorder ${t.name} or use Up/Down arrow keys"
+                          title="Drag or use Up/Down arrows to reorder ${t.name}">
+                          ⋮⋮
+                        </button>
+                        <div class="scdaw-timeline__nudge-buttons">
+                          <button
+                            type="button"
+                            class="scdaw-timeline__nudge-btn scdaw-timeline__nudge-btn--up"
+                            data-track="${t.id}"
+                            data-dir="up"
+                            aria-label="Move ${t.name} up"
+                            title="Move ${t.name} up"
+                            ${isFirst ? "disabled" : ""}>
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            class="scdaw-timeline__nudge-btn scdaw-timeline__nudge-btn--down"
+                            data-track="${t.id}"
+                            data-dir="down"
+                            aria-label="Move ${t.name} down"
+                            title="Move ${t.name} down"
+                            ${isLast ? "disabled" : ""}>
+                            ▼
+                          </button>
+                        </div>
+                      </div>
                       <div class="scdaw-timeline__track-name track-name" title="${t.name} (${countLabel})">
                         <span class="scdaw-timeline__track-icon" aria-hidden="true">${icon}</span>
                         <span class="scdaw-timeline__track-title">${t.name}</span>
@@ -1265,6 +1635,15 @@ export class DawTimelineElement extends BaseElement {
     });
 
     // Add track buttons
+    this.shadowRoot
+      .getElementById("timeline-snap-btn")
+      ?.addEventListener("click", () => {
+        const modes = ["beat", "bar", "off"];
+        const curIdx = modes.indexOf(this._snapMode || "beat");
+        this._snapMode = modes[(curIdx + 1) % modes.length];
+        this.render();
+      });
+
     this.shadowRoot
       .getElementById("add-drums-btn")
       ?.addEventListener("click", () => {
@@ -1447,6 +1826,41 @@ export class DawTimelineElement extends BaseElement {
       });
     });
 
+    // Track re-ordering: touch & pointer drag handle and touch nudge buttons
+    this.shadowRoot
+      .querySelectorAll(".scdaw-timeline__nudge-btn")
+      .forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation?.();
+          const trackId = btn.dataset.track;
+          const direction = btn.dataset.dir;
+          if (trackId && direction) {
+            scdaw.sendCommand("move_track", { trackId, direction });
+          }
+        });
+      });
+
+    this.shadowRoot
+      .querySelectorAll(".scdaw-timeline__reorder-handle")
+      .forEach((handle) => {
+        const trackId = handle.dataset.track;
+        const index = Number(handle.dataset.index);
+        const rowEl = handle.closest(".scdaw-timeline__track");
+        if (trackId && !isNaN(index) && rowEl) {
+          setupTrackReorderInteraction({
+            handleEl: handle,
+            trackRowEl: rowEl,
+            trackId,
+            index,
+            totalTracks: p.tracks.length,
+            rowHeight: 48,
+            onReorder: (targetIndex) => {
+              scdaw.sendCommand("move_track", { trackId, targetIndex });
+            },
+          });
+        }
+      });
+
     // Audio clip dragging, edge trimming/resizing, and keyboard nudging
     const currentBpm = p.bpm || 120;
     this.shadowRoot
@@ -1466,6 +1880,8 @@ export class DawTimelineElement extends BaseElement {
             trackId,
             totalBeats,
             bpm: currentBpm,
+            snapMode: this._snapMode || "beat",
+            beatsPerBar: p.signature?.[0] || 4,
             onUpdate: (patch) => {
               scdaw.sendCommand("set_audio_clip", { trackId, clipId, patch });
             },

@@ -567,6 +567,59 @@ export function applyCommand(project, name, params = {}) {
       return { project: next, result: { removed: trackId } };
     }
 
+    case "move_track": {
+      const trackId = params.trackId || params.id;
+      const currentIndex = next.tracks.findIndex((t) => t.id === trackId);
+      if (currentIndex === -1) {
+        throw new Error(`Track not found: ${trackId}`);
+      }
+      let targetIndex = currentIndex;
+      if (params.direction === "up") {
+        targetIndex = Math.max(0, currentIndex - 1);
+      } else if (params.direction === "down") {
+        targetIndex = Math.min(next.tracks.length - 1, currentIndex + 1);
+      } else if (params.targetIndex !== undefined) {
+        targetIndex = Math.max(
+          0,
+          Math.min(
+            next.tracks.length - 1,
+            Math.round(Number(params.targetIndex)),
+          ),
+        );
+      }
+      if (targetIndex !== currentIndex) {
+        const [track] = next.tracks.splice(currentIndex, 1);
+        next.tracks.splice(targetIndex, 0, track);
+      }
+      return {
+        project: next,
+        result: { trackId, fromIndex: currentIndex, toIndex: targetIndex },
+      };
+    }
+
+    case "reorder_tracks": {
+      const trackIds = Array.isArray(params.trackIds) ? params.trackIds : [];
+      if (trackIds.length > 0) {
+        const trackMap = new Map(next.tracks.map((t) => [t.id, t]));
+        const reordered = [];
+        for (const id of trackIds) {
+          const t = trackMap.get(id);
+          if (t) {
+            reordered.push(t);
+            trackMap.delete(id);
+          }
+        }
+        for (const t of trackMap.values()) {
+          reordered.push(t);
+        }
+        next.tracks = reordered;
+      }
+      return {
+        project: next,
+        result: { trackIds: next.tracks.map((t) => t.id) },
+      };
+    }
+
     case "set_track": {
       const trackId = params.trackId || params.id;
       const track = next.tracks.find((t) => t.id === trackId);

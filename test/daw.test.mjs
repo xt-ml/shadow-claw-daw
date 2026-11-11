@@ -173,6 +173,58 @@ test("applyCommand: transactional mutations on project", () => {
   const clrRes = applyCommand(project, "clear_notes", { trackId });
   project = clrRes.project;
   assert.equal(project.tracks[0].notes.length, 0);
+
+  // move_track and reorder_tracks
+  const t0 = project.tracks[0].id;
+  const p2 = applyCommand(project, "add_track", {
+    kind: "synth",
+    name: "Bass",
+  }).project;
+  const t1 = p2.tracks[1].id;
+  const p3 = applyCommand(p2, "add_track", {
+    kind: "audio",
+    name: "Vox",
+  }).project;
+  const t2 = p3.tracks[2].id;
+
+  // Move t2 (Vox) up -> should become index 1
+  const upRes = applyCommand(p3, "move_track", {
+    trackId: t2,
+    direction: "up",
+  });
+  assert.deepEqual(
+    upRes.project.tracks.map((t) => t.id),
+    [t0, t2, t1],
+  );
+
+  // Move t0 (Drums) down -> should become index 1
+  const downRes = applyCommand(p3, "move_track", {
+    trackId: t0,
+    direction: "down",
+  });
+  assert.deepEqual(
+    downRes.project.tracks.map((t) => t.id),
+    [t1, t0, t2],
+  );
+
+  // Move t0 directly to targetIndex 2
+  const targetRes = applyCommand(p3, "move_track", {
+    trackId: t0,
+    targetIndex: 2,
+  });
+  assert.deepEqual(
+    targetRes.project.tracks.map((t) => t.id),
+    [t1, t2, t0],
+  );
+
+  // reorder_tracks by ID array
+  const reorderRes = applyCommand(p3, "reorder_tracks", {
+    trackIds: [t2, t1, t0],
+  });
+  assert.deepEqual(
+    reorderRes.project.tracks.map((t) => t.id),
+    [t2, t1, t0],
+  );
 });
 
 test("computeEventsInRange: collects active note triggers and handles swing", () => {

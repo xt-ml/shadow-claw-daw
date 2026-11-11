@@ -250,6 +250,28 @@ export function renderDeviceControls(dev) {
   }
 }
 
+export function shouldPreserveDevicesDom({
+  renderedTrackId = null,
+  targetTrackId = null,
+  renderedChain = [],
+  targetChain = [],
+  hasContainer = false,
+} = {}) {
+  if (!hasContainer) return false;
+  if (!renderedTrackId || renderedTrackId !== targetTrackId) return false;
+  if (!Array.isArray(renderedChain) || !Array.isArray(targetChain))
+    return false;
+  if (renderedChain.length !== targetChain.length) return false;
+  for (let i = 0; i < renderedChain.length; i++) {
+    const r = renderedChain[i];
+    const t = targetChain[i];
+    if (!r || !t) return false;
+    if (r.role !== t.role || r.type !== t.type) return false;
+    if ((r.params?.id || "") !== (t.params?.id || "")) return false;
+  }
+  return true;
+}
+
 export class DawDevicesElement extends BaseElement {
   constructor() {
     super();
@@ -257,22 +279,80 @@ export class DawDevicesElement extends BaseElement {
       this.attachShadow({ mode: "open" });
     }
     this._selectedTrackId = null;
+    this._renderedTrackId = null;
+    this._renderedChain = [];
   }
 
   connectedCallback() {
     this.render();
     this._dispose = effect(() => {
-      scdaw.project.get();
+      const p = scdaw.project.get();
       const sharedTrackId = scdaw.selectedTrackId?.get();
-      if (sharedTrackId) {
-        this._selectedTrackId = sharedTrackId;
+      const activeTrackId =
+        sharedTrackId && p.tracks.some((t) => t.id === sharedTrackId)
+          ? sharedTrackId
+          : p.tracks[0]?.id || null;
+      this._selectedTrackId = activeTrackId;
+
+      const track = p.tracks.find((t) => t.id === activeTrackId);
+      const chain = getDeviceChainForTrack(track);
+      const hasContainer = Boolean(
+        this.shadowRoot &&
+        this.shadowRoot.querySelector(".scdaw-devices__rack"),
+      );
+
+      if (
+        shouldPreserveDevicesDom({
+          renderedTrackId: this._renderedTrackId,
+          targetTrackId: activeTrackId,
+          renderedChain: this._renderedChain,
+          targetChain: chain,
+          hasContainer,
+        })
+      ) {
+        this._syncDevices(track, chain);
+      } else {
+        this.render();
       }
-      this.render();
     });
   }
 
   disconnectedCallback() {
     if (this._dispose) this._dispose();
+  }
+
+  _syncDevices(track, chain) {
+    if (!this.shadowRoot) return;
+    this._renderedTrackId = track?.id || null;
+    this._renderedChain = chain;
+
+    // 1. Update track name in header if changed
+    const trackNameEl = this.shadowRoot.querySelector(
+      ".scdaw-devices__header strong",
+    );
+    if (trackNameEl && trackNameEl.textContent !== (track?.name || "None")) {
+      trackNameEl.textContent = track?.name || "None";
+    }
+
+    // 2. Sync knob values in each device card without disrupting active dragging
+    const cards = this.shadowRoot.querySelectorAll(".scdaw-devices__card");
+    cards.forEach((card, idx) => {
+      const dev = chain[idx];
+      if (!dev) return;
+      const p = dev.params || {};
+
+      card.querySelectorAll("scdaw-knob").forEach((knob) => {
+        const param = knob.dataset.param;
+        if (!param) return;
+        const targetVal = p[param];
+        if (targetVal !== undefined && !knob._isDragging) {
+          const numVal = Number(targetVal);
+          if (knob.value !== numVal) {
+            knob.value = numVal;
+          }
+        }
+      });
+    });
   }
 
   render() {
@@ -290,6 +370,9 @@ export class DawDevicesElement extends BaseElement {
 
     const track = p.tracks.find((t) => t.id === this._selectedTrackId);
     const chain = getDeviceChainForTrack(track);
+
+    this._renderedTrackId = this._selectedTrackId;
+    this._renderedChain = chain;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -309,6 +392,9 @@ export class DawDevicesElement extends BaseElement {
           gap: 0.75rem;
           padding: 0.75rem;
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-x pan-y;
+          overscroll-behavior-x: contain;
           background: rgba(0, 0, 0, 0.2);
           min-height: 120px;
           box-sizing: border-box;
@@ -342,6 +428,7 @@ export class DawDevicesElement extends BaseElement {
           justify-content: space-around;
           gap: 0.5rem;
           flex-wrap: wrap;
+          touch-action: none;
         }
       </style>
       <div class="scdaw-devices daw-panel" role="region" aria-label="Track Device Rack">

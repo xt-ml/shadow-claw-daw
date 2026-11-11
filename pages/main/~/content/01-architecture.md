@@ -14,7 +14,7 @@ Daw is built upon a 4-tier modular architecture designed for maximum performance
 1. **Pure Logic, Schemas & Codecs (`scdaw.js`, `scdaw-schema.js`, `scdaw-presets.js`, `scdaw-dsp.js`, `scdaw-midi.js`, `scdaw-dawproject.js`, `scdaw-zip.js`, `scdaw-signals.js`)**:
    - Zero DOM or browser dependencies.
    - Exact Pulses Per Quarter Note (`PPQN = 960`) musical timebase math and 16th-note swing displacement.
-   - Deterministic transaction reducers (`applyCommand`) and undo snapshot history.
+   - Deterministic transaction reducers (`applyCommand` supporting note mutations, automation, audio clips, and `move_track`/`reorder_tracks`) and undo snapshot history.
    - 16-bit, 24-bit PCM, and 32-bit Float RIFF WAVE binary encoders, pure-JS ZIP archive codec with CRC-32 integrity, SMF Format 0/1 MIDI codec, and DAWproject v1.0 XML/ZIP interchange.
    - Microtask-batched reactive Signals for UI and engine state.
 

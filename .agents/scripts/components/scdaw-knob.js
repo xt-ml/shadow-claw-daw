@@ -62,6 +62,144 @@ export function formatValueWithUnit(val, unit = "") {
     : `${num.toFixed(2)}${unit ? " " + unit : ""}`;
 }
 
+export function calculateKnobValueFromPointer({
+  startY,
+  currentY,
+  startNorm = 0.5,
+  min = 0,
+  max = 1,
+  scaling = "linear",
+  shiftKey = false,
+  sensitivity = 0.005,
+  shiftSensitivity = 0.001,
+}) {
+  if (typeof startY !== "number" || typeof currentY !== "number") {
+    return mapNormalizedToValue(startNorm, min, max, scaling);
+  }
+  const deltaY = startY - currentY;
+  const sens = shiftKey ? shiftSensitivity : sensitivity;
+  const newNorm = Math.max(0, Math.min(1, startNorm + deltaY * sens));
+  return mapNormalizedToValue(newNorm, min, max, scaling);
+}
+
+export function calculateKnobValueFromWheel({
+  currentValue,
+  deltaY,
+  min = 0,
+  max = 1,
+  scaling = "linear",
+  shiftKey = false,
+  step = 0.03,
+  shiftMultiplier = 0.25,
+}) {
+  if (deltaY === 0) {
+    return Math.max(min, Math.min(max, Number(currentValue)));
+  }
+  const norm = mapValueToNormalized(currentValue, min, max, scaling);
+  const direction = deltaY > 0 ? -1 : 1;
+  const effectiveStep = shiftKey ? step * shiftMultiplier : step;
+  const nextNorm = Math.max(0, Math.min(1, norm + direction * effectiveStep));
+  return mapNormalizedToValue(nextNorm, min, max, scaling);
+}
+
+export function setupKnobInteraction(
+  target,
+  { getState, onValueChange, onReset },
+) {
+  if (!target) return () => {};
+
+  let isDragging = false;
+  let startY = 0;
+  let startNorm = 0;
+
+  const handlePointerDown = (e) => {
+    const state = getState?.() || {};
+    isDragging = true;
+    state._isDragging = true;
+    startY = e.clientY;
+    startNorm = mapValueToNormalized(
+      state.value ?? 0,
+      state.min ?? 0,
+      state.max ?? 1,
+      state.scaling ?? "linear",
+    );
+    try {
+      target.setPointerCapture?.(e.pointerId);
+    } catch {}
+    e.preventDefault?.();
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    const state = getState?.() || {};
+    e.preventDefault?.();
+    const nextVal = calculateKnobValueFromPointer({
+      startY,
+      currentY: e.clientY,
+      startNorm,
+      min: state.min ?? 0,
+      max: state.max ?? 1,
+      scaling: state.scaling ?? "linear",
+      shiftKey: Boolean(e.shiftKey),
+    });
+    if (state.value !== nextVal) {
+      onValueChange?.(nextVal);
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    if (isDragging) {
+      isDragging = false;
+      const state = getState?.() || {};
+      state._isDragging = false;
+      try {
+        if (e && e.pointerId != null) {
+          target.releasePointerCapture?.(e.pointerId);
+        }
+      } catch {}
+    }
+  };
+
+  const handleDblClick = (e) => {
+    e?.preventDefault?.();
+    const state = getState?.() || {};
+    const defaultVal = state.defaultValue ?? state.min ?? 0;
+    onReset?.(defaultVal);
+  };
+
+  const handleWheel = (e) => {
+    e.preventDefault?.();
+    const state = getState?.() || {};
+    const nextVal = calculateKnobValueFromWheel({
+      currentValue: state.value ?? 0,
+      deltaY: e.deltaY,
+      min: state.min ?? 0,
+      max: state.max ?? 1,
+      scaling: state.scaling ?? "linear",
+      shiftKey: Boolean(e.shiftKey),
+    });
+    if (state.value !== nextVal) {
+      onValueChange?.(nextVal);
+    }
+  };
+
+  target.addEventListener("pointerdown", handlePointerDown);
+  target.addEventListener("pointermove", handlePointerMove);
+  target.addEventListener("pointerup", handlePointerUp);
+  target.addEventListener("pointercancel", handlePointerUp);
+  target.addEventListener("dblclick", handleDblClick);
+  target.addEventListener("wheel", handleWheel, { passive: false });
+
+  return () => {
+    target.removeEventListener?.("pointerdown", handlePointerDown);
+    target.removeEventListener?.("pointermove", handlePointerMove);
+    target.removeEventListener?.("pointerup", handlePointerUp);
+    target.removeEventListener?.("pointercancel", handlePointerUp);
+    target.removeEventListener?.("dblclick", handleDblClick);
+    target.removeEventListener?.("wheel", handleWheel);
+  };
+}
+
 export class DawKnobElement extends BaseElement {
   static get observedAttributes() {
     return ["value", "min", "max", "scaling", "unit", "label", "default"];
@@ -111,82 +249,33 @@ export class DawKnobElement extends BaseElement {
     this._updateVisuals();
   }
 
+  disconnectedCallback() {
+    this._cleanupKnob?.();
+  }
+
   _attachListeners() {
     if (!this.shadowRoot) return;
     const knob = this.shadowRoot.getElementById("knob");
     if (!knob) return;
 
-    knob.addEventListener("pointerdown", (e) => {
-      this._isDragging = true;
-      this._startY = e.clientY;
-      this._startNorm = mapValueToNormalized(
-        this._value,
-        this.min,
-        this.max,
-        this.scaling,
-      );
-      knob.setPointerCapture?.(e.pointerId);
-      e.preventDefault();
-    });
-
-    knob.addEventListener("pointermove", (e) => {
-      if (!this._isDragging) return;
-      const deltaY = this._startY - e.clientY;
-      const sensitivity = e.shiftKey ? 0.001 : 0.005;
-      const newNorm = Math.max(
-        0,
-        Math.min(1, this._startNorm + deltaY * sensitivity),
-      );
-      const nextVal = mapNormalizedToValue(
-        newNorm,
-        this.min,
-        this.max,
-        this.scaling,
-      );
-      this.value = nextVal;
-      this.dispatchEvent(
-        new CustomEvent("change", { detail: { value: nextVal } }),
-      );
-    });
-
-    const stopDrag = () => {
-      this._isDragging = false;
-    };
-    knob.addEventListener("pointerup", stopDrag);
-    knob.addEventListener("pointercancel", stopDrag);
-
-    // Double-click to reset
-    knob.addEventListener("dblclick", () => {
-      this.value = this.defaultValue;
-      this.dispatchEvent(
-        new CustomEvent("reset", { detail: { value: this.defaultValue } }),
-      );
-      this.dispatchEvent(
-        new CustomEvent("change", { detail: { value: this.defaultValue } }),
-      );
-    });
-
-    // Wheel adjustment
-    knob.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      const norm = mapValueToNormalized(
-        this._value,
-        this.min,
-        this.max,
-        this.scaling,
-      );
-      const step = (e.deltaY > 0 ? -1 : 1) * 0.03;
-      const nextNorm = Math.max(0, Math.min(1, norm + step));
-      const nextVal = mapNormalizedToValue(
-        nextNorm,
-        this.min,
-        this.max,
-        this.scaling,
-      );
-      this.value = nextVal;
-      this.dispatchEvent(
-        new CustomEvent("change", { detail: { value: nextVal } }),
-      );
+    this._cleanupKnob?.();
+    this._cleanupKnob = setupKnobInteraction(knob, {
+      getState: () => this,
+      onValueChange: (nextVal) => {
+        this.value = nextVal;
+        this.dispatchEvent(
+          new CustomEvent("change", { detail: { value: nextVal } }),
+        );
+      },
+      onReset: (defaultVal) => {
+        this.value = defaultVal;
+        this.dispatchEvent(
+          new CustomEvent("reset", { detail: { value: defaultVal } }),
+        );
+        this.dispatchEvent(
+          new CustomEvent("change", { detail: { value: defaultVal } }),
+        );
+      },
     });
 
     // Keyboard adjustment (WCAG 2.1 AA slider pattern)
@@ -269,6 +358,9 @@ export class DawKnobElement extends BaseElement {
           align-items: center;
           gap: 2px;
           user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
+          touch-action: none;
         }
         .scdaw-knob__control,
         .knob-container {
@@ -278,6 +370,8 @@ export class DawKnobElement extends BaseElement {
           position: relative;
           touch-action: none;
           border-radius: 50%;
+          user-select: none;
+          -webkit-user-select: none;
         }
         .scdaw-knob__svg,
         .knob-svg {

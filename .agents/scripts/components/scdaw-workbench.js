@@ -255,6 +255,176 @@ export function resolveWorkbenchButtonStates({
   };
 }
 
+/**
+ * Resolves fullscreen state and UI attributes for workbench button and container.
+ *
+ * @param {boolean} isFullscreen - Current or requested fullscreen state
+ * @returns {{
+ *   isFullscreen: boolean,
+ *   ariaLabel: string,
+ *   ariaPressed: "true" | "false",
+ *   title: string,
+ *   btnText: string,
+ *   btnIcon: string,
+ *   btnClass: string,
+ *   hostClass: string,
+ * }}
+ */
+export function resolveWorkbenchFullscreenState(isFullscreen) {
+  const active = Boolean(isFullscreen);
+  return {
+    isFullscreen: active,
+    ariaLabel: active ? "Exit full screen mode" : "Enter full screen mode",
+    ariaPressed: active ? "true" : "false",
+    title: active
+      ? "Exit full screen mode (restore app navigation)"
+      : "Full screen mode (hide app navigation and focus on DAW)",
+    btnText: active ? "Exit Full Screen" : "Full Screen",
+    btnIcon: active ? "✕" : "⛶",
+    btnClass: active
+      ? "scdaw-workbench__btn btn btn-icon scdaw-workbench__btn--fullscreen scdaw-workbench__btn--active btn-primary"
+      : "scdaw-workbench__btn btn btn-icon scdaw-workbench__btn--fullscreen",
+    hostClass: active ? "scdaw-workbench--fullscreen" : "",
+  };
+}
+
+/**
+ * Toggles fullscreen mode for the DAW workbench and host page container.
+ * Safely invokes requestFullscreen / exitFullscreen when supported,
+ * synchronizes CSS fixed fullscreen classes, ARIA attributes, and handles
+ * keyboard Escape and fullscreenchange events.
+ *
+ * @param {Object} options
+ * @param {HTMLElement} options.workbenchEl - The <scdaw-workbench> element
+ * @param {HTMLElement} [options.fullscreenBtn] - The fullscreen toggle button
+ * @param {HTMLElement} [options.pageEl] - The parent .scdaw-workbench-page element (if present)
+ * @param {Object} [options.windowObj] - Window reference (defaults to global window)
+ * @param {Object} [options.documentObj] - Document reference (defaults to global document)
+ * @param {Function} [options.onStateChange] - Callback invoked when state changes
+ * @returns {{ toggle: (force?: boolean) => void, setState: (force?: boolean) => void, isFullscreen: () => boolean, dispose: () => void }}
+ */
+export function setupWorkbenchFullscreen({
+  workbenchEl,
+  fullscreenBtn,
+  pageEl,
+  windowObj = typeof window !== "undefined" ? window : null,
+  documentObj = typeof document !== "undefined" ? document : null,
+  onStateChange,
+}) {
+  let isFullscreen = false;
+
+  const updateUI = () => {
+    const state = resolveWorkbenchFullscreenState(isFullscreen);
+
+    // Toggle classes on workbench element
+    workbenchEl?.classList?.toggle("scdaw-workbench--fullscreen", isFullscreen);
+
+    // Toggle classes on parent page container if available
+    pageEl?.classList?.toggle("scdaw-workbench-page--fullscreen", isFullscreen);
+
+    // Update button attributes and labels
+    if (fullscreenBtn) {
+      fullscreenBtn.setAttribute?.("aria-pressed", state.ariaPressed);
+      fullscreenBtn.setAttribute?.("aria-label", state.ariaLabel);
+      fullscreenBtn.title = state.title;
+
+      fullscreenBtn.classList?.toggle("btn-primary", state.isFullscreen);
+      fullscreenBtn.classList?.toggle(
+        "scdaw-workbench__btn--active",
+        state.isFullscreen,
+      );
+
+      const iconEl = fullscreenBtn.querySelector?.(
+        ".scdaw-workbench__fullscreen-icon",
+      );
+      if (iconEl) iconEl.textContent = state.btnIcon;
+
+      const labelEl = fullscreenBtn.querySelector?.(
+        ".scdaw-workbench__fullscreen-label",
+      );
+      if (labelEl) labelEl.textContent = state.btnText;
+    }
+
+    if (typeof onStateChange === "function") {
+      onStateChange(isFullscreen);
+    }
+  };
+
+  const setState = (nextActive) => {
+    const active = Boolean(nextActive);
+    if (isFullscreen === active) return;
+    isFullscreen = active;
+
+    if (documentObj) {
+      const isDocFs = Boolean(documentObj.fullscreenElement);
+      if (isFullscreen && !isDocFs) {
+        const target = pageEl || workbenchEl;
+        try {
+          if (typeof target?.requestFullscreen === "function") {
+            const p = target.requestFullscreen();
+            p?.catch?.(() => {});
+          }
+        } catch {}
+      } else if (!isFullscreen && isDocFs) {
+        try {
+          if (typeof documentObj.exitFullscreen === "function") {
+            const p = documentObj.exitFullscreen();
+            p?.catch?.(() => {});
+          }
+        } catch {}
+      }
+    }
+
+    updateUI();
+  };
+
+  const toggle = (force) => {
+    const next = typeof force === "boolean" ? force : !isFullscreen;
+    setState(next);
+  };
+
+  const onBtnClick = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    toggle();
+  };
+
+  const onKeyDown = (e) => {
+    if (e?.key === "Escape" && isFullscreen) {
+      e?.preventDefault?.();
+      setState(false);
+    }
+  };
+
+  const onFullscreenChange = () => {
+    const docActive = Boolean(documentObj?.fullscreenElement);
+    if (docActive !== isFullscreen) {
+      setState(docActive);
+    }
+  };
+
+  fullscreenBtn?.addEventListener?.("click", onBtnClick);
+  windowObj?.addEventListener?.("keydown", onKeyDown);
+  documentObj?.addEventListener?.("fullscreenchange", onFullscreenChange);
+
+  // Initialize initial UI
+  updateUI();
+
+  return {
+    toggle,
+    setState,
+    isFullscreen: () => isFullscreen,
+    dispose: () => {
+      fullscreenBtn?.removeEventListener?.("click", onBtnClick);
+      windowObj?.removeEventListener?.("keydown", onKeyDown);
+      documentObj?.removeEventListener?.(
+        "fullscreenchange",
+        onFullscreenChange,
+      );
+    },
+  };
+}
+
 export class DawWorkbenchElement extends BaseElement {
   constructor() {
     super();
@@ -270,6 +440,8 @@ export class DawWorkbenchElement extends BaseElement {
     this._mixerWidth = 320;
     this._resizeObserver = null;
     this._containerWidth = 1200;
+    this._isFullscreen = false;
+    this._fullscreenController = null;
   }
 
   _measureContainerWidth() {
@@ -288,6 +460,7 @@ export class DawWorkbenchElement extends BaseElement {
   connectedCallback() {
     this._measureContainerWidth();
     this._renderSkeleton();
+    this._initFullscreen();
     this._updatePanels();
     this._dispose = effect(() => {
       const p = scdaw.project.get();
@@ -329,6 +502,36 @@ export class DawWorkbenchElement extends BaseElement {
       this._resizeObserver.disconnect();
       this._resizeObserver = null;
     }
+    if (this._fullscreenController) {
+      this._fullscreenController.dispose();
+      this._fullscreenController = null;
+    }
+  }
+
+  _initFullscreen() {
+    if (this._fullscreenController) {
+      this._fullscreenController.dispose();
+      this._fullscreenController = null;
+    }
+    const btn = this.shadowRoot?.getElementById("fullscreen-btn");
+    const pageEl = this.closest?.(".scdaw-workbench-page") || null;
+    this._fullscreenController = setupWorkbenchFullscreen({
+      workbenchEl: this,
+      fullscreenBtn: btn,
+      pageEl,
+      onStateChange: (active) => {
+        this._isFullscreen = active;
+        this._updatePanels();
+      },
+    });
+  }
+
+  toggleFullscreen(force) {
+    this._fullscreenController?.toggle(force);
+  }
+
+  get isFullscreen() {
+    return Boolean(this._isFullscreen);
   }
 
   _renderSkeleton() {
@@ -357,6 +560,51 @@ export class DawWorkbenchElement extends BaseElement {
           box-sizing: border-box;
           padding: 0.5rem;
           overflow-x: hidden;
+        }
+
+        /* Fullscreen Viewport Mode */
+        :host(.scdaw-workbench--fullscreen),
+        :host(:fullscreen),
+        .scdaw-workbench.scdaw-workbench--fullscreen,
+        .scdaw-workbench:fullscreen {
+          position: fixed !important;
+          inset: 0 !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100dvh !important;
+          max-width: 100vw !important;
+          max-height: 100dvh !important;
+          z-index: 99999 !important;
+          margin: 0 !important;
+          padding: 0.5rem !important;
+          box-sizing: border-box !important;
+          background: var(--shadow-claw-bg-primary, #0f172a) !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+        }
+
+        :host(.scdaw-workbench--fullscreen) .scdaw-workbench,
+        :host(:fullscreen) .scdaw-workbench {
+          width: 100%;
+          height: 100%;
+          min-height: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-workbench__btn--fullscreen {
+          white-space: nowrap;
+        }
+
+        .scdaw-workbench__fullscreen-icon {
+          font-size: 0.88rem;
+          line-height: 1;
+        }
+
+        .scdaw-workbench__fullscreen-label {
+          white-space: nowrap;
         }
 
         .scdaw-workbench__header {
@@ -441,10 +689,10 @@ export class DawWorkbenchElement extends BaseElement {
           width: 100%;
         }
 
-        /* Actions: 2 equal columns on mobile */
+        /* Actions: 3 equal columns on mobile */
         .scdaw-workbench__toolbar-group--actions {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           gap: 0.35rem;
           width: 100%;
         }
@@ -908,9 +1156,19 @@ export class DawWorkbenchElement extends BaseElement {
               <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Mixer Dock" aria-pressed="true" aria-controls="mixer-container">🎛 Mixer</button>
             </div>
 
-            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History and Output">
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History, Output, and Display">
               <button id="undo-btn" class="scdaw-workbench__btn btn btn-icon" title="Undo last change">↩ Undo</button>
               <button id="bounce-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Export 16-bit WAV audio">💿 Bounce WAV</button>
+              <button
+                id="fullscreen-btn"
+                type="button"
+                class="scdaw-workbench__btn btn btn-icon scdaw-workbench__btn--fullscreen ${this._isFullscreen ? "btn-primary scdaw-workbench__btn--active" : ""}"
+                title="${this._isFullscreen ? "Exit full screen mode (restore app navigation)" : "Full screen mode (hide app navigation and focus on DAW)"}"
+                aria-label="${this._isFullscreen ? "Exit full screen mode" : "Enter full screen mode"}"
+                aria-pressed="${this._isFullscreen ? "true" : "false"}">
+                <span class="scdaw-workbench__fullscreen-icon" aria-hidden="true">${this._isFullscreen ? "✕" : "⛶"}</span>
+                <span class="scdaw-workbench__fullscreen-label">${this._isFullscreen ? "Exit Full Screen" : "Full Screen"}</span>
+              </button>
             </div>
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">

@@ -6,6 +6,9 @@ import {
   mapNormalizedToValue,
   mapValueToNormalized,
   formatValueWithUnit,
+  calculateKnobValueFromPointer,
+  calculateKnobValueFromWheel,
+  setupKnobInteraction,
 } from "../.agents/scripts/components/scdaw-knob.js";
 import {
   filterBrowserItems,
@@ -18,6 +21,8 @@ import {
   calculateClipResize,
   calculateClipKeyboardNudge,
   setupClipInteraction,
+  calculateTrackReorderIndex,
+  setupTrackReorderInteraction,
 } from "../.agents/scripts/components/scdaw-timeline.js";
 import {
   pitchToPianoRollRow,
@@ -30,6 +35,8 @@ import {
 } from "../.agents/scripts/components/scdaw-editor.js";
 import {
   getDeviceChainForTrack,
+  renderDeviceControls,
+  shouldPreserveDevicesDom,
   DawDevicesElement,
 } from "../.agents/scripts/components/scdaw-devices.js";
 import {
@@ -53,6 +60,8 @@ import {
   resolveWorkbenchPanels,
   resolveWorkbenchResponsiveLayout,
   resolveDropAction,
+  resolveWorkbenchFullscreenState,
+  setupWorkbenchFullscreen,
 } from "../.agents/scripts/components/scdaw-workbench.js";
 import {
   clampSize,
@@ -78,6 +87,210 @@ test("scdaw-knob: maps normalized 0-1 range to linear and exponential values acc
   assert.equal(formatValueWithUnit(1200, "Hz"), "1200 Hz");
   assert.equal(formatValueWithUnit(0.15, "s"), "150 ms");
   assert.equal(formatValueWithUnit(-6, "dB"), "-6 dB");
+});
+
+test("scdaw-knob: calculateKnobValueFromPointer computes linear and exponential adjustments from pointer drag", () => {
+  // Linear upward drag (e.g. startY = 100, currentY = 80 -> deltaY = +20)
+  // startNorm = 0.5, sensitivity = 0.005 -> newNorm = 0.5 + 20 * 0.005 = 0.6
+  const valUp = calculateKnobValueFromPointer({
+    startY: 100,
+    currentY: 80,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+    scaling: "linear",
+  });
+  assert.equal(Math.round(valUp * 10) / 10, 6);
+
+  // Linear downward drag (e.g. startY = 100, currentY = 120 -> deltaY = -20)
+  // newNorm = 0.5 - 0.1 = 0.4 -> val = 4
+  const valDown = calculateKnobValueFromPointer({
+    startY: 100,
+    currentY: 120,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+    scaling: "linear",
+  });
+  assert.equal(Math.round(valDown * 10) / 10, 4);
+
+  // Shift key fine-tuning (sensitivity = 0.001)
+  // deltaY = +20 -> newNorm = 0.5 + 20 * 0.001 = 0.52 -> val = 5.2
+  const valShift = calculateKnobValueFromPointer({
+    startY: 100,
+    currentY: 80,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+    scaling: "linear",
+    shiftKey: true,
+  });
+  assert.equal(Math.round(valShift * 10) / 10, 5.2);
+
+  // Clamping at boundaries
+  const valMax = calculateKnobValueFromPointer({
+    startY: 100,
+    currentY: -500,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+  });
+  assert.equal(valMax, 10);
+
+  const valMin = calculateKnobValueFromPointer({
+    startY: 100,
+    currentY: 1000,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+  });
+  assert.equal(valMin, 0);
+
+  // Missing or non-numeric coordinates returns current mapped value
+  const valNoCoords = calculateKnobValueFromPointer({
+    startY: null,
+    currentY: null,
+    startNorm: 0.5,
+    min: 0,
+    max: 10,
+  });
+  assert.equal(valNoCoords, 5);
+});
+
+test("scdaw-knob: calculateKnobValueFromWheel adjusts knob values with step, clamping, and shift fine-tuning", () => {
+  // Wheel up (deltaY < 0) increases value
+  const nextUp = calculateKnobValueFromWheel({
+    currentValue: 5,
+    deltaY: -100,
+    min: 0,
+    max: 10,
+    scaling: "linear",
+  });
+  assert.ok(nextUp > 5);
+
+  // Wheel down (deltaY > 0) decreases value
+  const nextDown = calculateKnobValueFromWheel({
+    currentValue: 5,
+    deltaY: 100,
+    min: 0,
+    max: 10,
+    scaling: "linear",
+  });
+  assert.ok(nextDown < 5);
+
+  // Clamped at 0
+  const clampedMin = calculateKnobValueFromWheel({
+    currentValue: 0,
+    deltaY: 100,
+    min: 0,
+    max: 10,
+  });
+  assert.equal(clampedMin, 0);
+
+  // Shift key fine-tuning produces smaller change
+  const normalDelta =
+    calculateKnobValueFromWheel({
+      currentValue: 5,
+      deltaY: -100,
+      min: 0,
+      max: 10,
+      shiftKey: false,
+    }) - 5;
+  const shiftDelta =
+    calculateKnobValueFromWheel({
+      currentValue: 5,
+      deltaY: -100,
+      min: 0,
+      max: 10,
+      shiftKey: true,
+    }) - 5;
+  assert.ok(shiftDelta > 0 && shiftDelta < normalDelta);
+});
+
+test("scdaw-knob: setupKnobInteraction binds pointer dragging, pointer capture, touch prevention, and value updates", () => {
+  const events = [];
+  const capturedPointerIds = [];
+  const releasedPointerIds = [];
+  let preventDefaultCalls = 0;
+
+  const mockTarget = {
+    listeners: {},
+    addEventListener(event, fn, options) {
+      this.listeners[event] = fn;
+    },
+    setPointerCapture(id) {
+      capturedPointerIds.push(id);
+    },
+    releasePointerCapture(id) {
+      releasedPointerIds.push(id);
+    },
+  };
+
+  const state = {
+    value: 1.2,
+    min: 0.1,
+    max: 4.0,
+    scaling: "linear",
+    defaultValue: 1.2,
+    _isDragging: false,
+  };
+
+  const cleanup = setupKnobInteraction(mockTarget, {
+    getState: () => state,
+    onValueChange: (val) => {
+      state.value = val;
+      events.push({ type: "change", value: val });
+    },
+    onReset: (val) => {
+      state.value = val;
+      events.push({ type: "reset", value: val });
+    },
+  });
+
+  // Pointer down captures pointer and prevents default (touch scroll prevention)
+  mockTarget.listeners["pointerdown"]({
+    pointerId: 42,
+    clientY: 200,
+    preventDefault: () => {
+      preventDefaultCalls++;
+    },
+  });
+  assert.equal(state._isDragging, true);
+  assert.deepEqual(capturedPointerIds, [42]);
+  assert.equal(preventDefaultCalls, 1);
+
+  // Pointer move updates value smoothly
+  mockTarget.listeners["pointermove"]({
+    clientY: 150,
+    shiftKey: false,
+    preventDefault: () => {
+      preventDefaultCalls++;
+    },
+  });
+  assert.ok(state.value > 1.2, "Dragging up should increase value");
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "change");
+
+  // Pointer up releases pointer capture and ends dragging
+  mockTarget.listeners["pointerup"]({
+    pointerId: 42,
+  });
+  assert.equal(state._isDragging, false);
+  assert.deepEqual(releasedPointerIds, [42]);
+
+  // Pointer move after pointerup does nothing
+  const valAfterUp = state.value;
+  mockTarget.listeners["pointermove"]({
+    clientY: 100,
+  });
+  assert.equal(state.value, valAfterUp);
+
+  // Double click resets to default
+  mockTarget.listeners["dblclick"]?.();
+  assert.equal(state.value, 1.2);
+  assert.equal(events[events.length - 1].type, "reset");
+
+  cleanup?.();
 });
 
 test("scdaw-browser: filters presets, instruments, and FX items by category tab and query", () => {
@@ -155,15 +368,47 @@ test("scdaw-timeline: calculateClipDragPosition moves and snaps clip to beats wi
   });
   assert.equal(pos4, 2);
 
-  // Fine snap with shiftKey (+35px = +1.4 beats from beat 1 -> snaps to 2.5 with 0.25 grid)
-  const pos5 = calculateClipDragPosition({
+  // Free movement between beats when outside magnetic snap threshold
+  // deltaX = +13px (+0.52 beat) -> rawBeat = 1.52. Distance to nearest beat (2) is 12px (> 10px)
+  const posFree = calculateClipDragPosition({
     startBeat: 1,
-    deltaX: 35,
+    deltaX: 13,
+    laneWidth,
+    totalBeats,
+    snapThresholdPx: 10,
+  });
+  assert.equal(posFree, 1.52);
+
+  // Magnetic snap to beat when within threshold
+  // deltaX = +23px (+0.92 beat) -> rawBeat = 1.92. Distance to beat 2 is 2px (<= 10px)
+  const posSnapped = calculateClipDragPosition({
+    startBeat: 1,
+    deltaX: 23,
+    laneWidth,
+    totalBeats,
+    snapThresholdPx: 10,
+  });
+  assert.equal(posSnapped, 2);
+
+  // SnapMode "none" / "off" moves freely anywhere even near beat
+  const posNoSnap = calculateClipDragPosition({
+    startBeat: 1,
+    deltaX: 23,
+    laneWidth,
+    totalBeats,
+    snapMode: "none",
+  });
+  assert.equal(posNoSnap, 1.92);
+
+  // shiftKey bypasses magnetic snap completely
+  const posShiftFree = calculateClipDragPosition({
+    startBeat: 1,
+    deltaX: 23,
     laneWidth,
     totalBeats,
     shiftKey: true,
   });
-  assert.equal(pos5, 2.5); // 1 + 1.4 = 2.4 -> rounded to nearest 0.25 is 2.5
+  assert.equal(posShiftFree, 1.92);
 });
 
 test("scdaw-timeline: calculateClipResize resizes right duration and trims left start/offset", () => {
@@ -238,6 +483,91 @@ test("scdaw-timeline: calculateClipResize resizes right duration and trims left 
   assert.equal(resLeft2.time, 1);
   assert.equal(resLeft2.duration, 5);
   assert.equal(resLeft2.offset, 0.5);
+
+  // 6. Right edge resize of overlong clip (e.g. 454 beats in an 8-beat timeline)
+  // Dragging left by 50px (-1 beat) from the visible right edge (8 beats) should resize to 7 beats
+  const resOverlong = calculateClipResize({
+    startTime: 0,
+    startDuration: 454.13,
+    startOffset: 0,
+    deltaX: -50,
+    laneWidth: 400,
+    totalBeats: 8, // 50 px/beat
+    edge: "right",
+  });
+  assert.equal(resOverlong.duration, 7);
+
+  // 7. Right edge resize between beats freely outside magnetic threshold
+  // startTime: 2, startDuration: 4, deltaX: 13px (+0.52 beat) -> duration 4.52
+  const resRightFree = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    deltaX: 13,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+    snapThresholdPx: 10,
+  });
+  assert.equal(resRightFree.duration, 4.52);
+
+  // 8. Right edge resize within snap threshold snaps end to beat
+  // deltaX: 23px (+0.92 beat) -> end 6.92 within 2px of 7 -> duration snaps to 5
+  const resRightSnap = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    deltaX: 23,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+    snapThresholdPx: 10,
+  });
+  assert.equal(resRightSnap.duration, 5);
+
+  // 9. Left edge trim between beats freely outside magnetic threshold
+  // startTime: 2, startDuration: 4, deltaX: 13px (+0.52 beat) -> time 2.52, dur 3.48, offset 0.26s
+  const resLeftFree = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: 13,
+    laneWidth,
+    totalBeats,
+    edge: "left",
+    bpm: 120,
+    snapThresholdPx: 10,
+  });
+  assert.equal(resLeftFree.time, 2.52);
+  assert.equal(resLeftFree.duration, 3.48);
+  assert.equal(resLeftFree.offset, 0.26);
+
+  // 10. Left edge trim within snap threshold snaps start to beat
+  // deltaX: 23px (+0.92 beat) -> time 2.92 within 2px of 3 -> time 3, dur 3, offset 0.5s
+  const resLeftSnap = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    startOffset: 0,
+    deltaX: 23,
+    laneWidth,
+    totalBeats,
+    edge: "left",
+    bpm: 120,
+    snapThresholdPx: 10,
+  });
+  assert.equal(resLeftSnap.time, 3);
+  assert.equal(resLeftSnap.duration, 3);
+  assert.equal(resLeftSnap.offset, 0.5);
+
+  // 11. shiftKey or snapMode: "none" resizes freely anywhere
+  const resShiftFree = calculateClipResize({
+    startTime: 2,
+    startDuration: 4,
+    deltaX: 23,
+    laneWidth,
+    totalBeats,
+    edge: "right",
+    shiftKey: true,
+  });
+  assert.equal(resShiftFree.duration, 4.92);
 });
 
 test("scdaw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift fine tuning, and alt resizing", () => {
@@ -283,6 +613,16 @@ test("scdaw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift f
     altKey: true,
   });
   assert.deepEqual(n5, { action: "resize", duration: 1 });
+
+  // Alt + ArrowLeft on overlong clip (454 beats, visible 8 beats)
+  const nOverlong = calculateClipKeyboardNudge({
+    currentBeat: 0,
+    currentDuration: 454.13,
+    totalBeats: 8,
+    key: "ArrowLeft",
+    altKey: true,
+  });
+  assert.deepEqual(nOverlong, { action: "resize", duration: 7 });
 
   // Home key: jump to start
   const n6 = calculateClipKeyboardNudge({
@@ -407,6 +747,109 @@ test("scdaw-timeline: setupClipInteraction binds pointer dragging, edge resizing
   assert.equal(Object.keys(listeners).length, 0);
 });
 
+test("scdaw-timeline: calculateTrackReorderIndex and setupTrackReorderInteraction support touch drag, keyboard arrows, and boundary clamping", () => {
+  // 1. calculateTrackReorderIndex math
+  // rowHeight = 48, totalTracks = 4
+  // Downward drag by 55px -> moves down 1 row
+  assert.equal(
+    calculateTrackReorderIndex({
+      currentIndex: 0,
+      deltaY: 55,
+      rowHeight: 48,
+      totalTracks: 4,
+    }),
+    1,
+  );
+  // Downward drag by 110px -> moves down 2 rows
+  assert.equal(
+    calculateTrackReorderIndex({
+      currentIndex: 0,
+      deltaY: 110,
+      rowHeight: 48,
+      totalTracks: 4,
+    }),
+    2,
+  );
+  // Clamped at top (0)
+  assert.equal(
+    calculateTrackReorderIndex({
+      currentIndex: 1,
+      deltaY: -150,
+      rowHeight: 48,
+      totalTracks: 4,
+    }),
+    0,
+  );
+  // Clamped at bottom (3)
+  assert.equal(
+    calculateTrackReorderIndex({
+      currentIndex: 2,
+      deltaY: 200,
+      rowHeight: 48,
+      totalTracks: 4,
+    }),
+    3,
+  );
+
+  // 2. setupTrackReorderInteraction event bindings
+  const listeners = {};
+  const classList = new Set();
+  const handleEl = {
+    addEventListener: (t, fn) => {
+      listeners[t] = fn;
+    },
+    removeEventListener: (t, fn) => {
+      if (listeners[t] === fn) delete listeners[t];
+    },
+    setPointerCapture: () => {},
+    releasePointerCapture: () => {},
+  };
+  const rowEl = {
+    classList: {
+      add: (c) => classList.add(c),
+      remove: (c) => classList.delete(c),
+      contains: (c) => classList.has(c),
+    },
+    getBoundingClientRect: () => ({ height: 48, top: 100 }),
+  };
+
+  const reorders = [];
+  const cleanup = setupTrackReorderInteraction({
+    handleEl,
+    trackRowEl: rowEl,
+    trackId: "trk_drums",
+    index: 1,
+    totalTracks: 3,
+    rowHeight: 48,
+    onReorder: (targetIdx) => reorders.push(targetIdx),
+  });
+
+  assert.ok(listeners.pointerdown);
+  assert.ok(listeners.keydown);
+
+  // Pointer down & drag down 60px -> releases on targetIndex 2
+  listeners.pointerdown({ button: 0, clientY: 100, pointerId: 1 });
+  assert.ok(rowEl.classList.contains("scdaw-timeline__track--reordering"));
+  listeners.pointermove({ clientY: 160 });
+  listeners.pointerup({ clientY: 160, pointerId: 1 });
+  assert.equal(
+    rowEl.classList.contains("scdaw-timeline__track--reordering"),
+    false,
+  );
+  assert.deepEqual(reorders, [2]);
+
+  // Keyboard ArrowUp -> nudges to index 0
+  listeners.keydown({ key: "ArrowUp" });
+  assert.deepEqual(reorders, [2, 0]);
+
+  // Keyboard ArrowDown -> nudges to index 2
+  listeners.keydown({ key: "ArrowDown" });
+  assert.deepEqual(reorders, [2, 0, 2]);
+
+  cleanup();
+  assert.equal(Object.keys(listeners).length, 0);
+});
+
 test("scdaw-editor: maps MIDI pitch to piano roll row and back", () => {
   // C4 = 60
   const rowC4 = pitchToPianoRollRow(60);
@@ -526,6 +969,158 @@ test("scdaw-devices: constructs device chain for track (MIDI FX -> Instrument ->
   assert.equal(chain[1].type, "synth");
   assert.equal(chain[2].role, "audio-fx");
   assert.equal(chain[2].type, "delay");
+});
+
+test("scdaw-devices: shouldPreserveDevicesDom determines when device rack DOM should be updated in-place vs re-rendered", () => {
+  const chainA = [
+    { role: "instrument", type: "808", params: { decay: 1.2, drive: 0.3 } },
+    { role: "audio-fx", type: "delay", params: { id: "fx1", feedback: 0.3 } },
+  ];
+  const chainB = [
+    { role: "instrument", type: "808", params: { decay: 1.5, drive: 0.5 } },
+    { role: "audio-fx", type: "delay", params: { id: "fx1", feedback: 0.4 } },
+  ];
+
+  // Identical device roles/types and same track with container -> preserve DOM
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_drums",
+      renderedChain: chainA,
+      targetChain: chainB,
+      hasContainer: true,
+    }),
+    true,
+  );
+
+  // Missing container element in shadowRoot -> re-render needed
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_drums",
+      renderedChain: chainA,
+      targetChain: chainB,
+      hasContainer: false,
+    }),
+    false,
+  );
+
+  // Different selected track ID -> re-render needed
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_bass",
+      renderedChain: chainA,
+      targetChain: chainB,
+      hasContainer: true,
+    }),
+    false,
+  );
+
+  // Different device count (e.g. added an FX) -> re-render needed
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_drums",
+      renderedChain: chainA,
+      targetChain: [
+        ...chainB,
+        { role: "audio-fx", type: "reverb", params: { id: "fx2" } },
+      ],
+      hasContainer: true,
+    }),
+    false,
+  );
+
+  // Different device type (e.g. instrument changed from 808 to cubed) -> re-render needed
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_drums",
+      renderedChain: chainA,
+      targetChain: [
+        { role: "instrument", type: "cubed", params: {} },
+        chainB[1],
+      ],
+      hasContainer: true,
+    }),
+    false,
+  );
+
+  // Different FX ID (different instance) -> re-render needed
+  assert.equal(
+    shouldPreserveDevicesDom({
+      renderedTrackId: "trk_drums",
+      targetTrackId: "trk_drums",
+      renderedChain: chainA,
+      targetChain: [
+        chainB[0],
+        { role: "audio-fx", type: "delay", params: { id: "fx_other" } },
+      ],
+      hasContainer: true,
+    }),
+    false,
+  );
+});
+
+test("scdaw-devices: in-place DOM sync preserves active knob dragging without destroying DOM or resetting values", () => {
+  // Simulate active device rack DOM with knobs
+  const knobDecay = {
+    dataset: { param: "decay" },
+    value: 1.85,
+    _isDragging: true, // User is currently dragging this dial
+  };
+  const knobGlide = {
+    dataset: { param: "glide" },
+    value: 120,
+    _isDragging: false,
+  };
+
+  const mockCard = {
+    querySelectorAll: (sel) => {
+      if (sel === "scdaw-knob") return [knobDecay, knobGlide];
+      return [];
+    },
+  };
+
+  const mockHeaderStrong = { textContent: "Drums" };
+
+  const element = new DawDevicesElement();
+  element.shadowRoot = {
+    querySelector: (sel) => {
+      if (sel === ".scdaw-devices__header strong") return mockHeaderStrong;
+      return null;
+    },
+    querySelectorAll: (sel) => {
+      if (sel === ".scdaw-devices__card") return [mockCard];
+      return [];
+    },
+  };
+
+  const track = {
+    id: "trk_drums",
+    name: "808 Kit",
+    params: { decay: 2.5, glide: 240 },
+  };
+  const chain = [
+    {
+      role: "instrument",
+      type: "808",
+      params: track.params,
+    },
+  ];
+
+  // Execute in-place sync
+  element._syncDevices(track, chain);
+
+  // Track name updated
+  assert.equal(mockHeaderStrong.textContent, "808 Kit");
+
+  // Actively dragged knob was NOT overwritten by external sync
+  assert.equal(knobDecay.value, 1.85);
+
+  // Inactive knob was updated to latest track parameter
+  assert.equal(knobGlide.value, 240);
 });
 
 test("scdaw-mixer: computes 12-segment meter levels and formats decibels", () => {
@@ -1406,6 +2001,186 @@ test("scdaw-statusbar: formats audio telemetry, project summary, and bounce stat
   assert.equal(status.bounceSummary, "Bounce: 4.0s (-1.2 dB)");
 });
 
+test("scdaw-workbench: resolveWorkbenchFullscreenState accurately determines ARIA attributes and button state", () => {
+  // Not fullscreen
+  const off = resolveWorkbenchFullscreenState(false);
+  assert.equal(off.isFullscreen, false);
+  assert.equal(off.ariaPressed, "false");
+  assert.equal(off.ariaLabel, "Enter full screen mode");
+  assert.equal(off.btnText, "Full Screen");
+  assert.equal(off.btnIcon, "⛶");
+  assert.equal(off.btnClass.includes("btn-primary"), false);
+  assert.equal(off.hostClass, "");
+
+  // Fullscreen active
+  const on = resolveWorkbenchFullscreenState(true);
+  assert.equal(on.isFullscreen, true);
+  assert.equal(on.ariaPressed, "true");
+  assert.equal(on.ariaLabel, "Exit full screen mode");
+  assert.equal(on.btnText, "Exit Full Screen");
+  assert.equal(on.btnIcon, "✕");
+  assert.equal(on.btnClass.includes("btn-primary"), true);
+  assert.equal(on.hostClass, "scdaw-workbench--fullscreen");
+});
+
+test("scdaw-workbench: setupWorkbenchFullscreen manages toggle, Escape key, fullscreenchange, and ARIA updates", () => {
+  const workbenchClassList = new Set();
+  const pageClassList = new Set();
+  const btnAttrs = {};
+  const btnClassList = new Set();
+  let iconText = "";
+  let labelText = "";
+
+  const workbenchEl = {
+    classList: {
+      add: (c) => workbenchClassList.add(c),
+      remove: (c) => workbenchClassList.delete(c),
+      toggle: (c, force) => {
+        if (force === undefined) {
+          if (workbenchClassList.has(c)) workbenchClassList.delete(c);
+          else workbenchClassList.add(c);
+        } else if (force) workbenchClassList.add(c);
+        else workbenchClassList.delete(c);
+        return workbenchClassList.has(c);
+      },
+      contains: (c) => workbenchClassList.has(c),
+    },
+    requestFullscreen: async () => {},
+  };
+
+  const pageEl = {
+    classList: {
+      add: (c) => pageClassList.add(c),
+      remove: (c) => pageClassList.delete(c),
+      toggle: (c, force) => {
+        if (force === undefined) {
+          if (pageClassList.has(c)) pageClassList.delete(c);
+          else pageClassList.add(c);
+        } else if (force) pageClassList.add(c);
+        else pageClassList.delete(c);
+        return pageClassList.has(c);
+      },
+      contains: (c) => pageClassList.has(c),
+    },
+    requestFullscreen: async () => {},
+  };
+
+  const iconEl = {
+    set textContent(v) {
+      iconText = v;
+    },
+    get textContent() {
+      return iconText;
+    },
+  };
+  const labelEl = {
+    set textContent(v) {
+      labelText = v;
+    },
+    get textContent() {
+      return labelText;
+    },
+  };
+
+  const fullscreenBtn = {
+    setAttribute: (k, v) => {
+      btnAttrs[k] = String(v);
+    },
+    getAttribute: (k) => btnAttrs[k],
+    title: "",
+    classList: {
+      add: (c) => btnClassList.add(c),
+      remove: (c) => btnClassList.delete(c),
+      toggle: (c, force) => {
+        if (force === undefined) {
+          if (btnClassList.has(c)) btnClassList.delete(c);
+          else btnClassList.add(c);
+        } else if (force) btnClassList.add(c);
+        else btnClassList.delete(c);
+        return btnClassList.has(c);
+      },
+      contains: (c) => btnClassList.has(c),
+    },
+    querySelector: (sel) => {
+      if (sel.includes("icon")) return iconEl;
+      if (sel.includes("label")) return labelEl;
+      return null;
+    },
+  };
+
+  const windowListeners = {};
+  const docListeners = {};
+  const mockWindow = {
+    addEventListener: (t, fn) => {
+      windowListeners[t] = fn;
+    },
+    removeEventListener: (t, fn) => {
+      if (windowListeners[t] === fn) delete windowListeners[t];
+    },
+  };
+  const mockDoc = {
+    fullscreenElement: null,
+    addEventListener: (t, fn) => {
+      docListeners[t] = fn;
+    },
+    removeEventListener: (t, fn) => {
+      if (docListeners[t] === fn) delete docListeners[t];
+    },
+    exitFullscreen: async () => {},
+  };
+
+  let currentState = false;
+  const controller = setupWorkbenchFullscreen({
+    workbenchEl,
+    fullscreenBtn,
+    pageEl,
+    windowObj: mockWindow,
+    documentObj: mockDoc,
+    onStateChange: (active) => {
+      currentState = active;
+    },
+  });
+
+  assert.equal(currentState, false);
+  assert.equal(btnAttrs["aria-pressed"], "false");
+  assert.equal(btnAttrs["aria-label"], "Enter full screen mode");
+
+  // 1. Toggle ON
+  controller.toggle();
+  assert.equal(currentState, true);
+  assert.equal(workbenchClassList.has("scdaw-workbench--fullscreen"), true);
+  assert.equal(pageClassList.has("scdaw-workbench-page--fullscreen"), true);
+  assert.equal(btnAttrs["aria-pressed"], "true");
+  assert.equal(btnAttrs["aria-label"], "Exit full screen mode");
+  assert.equal(iconText, "✕");
+  assert.equal(labelText, "Exit Full Screen");
+
+  // 2. Escape key triggers exit
+  windowListeners.keydown({ key: "Escape", preventDefault: () => {} });
+  assert.equal(currentState, false);
+  assert.equal(workbenchClassList.has("scdaw-workbench--fullscreen"), false);
+  assert.equal(pageClassList.has("scdaw-workbench-page--fullscreen"), false);
+  assert.equal(btnAttrs["aria-pressed"], "false");
+  assert.equal(iconText, "⛶");
+  assert.equal(labelText, "Full Screen");
+
+  // 3. Document native fullscreenchange activates fullscreen
+  mockDoc.fullscreenElement = pageEl;
+  docListeners.fullscreenchange();
+  assert.equal(currentState, true);
+  assert.equal(btnAttrs["aria-pressed"], "true");
+
+  // Document native fullscreenchange deactivated
+  mockDoc.fullscreenElement = null;
+  docListeners.fullscreenchange();
+  assert.equal(currentState, false);
+  assert.equal(btnAttrs["aria-pressed"], "false");
+
+  controller.dispose();
+  assert.equal(Object.keys(windowListeners).length, 0);
+  assert.equal(Object.keys(docListeners).length, 0);
+});
+
 test("scdaw-workbench: resolves grid docking columns according to panel visibility", () => {
   const allOpen = resolveWorkbenchPanels(true, true, "piano-roll");
   assert.equal(allOpen.gridColumns, "240px 1fr 280px");
@@ -1712,8 +2487,18 @@ test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degrada
   );
   assert.match(
     workbenchContent,
-    /grid-template-columns:\s*repeat\(2,\s*1fr\)/,
-    "Actions must use responsive 2-column grid on mobile",
+    /grid-template-columns:\s*repeat\([23],\s*1fr\)/,
+    "Actions must use responsive grid on mobile",
+  );
+  assert.match(
+    workbenchContent,
+    /scdaw-workbench__btn--fullscreen|fullscreen-btn/,
+    "Workbench toolbar must include a fullscreen toggle button",
+  );
+  assert.match(
+    workbenchContent,
+    /\.scdaw-workbench--fullscreen|:host\(\.scdaw-workbench--fullscreen\)/,
+    "Workbench styles must declare full screen fixed overlay styles",
   );
   assert.match(
     workbenchContent,
@@ -2511,10 +3296,89 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
     "scdaw-timeline must use @container scdaw-timeline to expand --track-header-w only when the timeline container itself is wide",
   );
 
+  // 6b. Timeline establishes balanced gutter spacing (using a custom property for width) and accessible clip resize handles
+  assert.match(
+    timelineContent,
+    /--timeline-gutter-width:\s*(?:1[2-9]|2[0-9])px/,
+    "scdaw-timeline must declare --timeline-gutter-width CSS custom property for balanced gutters",
+  );
+  assert.match(
+    timelineContent,
+    /--timeline-gutter-l:\s*var\(--timeline-gutter-width\)/,
+    "scdaw-timeline must declare left gutter custom property referencing --timeline-gutter-width",
+  );
+  assert.match(
+    timelineContent,
+    /--timeline-gutter-r:\s*var\(--timeline-gutter-width\)/,
+    "scdaw-timeline must declare right gutter custom property referencing --timeline-gutter-width",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__ruler[^{]*\{[^}]*margin-left:\s*calc\([^}]*--timeline-gutter-l/,
+    "scdaw-timeline ruler must offset left margin using --timeline-gutter-l to balance with lanes",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__lane[^{]*\{[^}]*margin-left:\s*var\(--timeline-gutter-l/,
+    "scdaw-timeline lane must apply left margin using --timeline-gutter-l to surround tracks with balanced gutters",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__lane[^{]*\{[^}]*margin-right:\s*var\(--timeline-gutter-r/,
+    "scdaw-timeline lane must apply right margin using --timeline-gutter-r to surround tracks with balanced gutters",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__track-header[^{]*\{[^}]*left:\s*0/,
+    "scdaw-timeline track header must be docked flush to the left boundary without empty gaps",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__clip-handle\s*\{[^}]*width:\s*(?:1[2-9]|2[0-9])px/,
+    "scdaw-timeline clip handles must provide at least 12px hit area for reliable dragging and edge resizing",
+  );
+
+  // 6c. Timeline establishes interactive snap mode control (Beat / Bar / Off)
+  assert.match(
+    timelineContent,
+    /timeline-snap-btn|scdaw-timeline__snap-btn/,
+    "scdaw-timeline must provide a snap mode control in the toolbar",
+  );
+
+  // 6d. Track header includes mobile-first, touch-friendly track reorder controls (grab handle and nudge buttons)
+  assert.match(
+    timelineContent,
+    /scdaw-timeline__reorder-handle|scdaw-timeline__track-reorder/,
+    "scdaw-timeline track header must include track reorder grab handle",
+  );
+  assert.match(
+    timelineContent,
+    /scdaw-timeline__nudge-btn--up/,
+    "scdaw-timeline track header must include touch-friendly Move Up nudge button",
+  );
+  assert.match(
+    timelineContent,
+    /scdaw-timeline__nudge-btn--down/,
+    "scdaw-timeline track header must include touch-friendly Move Down nudge button",
+  );
+  assert.match(
+    timelineContent,
+    /\.scdaw-timeline__reorder-handle\s*\{[^}]*touch-action:\s*none/,
+    "scdaw-timeline reorder handle must specify touch-action: none for touch dragging",
+  );
+
   // 7. Knob implements WCAG role="slider", keyboard navigation, touch-action: none, and BEM classes
   assert.match(knobContent, /role=["']slider["']/);
-  assert.match(knobContent, /touch-action:\s*none/);
+  assert.match(knobContent, /:host\s*\{[^}]*touch-action:\s*none/);
+  assert.match(knobContent, /:host\s*\{[^}]*-webkit-user-select:\s*none/);
   assert.match(knobContent, /scdaw-knob/);
+
+  // 8. Device rack specifies overscroll-behavior-x: contain and touch containment to prevent mobile jumping
+  assert.match(
+    devicesContent,
+    /overscroll-behavior-x:\s*contain/,
+    "scdaw-devices must specify overscroll-behavior-x: contain to prevent parent scroll jumping on touch gestures",
+  );
 });
 
 test("scdaw-browser & scdaw-workbench: mobile-first container query height capping and internal scroll containment", async () => {
