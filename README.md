@@ -1,8 +1,10 @@
 # [ShadowClaw DAW](https://xt-ml.github.io/shadow-claw-daw/main/)
 
+[![ShadowClaw](https://img.shields.io/badge/Github-xt--ml%2Fshadow--claw-red.svg)](https://github.com/xt-ml/shadow-claw)
+[![ShadowClaw DAW](https://img.shields.io/badge/Github-xt--ml%2Fshadow--claw--daw-green.svg)](https://github.com/xt-ml/shadow-claw-daw)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-xt--ml%2Fshadow--claw--daw-blue.svg)](https://deepwiki.com/xt-ml/shadow-claw-daw)
 
-An in-browser digital audio workstation (DAW) template powered by **ShadowClaw**, featuring a Vanilla JS Web Audio API engine, TC39-shaped reactive Signals, Web Components, and autonomous agent skills.
+An in-browser digital audio workstation (DAW) template powered by **[ShadowClaw](https://github.com/xt-ml/shadow-claw)**, featuring a Vanilla JS Web Audio API engine, TC39-shaped reactive Signals, Web Components, and autonomous agent skills.
 
 ## Overview
 
