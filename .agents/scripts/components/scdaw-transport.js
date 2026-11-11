@@ -926,10 +926,21 @@ export class DawTransportElement extends BaseElement {
 
     this.shadowRoot
       .getElementById("metro-btn")
-      ?.addEventListener("click", () => {
+      ?.addEventListener("click", async () => {
         const currentP = scdaw.getProject();
         const nextEnabled = !currentP.metronome?.enabled;
-        scdaw.sendCommand("set_metronome", { enabled: nextEnabled });
+        if (nextEnabled) {
+          try {
+            await scdaw.unlockAudio?.();
+          } catch (_) {}
+        }
+        await scdaw.sendCommand("set_metronome", { enabled: nextEnabled });
+        if (nextEnabled) {
+          const s = scdaw.getState();
+          if (!s.playing) {
+            scdaw.previewMetronomeClick?.(true);
+          }
+        }
       });
 
     this.shadowRoot

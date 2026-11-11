@@ -7,6 +7,8 @@
  */
 
 import { scdaw } from "./scdaw-engine.js";
+import { projectToScoreView, beatsPerBar } from "./scdaw.js";
+import { TOOLS_METADATA } from "./scdaw-tools-metadata.js";
 import "./scdaw-element.js";
 
 let cmdChannel = null;
@@ -118,7 +120,19 @@ export async function handleToolDispatch(name, params) {
     }
 
     case "scdaw_get_project": {
-      return scdaw.getProject();
+      const p = scdaw.getProject();
+      if (params.view === "score" || params.scoreView) {
+        return projectToScoreView(p);
+      }
+      return {
+        timebase: {
+          ppqnPerQuarter: 960,
+          beatsPerBar: beatsPerBar(p.signature || [4, 4]),
+          stepsPerBar: beatsPerBar(p.signature || [4, 4]) * 4,
+          lengthBars: p.lengthBars || 1,
+        },
+        ...p,
+      };
     }
 
     case "scdaw_new_project": {
@@ -165,6 +179,10 @@ export async function handleToolDispatch(name, params) {
 
     case "scdaw_clear_notes": {
       return await scdaw.sendCommand("clear_notes", params);
+    }
+
+    case "scdaw_clear_project_notes": {
+      return await scdaw.sendCommand("clear_project_notes", params);
     }
 
     case "scdaw_get_levels": {
@@ -316,6 +334,18 @@ export async function handleToolDispatch(name, params) {
       });
     }
 
+    case "scdaw_compose_song": {
+      return await scdaw.sendCommand("compose_song", params);
+    }
+
+    case "scdaw_describe_arrangement": {
+      return await scdaw.sendCommand("describe_arrangement", params);
+    }
+
+    case "scdaw_analyze_mix": {
+      return await scdaw.sendCommand("analyze_mix", params);
+    }
+
     case "scdaw_render_surface": {
       const el = params.element || "workbench";
       const tagMap = {
@@ -355,45 +385,56 @@ export async function registerNativeWebMcp() {
     return;
   }
 
-  const nativeTools = [
-    {
-      name: "scdaw_get_status",
-      title: "Get DAW Playback & Engine Status",
-      description:
-        "Return current DAW playback position, audio engine state, track count, BPM, and recent bounce metrics.",
-      inputSchema: { type: "object", properties: {} },
-      annotations: { readOnlyHint: true, consequentialHint: false },
-      execute: async () => scdaw.getState(),
-    },
-    {
-      name: "scdaw_play",
-      title: "Start DAW Playback",
-      description: "Start playback of the looping pattern.",
-      inputSchema: { type: "object", properties: {} },
-      annotations: { readOnlyHint: false, consequentialHint: false },
-      execute: async () => await scdaw.sendCommand("play"),
-    },
-    {
-      name: "scdaw_stop",
-      title: "Stop DAW Playback",
-      description: "Stop playback and rewind playhead.",
-      inputSchema: { type: "object", properties: {} },
-      annotations: { readOnlyHint: false, consequentialHint: false },
-      execute: async () => await scdaw.sendCommand("stop"),
-    },
-    {
-      name: "scdaw_get_levels",
-      title: "Get DAW Audio Meter Levels",
-      description: "Read real-time peak and RMS audio decibel levels.",
-      inputSchema: { type: "object", properties: {} },
-      annotations: { readOnlyHint: true, consequentialHint: false },
-      execute: async () => scdaw.getLevels(),
-    },
-  ];
+  const toolsToRegister =
+    Array.isArray(TOOLS_METADATA) && TOOLS_METADATA.length > 0
+      ? TOOLS_METADATA
+      : [
+          {
+            name: "scdaw_get_status",
+            title: "Get DAW Playback & Engine Status",
+            description:
+              "Return current DAW playback position, audio engine state, track count, BPM, and recent bounce metrics.",
+            inputSchema: { type: "object", properties: {} },
+            annotations: { readOnlyHint: true, consequentialHint: false },
+          },
+          {
+            name: "scdaw_play",
+            title: "Start DAW Playback",
+            description: "Start playback of the looping pattern.",
+            inputSchema: { type: "object", properties: {} },
+            annotations: { readOnlyHint: false, consequentialHint: false },
+          },
+          {
+            name: "scdaw_stop",
+            title: "Stop DAW Playback",
+            description: "Stop playback and rewind playhead.",
+            inputSchema: { type: "object", properties: {} },
+            annotations: { readOnlyHint: false, consequentialHint: false },
+          },
+          {
+            name: "scdaw_get_levels",
+            title: "Get DAW Audio Meter Levels",
+            description: "Read real-time peak and RMS audio decibel levels.",
+            inputSchema: { type: "object", properties: {} },
+            annotations: { readOnlyHint: true, consequentialHint: false },
+          },
+        ];
 
-  for (const tool of nativeTools) {
+  for (const tool of toolsToRegister) {
     try {
-      const res = modelContext.registerTool(tool);
+      const res = modelContext.registerTool({
+        name: tool.name,
+        title: tool.title || tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema ||
+          tool.input_schema || { type: "object", properties: {} },
+        annotations: tool.annotations || {
+          readOnlyHint: false,
+          consequentialHint: false,
+        },
+        execute: async (input) =>
+          await handleToolDispatch(tool.name, input || {}),
+      });
       if (res && typeof res.catch === "function") {
         await res.catch(() => {});
       }

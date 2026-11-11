@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_compose_song",
+  "description": "Compile a complete multi-bar, multi-track song in one call from a high-level SongSpec (chords, feel, tempo, sections, form, instrumentation, custom riffs). Supports SoundFont GM instruments (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio, multiple chords per bar (e.g. 'F Bb | C Bb'), and custom riffs with rests (e.g. motifs: { bass: 'F2:8 F2:8 r:8 A2:8 C3:8' }). Example: scdaw_compose_song({ title: 'Keep on the Sunny Side', bpm: 86, feel: 'blues-rock', swing: 0.3, instruments: { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }, sections: [{ name: 'verse', bars: 8, chords: 'F Bb | C Bb' }], form: ['verse'] })",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Song title"
+      },
+      "bpm": {
+        "type": "number",
+        "description": "Tempo in BPM (e.g. 82, 122)"
+      },
+      "signature": {
+        "type": "array",
+        "items": {
+          "type": "integer"
+        },
+        "description": "Time signature [numerator, denominator] e.g. [4, 4]"
+      },
+      "key": {
+        "type": "string",
+        "description": "Musical key root e.g. 'F', 'E', 'C', 'G'"
+      },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "major",
+          "minor",
+          "mixolydian",
+          "dorian",
+          "blues",
+          "ionian",
+          "aeolian",
+          "pentatonic_major",
+          "pentatonic_minor"
+        ],
+        "description": "Musical mode/scale"
+      },
+      "feel": {
+        "type": "string",
+        "enum": [
+          "straight-rock",
+          "blues-rock",
+          "funk",
+          "four-on-floor",
+          "trap",
+          "lofi"
+        ],
+        "description": "Rhythm and genre feel preset"
+      },
+      "swing": {
+        "type": "number",
+        "description": "Swing factor between 0.0 and 1.0 (e.g. 0.3 for blues-rock shuffle)"
+      },
+      "soundfontProfile": {
+        "type": "string",
+        "enum": ["lofi", "hifi", "generaluser-gs"],
+        "description": "SoundFont playback profile"
+      },
+      "instruments": {
+        "type": "object",
+        "description": "Map of track roles to instrument names e.g. { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }. Use SoundFont GM names (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio. Use 'synth' only when electronic chiptune/synthwave is desired."
+      },
+      "sections": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Section name (e.g. 'intro', 'verse', 'chorus', 'solo', 'outro')"
+            },
+            "bars": {
+              "type": "integer",
+              "description": "Length of section in bars"
+            },
+            "chords": {
+              "type": "string",
+              "description": "Chord progression string. Supports bar delimiters and multiple chords per bar (e.g. 'F Bb | C Bb' or 'E | E | A | B')"
+            },
+            "energy": {
+              "type": "number",
+              "description": "Energy dynamic curve between 0.0 and 1.0"
+            }
+          },
+          "required": ["name", "bars"]
+        },
+        "description": "Defined musical sections with chord progressions and bar lengths"
+      },
+      "form": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Arrangement structure ordering the sections e.g. ['intro', 'verse', 'chorus', 'verse', 'chorus', 'solo', 'outro']"
+      },
+      "motifs": {
+        "type": "object",
+        "description": "Melodic motifs and custom signature riffs mapped by role (e.g. { bass: 'F2:8 F2:8 r:8 A2:8 C3:8 D3:8 F3:4', rhythm: 'r:4 F4:8 r:8', lead: 'F4:8 A4:8 C5:4' }). Supports pitch tokens (e.g. F2:8, C3:4) and rests (e.g. r:8, _:16, rest:4). When a bass or rhythm motif is provided, it repeats across sections as the song's signature hook."
+      },
+      "riffs": {
+        "type": "object",
+        "description": "Alias for motifs: custom riffs mapped by role (bass, rhythm, lead, drums)"
+      },
+      "seed": {
+        "type": "number",
+        "description": "Deterministic PRNG seed"
+      }
+    },
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": true
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_compose_song. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 15000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_compose_song\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

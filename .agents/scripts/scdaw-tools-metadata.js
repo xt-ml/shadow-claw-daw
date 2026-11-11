@@ -1,0 +1,1427 @@
+/**
+ * .agents/scripts/scdaw-tools-metadata.js
+ *
+ * Generated automatically from bin/tool-manifest.mjs via bin/generate-tools.mjs.
+ * Exposes declarative tool definitions to the WebMCP browser adapter.
+ */
+
+export const TOOLS_METADATA = [
+  {
+    name: "scdaw_get_status",
+    description:
+      "Return current DAW playback position, audio engine state, track count, BPM, and recent bounce metrics.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_get_project",
+    description:
+      "Return the complete project JSON graph including all tracks, notes, volume, pan, and synthesis parameters.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_new_project",
+    description:
+      "Create and initialize a new project from a template ('basic-beat' or 'empty').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Project name",
+        },
+        bpm: {
+          type: "number",
+          description: "Initial tempo (40-240)",
+        },
+        template: {
+          type: "string",
+          enum: [
+            "basic-beat",
+            "straight-beat",
+            "empty",
+            "techno-bass",
+            "pop",
+            "house",
+            "trap",
+            "synthwave",
+          ],
+          description: "Starter template (defaults to 'empty')",
+        },
+        clear: {
+          type: "boolean",
+          description:
+            "If true, clears all notes from the template so tracks start blank",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_load_project",
+    description:
+      "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from OPFS conversation storage.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: {
+          type: "object",
+          description: "Valid DAW project object",
+        },
+        filename: {
+          type: "string",
+          description:
+            "Project filename to load from conversation files (.scdaw.json, .dawproject, .mid)",
+        },
+        conversationId: {
+          type: "string",
+          description:
+            "Conversation ID to load from (defaults to 'br:main' / Main)",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_set_transport",
+    description:
+      "Update transport properties: BPM (40-240), signature ([4,4] or [3,4]), pattern length in bars (1-4), or swing factor (0-0.5).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        bpm: {
+          type: "number",
+          description: "Beats per minute (40-240)",
+        },
+        signature: {
+          type: "array",
+          items: {
+            type: "number",
+          },
+          description: "Time signature [nominator, denominator]",
+        },
+        lengthBars: {
+          type: "number",
+          description: "Loop pattern length in bars (1-4)",
+        },
+        swing: {
+          type: "number",
+          description: "16th-note swing factor (0.0 to 0.5)",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_play",
+    description: "Start playback of the looping pattern.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_stop",
+    description:
+      "Stop playback and rewind the transport playhead to the start of the loop.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_add_track",
+    description:
+      "Add a new instrument track ('drums' or 'synth') with custom name and initial synthesis parameters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["drums", "synth"],
+          description: "Track instrument kind",
+        },
+        name: {
+          type: "string",
+          description: "Track label",
+        },
+        params: {
+          type: "object",
+          description: "Optional synthesizer or effect parameters",
+        },
+      },
+      required: ["kind"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_remove_track",
+    description: "Remove an existing track from the project by track ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Track identifier to delete",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_set_track",
+    description:
+      "Adjust track mixing parameters (volume, pan, mute, solo) or synthesis parameters (waveform, cutoff, resonance, ADSR).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track identifier",
+        },
+        name: {
+          type: "string",
+          description: "Rename track",
+        },
+        volume: {
+          type: "number",
+          description: "Track volume fader (0.0 to 1.5)",
+        },
+        pan: {
+          type: "number",
+          description: "Stereo pan (-1.0 left to 1.0 right)",
+        },
+        mute: {
+          type: "boolean",
+          description: "Mute track audio",
+        },
+        solo: {
+          type: "boolean",
+          description: "Solo track",
+        },
+        params: {
+          type: "object",
+          description: "Synthesizer parameter overrides",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_write_notes",
+    description:
+      "Write or merge notes into a track. Supports step indices (0-15 per bar), musical beat units, or raw PPQN pulses. Pitch can be MIDI number, note name ('C4'), or drum name ('kick', 'snare', 'hat', 'clap').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        units: {
+          type: "string",
+          enum: ["steps", "beats", "ppqn", "bars"],
+          description:
+            "Timebase units used in notes array: 'bars' (1-indexed bar & beat), 'steps' (0-15 per bar), 'beats', or 'ppqn'",
+        },
+        mode: {
+          type: "string",
+          enum: ["replace", "merge"],
+          description:
+            "'replace' overwrites all notes in track, 'merge' appends to existing notes",
+        },
+        notes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              bar: {
+                type: "number",
+                description: "1-based bar number (e.g. 1, 2, 3...)",
+              },
+              beat: {
+                type: "number",
+                description:
+                  "Beat position within bar (1-based, e.g. 1, 2, 2.5, 3...)",
+              },
+              step: {
+                type: "number",
+                description: "16th step index (0-15 per bar)",
+              },
+              position: {
+                type: "number",
+                description: "PPQN position",
+              },
+              note: {
+                description:
+                  "Note pitch alias (e.g. 'C4', 'Eb3', 60, or 'kick')",
+              },
+              pitch: {
+                description:
+                  "Note pitch (MIDI number 0-127, note string 'C4', or drum name 'kick')",
+              },
+              dur: {
+                type: "string",
+                description:
+                  "Musical duration string ('1/16', '1/8', 'q'/'1/4', 'h'/'1/2', '1 bar', '2 beats')",
+              },
+              durationSteps: {
+                type: "number",
+                description: "Duration in 16th steps",
+              },
+              duration: {
+                type: "number",
+                description: "Duration in PPQN pulses",
+              },
+              vel: {
+                type: "number",
+                description: "Velocity alias (0.0 to 1.0)",
+              },
+              velocity: {
+                type: "number",
+                description: "Velocity (0.0 to 1.0)",
+              },
+            },
+          },
+          description:
+            "List of notes to write (e.g. [{ bar: 1, beat: 1, note: 'E3', dur: '1/8', vel: 0.8 }])",
+        },
+      },
+      required: ["trackId", "notes"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_clear_notes",
+    description:
+      "Clear notes on a specific track, optionally within a specified step range.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        fromStep: {
+          type: "number",
+          description: "Start 16th step index (inclusive)",
+        },
+        toStep: {
+          type: "number",
+          description: "End 16th step index (exclusive)",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_clear_project_notes",
+    description:
+      "Clears all notes across all tracks in the project, preserving tracks, instruments, and effects.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_get_levels",
+    description:
+      "Read real-time peak and RMS audio decibel meter levels for master bus and all active tracks.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_bounce",
+    description:
+      "Render project offline into a WAV audio file (16-bit, 24-bit, or 32-bit Float) via OfflineAudioContext, initiating browser download and returning audio metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        loops: {
+          type: "number",
+          description:
+            "Number of pattern loop repetitions to render (1-8, default 1)",
+        },
+        bitDepth: {
+          type: "number",
+          enum: [16, 24, 32],
+          description:
+            "Audio bit depth: 16 (CD standard), 24 (studio standard, default), or 32 (32-bit float)",
+        },
+        tailSeconds: {
+          type: "number",
+          description:
+            "Decay tail duration in seconds for reverb/release (default 0.5)",
+        },
+        trimSilence: {
+          type: "boolean",
+          description:
+            "Whether to trim tail silence below -72dBFS threshold (default true)",
+        },
+        saveToWorkspace: {
+          type: "boolean",
+          description: "Whether to preserve audio metadata in session storage",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_export_stems",
+    description:
+      "Renders consolidated Bar 1 Beat 1 audio stems across all tracks with multi-tap routing (post-fader, pre-fader, pre-fx), silence-tail trimming, and bundles stems, MIDI, and project into a ZIP archive.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        loops: {
+          type: "number",
+          description: "Number of loop repetitions to render (1-8, default 1)",
+        },
+        tap: {
+          type: "string",
+          enum: ["post-fader", "pre-fader", "pre-fx"],
+          description:
+            "Tap routing: post-fader (default), pre-fader (raw track level), pre-fx (raw synth voice)",
+        },
+        bitDepth: {
+          type: "number",
+          enum: [16, 24, 32],
+          description: "Audio bit depth: 16, 24 (default), or 32 (float)",
+        },
+        tailSeconds: {
+          type: "number",
+          description: "Decay tail duration in seconds (default 1.0)",
+        },
+        trimSilence: {
+          type: "boolean",
+          description:
+            "Whether to trim tail silence below -72dBFS threshold (default true)",
+        },
+        bundleZip: {
+          type: "boolean",
+          description:
+            "Whether to package all stems into a single ZIP bundle (default true)",
+        },
+        includeMaster: {
+          type: "boolean",
+          description: "Whether to include 00_Master.wav stem (default true)",
+        },
+        includeMidi: {
+          type: "boolean",
+          description:
+            "Whether to include Standard MIDI File (.mid) in bundle (default true)",
+        },
+        includeProject: {
+          type: "boolean",
+          description:
+            "Whether to include native .scdaw.json project in bundle (default true)",
+        },
+        saveToWorkspace: {
+          type: "boolean",
+          description:
+            "Whether to trigger browser download of the stems ZIP archive",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_export_midi",
+    description:
+      "Exports the active song or track notes as a Standard MIDI File (.mid) Format 1 (multi-track) or Format 0 (single track), baking active MIDI FX and swing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        format: {
+          type: "number",
+          enum: [0, 1],
+          description:
+            "SMF format: 1 (multi-track, default) or 0 (single track merged)",
+        },
+        loops: {
+          type: "number",
+          description: "Number of pattern repetitions to export (default 1)",
+        },
+        bakeMidiFx: {
+          type: "boolean",
+          description:
+            "Whether to bake arpeggiator/pitch/velocity MIDI FX into notes (default true)",
+        },
+        bakeSwing: {
+          type: "boolean",
+          description:
+            "Whether to bake 16th-note swing timing offsets into notes (default true)",
+        },
+        saveToWorkspace: {
+          type: "boolean",
+          description: "Whether to trigger browser download of .mid file",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_import_midi",
+    description:
+      "Imports a Standard MIDI File (.mid) buffer or base64 data into the DAW project or a target track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        data: {
+          type: "string",
+          description: "Base64-encoded SMF (.mid) file data",
+        },
+        targetTrackId: {
+          type: "string",
+          description:
+            "Optional track ID to import notes into; if omitted, loads whole project",
+        },
+      },
+      required: ["data"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_export_project",
+    description:
+      "Exports the current project as a native .scdaw.json schema or a DAWproject v1.0 interchange archive (.dawproject) to OPFS conversation storage and/or browser download.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        format: {
+          type: "string",
+          enum: ["json", "dawproject"],
+          description:
+            "Export format: 'json' (native .scdaw.json, default) or 'dawproject' (DAWproject v1.0 ZIP)",
+        },
+        filename: {
+          type: "string",
+          description: "Target filename to save as",
+        },
+        conversationId: {
+          type: "string",
+          description:
+            "Destination conversation ID in OPFS (defaults to 'br:main' / Main)",
+        },
+        saveToOpfs: {
+          type: "boolean",
+          description:
+            "Whether to save to OPFS conversation storage (default: true)",
+        },
+        saveToWorkspace: {
+          type: "boolean",
+          description:
+            "Whether to trigger browser download of the exported file",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_import_project",
+    description:
+      "Imports a project from native .scdaw.json or .dawproject archive data (JSON string or Base64 string).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        data: {
+          type: "string",
+          description:
+            "Native JSON string or Base64-encoded .dawproject / .scdaw.json file data",
+        },
+      },
+      required: ["data"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_undo",
+    description:
+      "Undo the last project edit, restoring the previous snapshot from the undo history stack.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_render_surface",
+    description:
+      "Return custom element HTML tag to embed the live DAW workbench, mixer, transport, or sequencer surface in chat.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        element: {
+          type: "string",
+          enum: [
+            "workbench",
+            "mixer",
+            "sequencer",
+            "transport",
+            "browser",
+            "timeline",
+            "editor",
+            "devices",
+            "statusbar",
+            "knob",
+            "resize-handle",
+          ],
+          description: "Surface element to render (default 'workbench')",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_reset",
+    description:
+      "Reset parameter, device, track, pattern notes, or entire project to defaults (supports scopes: 'param', 'track', 'pattern', 'project').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        scope: {
+          type: "string",
+          enum: ["param", "track", "pattern", "project"],
+          description: "Reset target scope",
+        },
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        param: {
+          type: "string",
+          description: "Parameter name (if scope is 'param')",
+        },
+        mode: {
+          type: "string",
+          enum: ["mixer", "params", "all"],
+          description: "Track reset mode (if scope is 'track')",
+        },
+        template: {
+          type: "string",
+          enum: [
+            "basic-beat",
+            "straight-beat",
+            "empty",
+            "techno-bass",
+            "pop",
+            "house",
+            "trap",
+            "synthwave",
+          ],
+          description: "Starter template (if scope is 'project')",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_apply_preset",
+    description:
+      "Apply a curated synthesizer preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead') to a synth track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        preset: {
+          type: "string",
+          enum: [
+            "init-saw",
+            "techno-bass",
+            "acid-303",
+            "pop-pluck",
+            "warm-pad",
+            "sub-808",
+            "supersaw-lead",
+          ],
+          description: "Preset name",
+        },
+      },
+      required: ["trackId", "preset"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_panic",
+    description:
+      "Emergency All Notes Off: immediately silences all active synthesizer voices and stops the transport.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_manage_fx",
+    description:
+      "Add, update, reset, or remove an audio effect ('fold', 'crusher', 'stereoTool', 'delay', 'reverb', 'compressor', 'revamp') or MIDI effect ('arpeggio', 'pitch', 'velocity') on a track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        action: {
+          type: "string",
+          enum: ["add", "update", "reset", "remove"],
+          description: "Action to perform on track FX rack",
+        },
+        fxType: {
+          type: "string",
+          enum: [
+            "fold",
+            "crusher",
+            "stereoTool",
+            "delay",
+            "reverb",
+            "compressor",
+            "revamp",
+            "arpeggio",
+            "pitch",
+            "velocity",
+          ],
+          description: "Effect type",
+        },
+        fxId: {
+          type: "string",
+          description: "Specific FX instance ID (optional if fxType is unique)",
+        },
+        params: {
+          type: "object",
+          description: "Effect parameter key-value pairs to set or update",
+        },
+      },
+      required: ["trackId", "action", "fxType"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_set_automation",
+    description:
+      "Set or update continuous parameter automation points (time in beats, value) for a track parameter such as 'volume', 'pan', or 'cutoff'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        param: {
+          type: "string",
+          description:
+            "Target parameter name ('volume', 'pan', 'cutoff', etc.)",
+        },
+        points: {
+          type: "array",
+          description: "List of automation points { time, value }",
+          items: {
+            type: "object",
+            properties: {
+              time: {
+                type: "number",
+                description: "Point time in musical beats",
+              },
+              value: {
+                type: "number",
+                description: "Target parameter value at this time",
+              },
+            },
+            required: ["time", "value"],
+          },
+        },
+        time: {
+          type: "number",
+          description:
+            "Point time in musical beats (when setting a single point)",
+        },
+        value: {
+          type: "number",
+          description: "Point value (when setting a single point)",
+        },
+      },
+      required: ["trackId", "param"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_clear_automation",
+    description:
+      "Clear continuous automation points for a specific track parameter, or clear all automation for the track if no parameter is specified.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        param: {
+          type: "string",
+          description:
+            "Specific parameter name to clear (omitted to clear all parameters on track)",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_add_audio_clip",
+    description:
+      "Add an audio clip (sample, vocal take, stem) to an audio track at a specified time position in beats.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target audio track ID",
+        },
+        clip: {
+          type: "object",
+          description: "Audio clip configuration",
+          properties: {
+            id: {
+              type: "string",
+              description: "Unique clip ID (optional)",
+            },
+            name: {
+              type: "string",
+              description: "Clip label / name",
+            },
+            sample: {
+              type: "string",
+              description: "Sample file name or URI reference",
+            },
+            time: {
+              type: "number",
+              description: "Clip start position in musical beats",
+            },
+            duration: {
+              type: "number",
+              description: "Clip playback duration in beats",
+            },
+            offset: {
+              type: "number",
+              description: "Source audio offset in seconds",
+            },
+            gain: {
+              type: "number",
+              description: "Clip gain multiplier (default 1.0)",
+            },
+          },
+          required: ["name"],
+        },
+      },
+      required: ["trackId", "clip"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_set_audio_clip",
+    description:
+      "Update properties (time, duration, offset, gain, name) of an existing audio clip on an audio track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        clipId: {
+          type: "string",
+          description: "Audio clip ID",
+        },
+        patch: {
+          type: "object",
+          description: "Patch object containing updated clip properties",
+          properties: {
+            name: {
+              type: "string",
+            },
+            sample: {
+              type: "string",
+            },
+            time: {
+              type: "number",
+            },
+            duration: {
+              type: "number",
+            },
+            offset: {
+              type: "number",
+            },
+            gain: {
+              type: "number",
+            },
+          },
+        },
+      },
+      required: ["trackId", "clipId", "patch"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_set_track_send",
+    description:
+      "Configure an auxiliary send routing level (0.0 to 1.0) from a source track to a destination track or submix.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Source track ID",
+        },
+        targetTrackId: {
+          type: "string",
+          description: "Target destination track or bus ID",
+        },
+        level: {
+          type: "number",
+          description: "Send level multiplier (0.0 to 1.0)",
+        },
+      },
+      required: ["trackId", "targetTrackId", "level"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_record_arm",
+    description: "Arm or disarm an audio track for live recording.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        armed: {
+          type: "boolean",
+          description: "Whether track is armed for recording",
+        },
+      },
+      required: ["trackId", "armed"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_set_metronome",
+    description: "Toggle the metronome click track and configure click volume.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        enabled: {
+          type: "boolean",
+          description: "Enable or disable audible metronome",
+        },
+        volume: {
+          type: "number",
+          description: "Metronome volume multiplier (0.0 to 1.0)",
+        },
+      },
+      required: ["enabled"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_set_instrument",
+    description:
+      "Set the synthesis instrument on an existing track (808, cubed, pluck, tubular, neon, noise-pad, korpus, nano, soundfont, synth, drums).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        instrument: {
+          type: "string",
+          enum: [
+            "808",
+            "cubed",
+            "pluck",
+            "tubular",
+            "neon",
+            "noise-pad",
+            "korpus",
+            "nano",
+            "soundfont",
+            "synth",
+            "drums",
+          ],
+          description: "Instrument synthesis model",
+        },
+        params: {
+          type: "object",
+          description: "Optional custom instrument parameter overrides",
+        },
+      },
+      required: ["trackId", "instrument"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_set_808",
+    description:
+      "Configure and shape an authentic 808 sub bass voice with portamento glide, drive, decay, tone, and harmonics presets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        glide: {
+          type: "number",
+          description: "Portamento slide time in PPQN ticks (0 to 480)",
+        },
+        decay: {
+          type: "number",
+          description:
+            "Sub bass decay envelope duration in seconds (0.1 to 4.0)",
+        },
+        drive: {
+          type: "number",
+          description: "Tanh soft-clip drive factor (0.0 to 1.0)",
+        },
+        tone: {
+          type: "number",
+          description: "Low-pass filter brightness (0.1 to 1.0)",
+        },
+        harmonics: {
+          type: "string",
+          enum: ["clean", "dist", "growl", "grit"],
+          description: "Harmonics saturation preset",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_configure_fx",
+    description:
+      "Add, update, or remove an audio effect (autotune, vocoder, maximizer, tidal, transient, sidechain, fold, crusher, delay, reverb, stereoTool) on a track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        action: {
+          type: "string",
+          enum: ["add", "update", "reset", "remove"],
+          description: "Action to perform on track FX chain",
+        },
+        fxType: {
+          type: "string",
+          enum: [
+            "autotune",
+            "vocoder",
+            "maximizer",
+            "tidal",
+            "transient",
+            "sidechain",
+            "fold",
+            "crusher",
+            "delay",
+            "reverb",
+            "stereoTool",
+          ],
+          description: "Audio effect type",
+        },
+        fxId: {
+          type: "string",
+          description: "Optional existing FX ID for update/remove/reset",
+        },
+        params: {
+          type: "object",
+          description: "Parameters for the effect",
+        },
+      },
+      required: ["trackId", "fxType"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_apply_groove",
+    description:
+      "Apply micro-timing groove templates (Zeitgeist: mpc60, sp1200, swing16, shuffle, laidback, rushed) or humanize timing and velocity on a track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        template: {
+          type: "string",
+          enum: [
+            "straight",
+            "swing16",
+            "mpc60",
+            "sp1200",
+            "shuffle",
+            "laidback",
+            "rushed",
+            "scurve",
+            "power",
+          ],
+          description: "Groove shuffle template",
+        },
+        amount: {
+          type: "number",
+          description: "Groove displacement amount (0.0 to 1.0)",
+        },
+        timingTicks: {
+          type: "number",
+          description: "Humanize micro-timing jitter range in PPQN ticks",
+        },
+        velocity: {
+          type: "number",
+          description: "Humanize velocity jitter range (0 to 64)",
+        },
+        seed: {
+          type: "number",
+          description: "Deterministic PRNG seed for humanize",
+        },
+      },
+      required: ["trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_compose_song",
+    description:
+      "Compile a complete multi-bar, multi-track song in one call from a high-level SongSpec (chords, feel, tempo, sections, form, instrumentation, custom riffs). Supports SoundFont GM instruments (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio, multiple chords per bar (e.g. 'F Bb | C Bb'), and custom riffs with rests (e.g. motifs: { bass: 'F2:8 F2:8 r:8 A2:8 C3:8' }). Example: scdaw_compose_song({ title: 'Keep on the Sunny Side', bpm: 86, feel: 'blues-rock', swing: 0.3, instruments: { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }, sections: [{ name: 'verse', bars: 8, chords: 'F Bb | C Bb' }], form: ['verse'] })",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Song title",
+        },
+        bpm: {
+          type: "number",
+          description: "Tempo in BPM (e.g. 82, 122)",
+        },
+        signature: {
+          type: "array",
+          items: {
+            type: "integer",
+          },
+          description: "Time signature [numerator, denominator] e.g. [4, 4]",
+        },
+        key: {
+          type: "string",
+          description: "Musical key root e.g. 'F', 'E', 'C', 'G'",
+        },
+        mode: {
+          type: "string",
+          enum: [
+            "major",
+            "minor",
+            "mixolydian",
+            "dorian",
+            "blues",
+            "ionian",
+            "aeolian",
+            "pentatonic_major",
+            "pentatonic_minor",
+          ],
+          description: "Musical mode/scale",
+        },
+        feel: {
+          type: "string",
+          enum: [
+            "straight-rock",
+            "blues-rock",
+            "funk",
+            "four-on-floor",
+            "trap",
+            "lofi",
+          ],
+          description: "Rhythm and genre feel preset",
+        },
+        swing: {
+          type: "number",
+          description:
+            "Swing factor between 0.0 and 1.0 (e.g. 0.3 for blues-rock shuffle)",
+        },
+        soundfontProfile: {
+          type: "string",
+          enum: ["lofi", "hifi", "generaluser-gs"],
+          description: "SoundFont playback profile",
+        },
+        instruments: {
+          type: "object",
+          description:
+            "Map of track roles to instrument names e.g. { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }. Use SoundFont GM names (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio. Use 'synth' only when electronic chiptune/synthwave is desired.",
+        },
+        sections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description:
+                  "Section name (e.g. 'intro', 'verse', 'chorus', 'solo', 'outro')",
+              },
+              bars: {
+                type: "integer",
+                description: "Length of section in bars",
+              },
+              chords: {
+                type: "string",
+                description:
+                  "Chord progression string. Supports bar delimiters and multiple chords per bar (e.g. 'F Bb | C Bb' or 'E | E | A | B')",
+              },
+              energy: {
+                type: "number",
+                description: "Energy dynamic curve between 0.0 and 1.0",
+              },
+            },
+            required: ["name", "bars"],
+          },
+          description:
+            "Defined musical sections with chord progressions and bar lengths",
+        },
+        form: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description:
+            "Arrangement structure ordering the sections e.g. ['intro', 'verse', 'chorus', 'verse', 'chorus', 'solo', 'outro']",
+        },
+        motifs: {
+          type: "object",
+          description:
+            "Melodic motifs and custom signature riffs mapped by role (e.g. { bass: 'F2:8 F2:8 r:8 A2:8 C3:8 D3:8 F3:4', rhythm: 'r:4 F4:8 r:8', lead: 'F4:8 A4:8 C5:4' }). Supports pitch tokens (e.g. F2:8, C3:4) and rests (e.g. r:8, _:16, rest:4). When a bass or rhythm motif is provided, it repeats across sections as the song's signature hook.",
+        },
+        riffs: {
+          type: "object",
+          description:
+            "Alias for motifs: custom riffs mapped by role (bass, rhythm, lead, drums)",
+        },
+        seed: {
+          type: "number",
+          description: "Deterministic PRNG seed",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+  },
+  {
+    name: "scdaw_describe_arrangement",
+    description:
+      "Inspect and return a human-readable summary of the active project arrangement (tempo, signature, total bars, track roles, note counts, and looping state) to verify structure.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        detail: {
+          type: "string",
+          enum: ["summary", "full"],
+          description: "Level of arrangement detail",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_analyze_mix",
+    description:
+      "Analyze the current mix levels, dynamic range, clipping, and 3-band energy distribution (low, mid, high) across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, and actionable mix suggestions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        durationSeconds: {
+          type: "number",
+          description:
+            "Duration of the mix to analyze in seconds (default 2.0, max 60.0)",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+];

@@ -59,6 +59,31 @@ for (const tool of TOOLS) {
   }
 }
 
+const metadataPath = resolve(ROOT, ".agents/scripts/scdaw-tools-metadata.js");
+const metadataContent = `/**
+ * .agents/scripts/scdaw-tools-metadata.js
+ *
+ * Generated automatically from bin/tool-manifest.mjs via bin/generate-tools.mjs.
+ * Exposes declarative tool definitions to the WebMCP browser adapter.
+ */
+
+export const TOOLS_METADATA = ${JSON.stringify(
+  TOOLS.map((t) => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.input_schema,
+    annotations: t.annotations,
+  })),
+  null,
+  2,
+)};
+`;
+
+if (!isCheck) {
+  writeFileSync(metadataPath, metadataContent, "utf8");
+  console.log(`[GEN] Generated .agents/scripts/scdaw-tools-metadata.js`);
+}
+
 if (isCheck) {
   if (driftCount > 0) {
     console.error(

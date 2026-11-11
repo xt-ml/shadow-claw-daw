@@ -719,3 +719,170 @@ export function processSidechainDucking(
 
   return { outLeft, outRight };
 }
+
+/**
+ * Generates an asymmetric warm tube overdrive curve for guitar amp / cabinet distortion.
+ *
+ * @param {number} driveDb - Overdrive gain boost in dB (default: 12 dB).
+ * @param {number} warmth - Even-harmonic warmth asymmetry (0.0 to 1.0).
+ * @param {number} numSamples - Curve resolution (default: 1024).
+ * @returns {Float32Array} Transfer function from -1 to 1.
+ */
+export function createGuitarOverdriveCurve(
+  driveDb = 12,
+  warmth = 0.4,
+  numSamples = 1024,
+) {
+  const curve = new Float32Array(numSamples);
+  const gain = Math.pow(10, driveDb / 20);
+
+  for (let i = 0; i < numSamples; i++) {
+    const x = (i * 2) / (numSamples - 1) - 1;
+    const driven = x * gain;
+    // Asymmetric soft-clipping saturation
+    const soft = driven / (1.0 + Math.abs(driven));
+    // Warm 2nd harmonic tone contour
+    const warm = soft + warmth * 0.2 * (1.0 - Math.abs(x)) * x;
+    curve[i] = Math.max(-1.0, Math.min(1.0, warm));
+  }
+  return curve;
+}
+
+/**
+ * Analyzes an audio buffer (peak dBFS, RMS dBFS, crest factor, clipping, frequency balance, and suggestions).
+ * Ported concepts from claw-daw audio/metering and openDAW rms/analyser.
+ *
+ * @param {object} options
+ * @param {Float32Array} options.left - Left channel audio data.
+ * @param {Float32Array} [options.right] - Right channel audio data.
+ * @param {number} [options.sampleRate=44100] - Sample rate.
+ * @returns {object} Analysis report with metrics and actionable suggestions.
+ */
+export function analyzeAudioBuffer({ left, right, sampleRate = 44100 }) {
+  if (!left || left.length === 0) {
+    return {
+      ok: false,
+      error: "Empty or invalid audio buffer",
+    };
+  }
+
+  const numFrames = left.length;
+  const hasRight = right && right.length === numFrames;
+
+  let maxL = 0;
+  let maxR = 0;
+  let sumSqL = 0;
+  let sumSqR = 0;
+  let clippedCount = 0;
+
+  let lowEnergy = 0;
+  let midEnergy = 0;
+  let highEnergy = 0;
+
+  // Single-pole filters for rough 3-band energy partitioning:
+  // Low cutoff ~ 250 Hz, High cutoff ~ 4 kHz
+  const dt = 1.0 / sampleRate;
+  const rcLow = 1.0 / (2.0 * Math.PI * 250);
+  const alphaLow = dt / (rcLow + dt);
+  const rcHigh = 1.0 / (2.0 * Math.PI * 4000);
+  const alphaHigh = rcHigh / (rcHigh + dt);
+
+  let prevLowL = 0;
+  let prevHighInL = 0;
+  let prevHighOutL = 0;
+
+  for (let i = 0; i < numFrames; i++) {
+    const sL = left[i];
+    const absL = Math.abs(sL);
+    if (absL > maxL) maxL = absL;
+    sumSqL += sL * sL;
+    if (absL >= 0.999) clippedCount++;
+
+    if (hasRight) {
+      const sR = right[i];
+      const absR = Math.abs(sR);
+      if (absR > maxR) maxR = absR;
+      sumSqR += sR * sR;
+      if (absR >= 0.999) clippedCount++;
+    }
+
+    // Band energy estimation (Left channel)
+    prevLowL += alphaLow * (sL - prevLowL);
+    lowEnergy += prevLowL * prevLowL;
+
+    prevHighOutL = alphaHigh * (prevHighOutL + sL - prevHighInL);
+    prevHighInL = sL;
+    highEnergy += prevHighOutL * prevHighOutL;
+
+    const midSample = sL - prevLowL - prevHighOutL;
+    midEnergy += midSample * midSample;
+  }
+
+  const peak = Math.max(maxL, maxR || maxL);
+  const totalChannels = hasRight ? 2 : 1;
+  const rms = Math.sqrt((sumSqL + sumSqR) / (totalChannels * numFrames));
+
+  const peakDb = peak > 1e-6 ? 20 * Math.log10(peak) : -96.0;
+  const rmsDb = rms > 1e-6 ? 20 * Math.log10(rms) : -96.0;
+  const crestFactorDb = Math.max(0, peakDb - rmsDb);
+
+  const totalBand = Math.max(1e-6, lowEnergy + midEnergy + highEnergy);
+  const bandBalance = {
+    low: Math.round((lowEnergy / totalBand) * 100) / 100,
+    mid: Math.round((midEnergy / totalBand) * 100) / 100,
+    high: Math.round((highEnergy / totalBand) * 100) / 100,
+  };
+
+  const suggestions = [];
+  const clipping = clippedCount > 0;
+
+  if (clipping) {
+    suggestions.push(
+      `Clipping detected (${clippedCount} samples >= 0 dBFS): reduce master volume or engage master limiter.`,
+    );
+  } else if (peakDb > -0.3) {
+    suggestions.push(
+      `Peak level is hot (${peakDb.toFixed(2)} dBFS): consider lowering master fader by ${(peakDb - -0.3).toFixed(1)} dB to prevent ISP inter-sample peaks.`,
+    );
+  } else {
+    suggestions.push(
+      `Master headroom is clean (${peakDb.toFixed(2)} dBFS peak) with zero clipping.`,
+    );
+  }
+
+  if (rmsDb < -22.0) {
+    suggestions.push(
+      `Mix is quiet (${rmsDb.toFixed(1)} dBFS RMS): raise track faders or increase master bus compression to target -14 dBFS.`,
+    );
+  } else if (rmsDb > -10.0) {
+    suggestions.push(
+      `Mix is heavily squashed (${rmsDb.toFixed(1)} dBFS RMS): back off master compression to recover dynamic range.`,
+    );
+  }
+
+  if (bandBalance.low > 0.45) {
+    suggestions.push(
+      `Bass energy is prominent (${Math.round(bandBalance.low * 100)}%): apply HPF below 80Hz on rhythm guitars and synths to clean mud.`,
+    );
+  }
+
+  const summary = [
+    `Peak: ${peakDb.toFixed(2)} dBFS | RMS: ${rmsDb.toFixed(2)} dBFS | Dynamic Range: ${crestFactorDb.toFixed(2)} dB`,
+    `Bands: Low ${Math.round(bandBalance.low * 100)}% | Mid ${Math.round(bandBalance.mid * 100)}% | High ${Math.round(bandBalance.high * 100)}%`,
+    clipping
+      ? `WARNING: ${clippedCount} clipped samples`
+      : `Status: Clean headroom`,
+  ].join(" | ");
+
+  return {
+    ok: true,
+    peakDb: Math.round(peakDb * 100) / 100,
+    rmsDb: Math.round(rmsDb * 100) / 100,
+    crestFactorDb: Math.round(crestFactorDb * 100) / 100,
+    clipping,
+    clippedSampleCount: clippedCount,
+    bandBalance,
+    summary,
+    suggestions,
+  };
+}

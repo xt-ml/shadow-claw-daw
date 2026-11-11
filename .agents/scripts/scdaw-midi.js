@@ -173,8 +173,9 @@ export function encodeMidiFile(project, options = {}) {
   ];
 
   // Time signature: default 4/4 (4, 2, 24, 8) -> 4 / 2^2
-  const sigNum = 4;
-  const sigDenExp = 2; // 2^2 = 4
+  const sigNum = Array.isArray(project.signature) ? project.signature[0] : 4;
+  const sigDen = Array.isArray(project.signature) ? project.signature[1] : 4;
+  const sigDenExp = Math.round(Math.log2(sigDen)) || 2;
   const timeSigBytes = [sigNum, sigDenExp, 24, 8];
 
   const trackBuffers = [];
@@ -191,7 +192,12 @@ export function encodeMidiFile(project, options = {}) {
     // TRACKS 1..N: Instrument Tracks
     let melChannelIndex = 0;
     tracks.forEach((track, index) => {
-      const isDrums = track.type === "drums" || track.id === "drums";
+      const isDrums =
+        track.kind === "drums" ||
+        track.type === "drums" ||
+        track.id === "drums" ||
+        /drum/i.test(track.id) ||
+        /drum/i.test(track.name);
       // MIDI Channel 10 is 0-indexed as channel 9
       let channel;
       if (isDrums) {
@@ -218,10 +224,11 @@ export function encodeMidiFile(project, options = {}) {
           Math.floor(note.position + note.duration),
         );
         const pitch = Math.min(127, Math.max(0, Math.floor(note.pitch)));
-        const vel = Math.min(
-          127,
-          Math.max(1, Math.floor(note.velocity ?? 100)),
-        );
+        let rawVel = note.velocity ?? 0.8;
+        if (typeof rawVel === "number" && rawVel <= 1.0) {
+          rawVel = Math.round(rawVel * 127);
+        }
+        const vel = Math.min(127, Math.max(1, Math.floor(rawVel)));
 
         // Note On: type 1
         // Note Off: type 0 (Note Off must come first if ticks match)
@@ -241,6 +248,13 @@ export function encodeMidiFile(project, options = {}) {
         META_TYPE.TRACK_NAME,
         encodeText(track.name || `Track ${index + 1}`),
       );
+
+      if (!isDrums && track.params?.program !== undefined) {
+        trackWriter.addEvent(0, [
+          CONTROL_TYPE.PROGRAM_CHANGE | channel,
+          Number(track.params.program) & 0x7f,
+        ]);
+      }
 
       let lastTick = 0;
       for (const ev of events) {
@@ -426,6 +440,7 @@ export function decodeMidiFile(input) {
     let runningStatus = 0;
     let trackName = "";
     let trackChannel = null;
+    let trackProgram = null;
     let timeSignature = null;
 
     // Active notes map: key `${channel}:${pitch}` -> { position, velocity }
@@ -538,10 +553,9 @@ export function decodeMidiFile(input) {
               });
             }
           }
-        } else if (
-          eventType === CONTROL_TYPE.PROGRAM_CHANGE ||
-          eventType === CONTROL_TYPE.CHANNEL_AFTERTOUCH
-        ) {
+        } else if (eventType === CONTROL_TYPE.PROGRAM_CHANGE) {
+          trackProgram = bytes[offset++];
+        } else if (eventType === CONTROL_TYPE.CHANNEL_AFTERTOUCH) {
           offset += 1;
         } else {
           // CONTROLLER, PITCH_BEND, AFTERTOUCH (2 data bytes)
@@ -571,6 +585,7 @@ export function decodeMidiFile(input) {
     tracks.push({
       name: trackName,
       channel: trackChannel,
+      program: trackProgram,
       timeSignature,
       notes,
     });
@@ -603,43 +618,93 @@ export function midiToProject(input, options = {}) {
   // Filter out tracks with notes
   const noteTracks = midi.tracks.filter((t) => t.notes && t.notes.length > 0);
 
-  const newTracks = [];
-  let trackCounter = 1;
-
   if (noteTracks.length === 0) {
     // Return empty starter project with imported BPM
     return createProject({
-      title: options.title || midi.tracks[0]?.name || "Imported MIDI",
+      title:
+        options.title ||
+        midi.tracks.find((t) => t.name)?.name ||
+        "Imported MIDI",
       bpm: midi.bpm,
+      signature: midi.timeSignature || [4, 4],
     });
   }
+
+  const newTracks = [];
+  const usedIds = new Set();
+  let drumCount = 0;
+  let synthCount = 0;
+  let maxPulse = 0;
 
   for (const mt of noteTracks) {
     const isDrums = mt.channel === 9 || /drum|percussion|beat/i.test(mt.name);
-    const scaledNotes = mt.notes.map((n) => ({
-      position: Math.round(n.position * scale),
-      duration: Math.max(60, Math.round(n.duration * scale)),
-      pitch: n.pitch,
-      velocity: n.velocity,
-    }));
+    let trackId;
+    if (isDrums) {
+      drumCount++;
+      trackId = drumCount === 1 ? "trk_drums" : `trk_drums_${drumCount}`;
+    } else {
+      synthCount++;
+      trackId = `trk_synth_${synthCount}`;
+    }
+    while (usedIds.has(trackId)) {
+      trackId = `${trackId}_${Math.random().toString(36).slice(2, 6)}`;
+    }
+    usedIds.add(trackId);
 
-    const trackId = isDrums ? "drums" : `track_${trackCounter++}`;
+    const scaledNotes = mt.notes.map((n) => {
+      const pos = Math.round(n.position * scale);
+      const dur = Math.max(60, Math.round(n.duration * scale));
+      const end = pos + dur;
+      if (end > maxPulse) maxPulse = end;
+
+      let vel = typeof n.velocity === "number" ? n.velocity : 100;
+      if (vel > 1.0) {
+        vel = Math.min(1.0, Math.max(0.0, +(vel / 127).toFixed(3)));
+      } else {
+        vel = Math.min(1.0, Math.max(0.0, +vel.toFixed(3)));
+      }
+
+      return {
+        position: pos,
+        duration: dur,
+        pitch: n.pitch,
+        velocity: vel,
+      };
+    });
+
     const trackName =
-      mt.name || (isDrums ? "Drums" : `Synth Track ${trackCounter - 1}`);
+      mt.name || (isDrums ? "Drums" : `Synth Track ${synthCount}`);
 
-    newTracks.push({
+    const trackObj = {
       id: trackId,
       name: trackName,
-      type: isDrums ? "drums" : "synth",
+      kind: isDrums ? "drums" : "synth",
       volume: 0.85,
       pan: 0,
       notes: scaledNotes,
-    });
+    };
+
+    if (!isDrums && mt.program !== null && mt.program !== undefined) {
+      trackObj.instrument = "soundfont";
+      trackObj.params = { program: mt.program };
+    }
+
+    newTracks.push(trackObj);
   }
 
+  const sig = midi.timeSignature || [4, 4];
+  const pulsesPerBar =
+    (PPQN.Quarter || 960) * (Array.isArray(sig) ? sig[0] : 4);
+  const lengthBars = Math.max(1, Math.ceil(maxPulse / pulsesPerBar));
+
+  const projectTitle =
+    options.title || midi.tracks.find((t) => t.name)?.name || "Imported MIDI";
+
   return createProject({
-    title: options.title || midi.tracks[0]?.name || "Imported MIDI",
+    title: projectTitle,
     bpm: midi.bpm,
+    signature: sig,
+    lengthBars,
     tracks: newTracks,
   });
 }

@@ -12,15 +12,20 @@ import {
   TRACK_MIX_SCHEMA,
   SYNTH_PARAM_SCHEMA,
   DRUM_PARAM_SCHEMA,
+  INSTRUMENT_SCHEMAS,
+  FX_SCHEMAS,
   AUTOMATABLE_PARAMS,
   getDefaultParams,
   migrateProject,
+  validateAndFilterParams,
 } from "./scdaw-schema.js";
 import {
   INSTRUMENT_PRESETS,
   GENRE_TEMPLATES,
   generateGenrePattern,
 } from "./scdaw-presets.js";
+import { compileSong } from "./scdaw-compose.js";
+import { analyzeAudioBuffer } from "./scdaw-dsp.js";
 
 export {
   MASTER_SCHEMA,
@@ -33,6 +38,7 @@ export {
   INSTRUMENT_PRESETS,
   GENRE_TEMPLATES,
   generateGenrePattern,
+  analyzeAudioBuffer,
 };
 
 export const PPQN = Object.freeze({
@@ -138,6 +144,112 @@ export function pitchToName(pitch, kind = "synth") {
   const noteName = NOTE_NAMES[p % 12];
   const octave = Math.floor(p / 12) - 1;
   return `${noteName}${octave}`;
+}
+
+export function beatsPerBar(signature = [4, 4]) {
+  const [num = 4, den = 4] = Array.isArray(signature) ? signature : [4, 4];
+  return (num * 4) / den;
+}
+
+export function barPulses(signature = [4, 4]) {
+  return Math.round(beatsPerBar(signature) * PPQN.Quarter);
+}
+
+export function parseDuration(dur) {
+  if (typeof dur === "number") return Math.max(1, Math.round(dur));
+  if (typeof dur !== "string") return PPQN.SemiQuaver;
+  const s = dur.trim().toLowerCase();
+  if (s === "1/16" || s === "16th" || s === "s") return PPQN.SemiQuaver; // 240
+  if (s === "1/8" || s === "8th" || s === "e")
+    return Math.round(PPQN.Quarter / 2); // 480
+  if (
+    s === "1/4" ||
+    s === "4th" ||
+    s === "q" ||
+    s === "quarter" ||
+    s === "1 beat"
+  )
+    return PPQN.Quarter; // 960
+  if (s === "1/2" || s === "half" || s === "h" || s === "2 beats")
+    return PPQN.Quarter * 2; // 1920
+  if (
+    s === "1/1" ||
+    s === "whole" ||
+    s === "w" ||
+    s === "4 beats" ||
+    s === "1 bar"
+  )
+    return PPQN.Bar; // 3840
+
+  const matchBeats = s.match(/^([\d.]+)\s*beats?$/);
+  if (matchBeats) {
+    return Math.max(1, Math.round(parseFloat(matchBeats[1]) * PPQN.Quarter));
+  }
+  const matchBars = s.match(/^([\d.]+)\s*bars?$/);
+  if (matchBars) {
+    return Math.max(1, Math.round(parseFloat(matchBars[1]) * PPQN.Bar));
+  }
+  const num = parseFloat(s);
+  return !isNaN(num) && num > 0 ? Math.round(num) : PPQN.SemiQuaver;
+}
+
+export function projectToScoreView(project) {
+  const signature = project.signature || [4, 4];
+  const bpBar = beatsPerBar(signature);
+  const barPulseCount = Math.round(bpBar * PPQN.Quarter);
+
+  const timebase = {
+    ppqnPerQuarter: PPQN.Quarter,
+    beatsPerBar: bpBar,
+    stepsPerBar: bpBar * 4,
+    lengthBars: project.lengthBars || 1,
+    signature,
+    bpm: project.bpm || 120,
+  };
+
+  const tracks = (project.tracks || []).map((trk) => {
+    const score = (trk.notes || []).map((n) => {
+      const pos = n.position || 0;
+      const bar = Math.floor(pos / barPulseCount) + 1;
+      const rem = pos % barPulseCount;
+      const beat = Math.floor(rem / PPQN.Quarter) + 1;
+      const beatOffset = rem % PPQN.Quarter;
+
+      let durLabel = `${n.duration}p`;
+      if (n.duration === PPQN.Quarter) durLabel = "1/4";
+      else if (n.duration === Math.round(PPQN.Quarter / 2)) durLabel = "1/8";
+      else if (n.duration === PPQN.SemiQuaver) durLabel = "1/16";
+      else if (n.duration === PPQN.Quarter * 2) durLabel = "1/2";
+      else if (n.duration === barPulseCount) durLabel = "1 bar";
+
+      return {
+        bar,
+        beat:
+          beatOffset > 0
+            ? parseFloat((beat + beatOffset / PPQN.Quarter).toFixed(2))
+            : beat,
+        note: pitchToName(n.pitch, trk.kind),
+        pitch: n.pitch,
+        dur: durLabel,
+        vel: parseFloat((n.velocity ?? 0.8).toFixed(2)),
+      };
+    });
+
+    return {
+      id: trk.id,
+      name: trk.name,
+      kind: trk.kind,
+      instrument: trk.instrument || trk.kind,
+      noteCount: trk.notes ? trk.notes.length : 0,
+      score,
+    };
+  });
+
+  return {
+    timebase,
+    title: project.name || project.title,
+    tracks,
+  };
 }
 
 export function createProject(template = "basic-beat") {
@@ -346,10 +458,10 @@ export function validateProject(project) {
   if (
     typeof project.lengthBars !== "number" ||
     project.lengthBars < 1 ||
-    project.lengthBars > 4
+    project.lengthBars > 512
   ) {
     errors.push(
-      `Invalid lengthBars: ${project.lengthBars} (must be between 1 and 4)`,
+      `Invalid lengthBars: ${project.lengthBars} (must be between 1 and 512)`,
     );
   }
   if (
@@ -358,10 +470,16 @@ export function validateProject(project) {
   ) {
     errors.push(`Invalid swing: ${project.swing} (must be between 0 and 0.5)`);
   }
+  if (
+    project.loop !== undefined &&
+    (typeof project.loop !== "object" || project.loop === null)
+  ) {
+    errors.push("Project loop must be an object");
+  }
   if (!Array.isArray(project.tracks)) {
     errors.push("Project tracks must be an array");
-  } else if (project.tracks.length > 8) {
-    errors.push(`Too many tracks: ${project.tracks.length} (max 8)`);
+  } else if (project.tracks.length > 64) {
+    errors.push(`Too many tracks: ${project.tracks.length} (max 64)`);
   } else {
     for (const [idx, trk] of project.tracks.entries()) {
       if (!trk.id || typeof trk.id !== "string")
@@ -375,9 +493,9 @@ export function validateProject(project) {
       }
       if (!Array.isArray(trk.notes)) {
         errors.push(`Track[${idx}] notes must be an array`);
-      } else if (trk.notes.length > 512) {
+      } else if (trk.notes.length > 20000) {
         errors.push(
-          `Track[${idx}] has too many notes (${trk.notes.length} > 512)`,
+          `Track[${idx}] has too many notes (${trk.notes.length} > 20000)`,
         );
       }
       if (trk.audioClips !== undefined && !Array.isArray(trk.audioClips)) {
@@ -399,8 +517,11 @@ export function validateProject(project) {
   return { valid: errors.length === 0, errors };
 }
 
-export function normalizeNotes(units, notes) {
+export function normalizeNotes(units, notes, signature = [4, 4]) {
   if (!Array.isArray(notes)) return [];
+  const bpBar = beatsPerBar(signature);
+  const barPulseCount = Math.round(bpBar * PPQN.Quarter);
+
   return notes.map((item) => {
     let position = 0;
     let duration = PPQN.SemiQuaver;
@@ -410,20 +531,51 @@ export function normalizeNotes(units, notes) {
       duration =
         item.durationSteps !== undefined
           ? stepToPpqn(item.durationSteps)
-          : PPQN.SemiQuaver;
+          : item.dur !== undefined
+            ? parseDuration(item.dur)
+            : PPQN.SemiQuaver;
     } else if (units === "beats") {
       position = Math.round((item.beat ?? 0) * PPQN.Quarter);
-      duration = Math.round((item.durationBeats ?? 0.25) * PPQN.Quarter);
+      duration =
+        item.durationBeats !== undefined
+          ? Math.round(item.durationBeats * PPQN.Quarter)
+          : item.dur !== undefined
+            ? parseDuration(item.dur)
+            : Math.round(0.25 * PPQN.Quarter);
+    } else if (units === "bars" || item.bar !== undefined) {
+      const barNum = item.bar !== undefined ? Number(item.bar) : 1;
+      const barIdx = barNum >= 1 ? barNum - 1 : barNum;
+      const beatNum = item.beat !== undefined ? Number(item.beat) : 1;
+      const beatIdx = barNum >= 1 && beatNum >= 1 ? beatNum - 1 : beatNum;
+      position = Math.round(barIdx * barPulseCount + beatIdx * PPQN.Quarter);
+      duration =
+        item.dur !== undefined
+          ? parseDuration(item.dur)
+          : item.duration !== undefined
+            ? parseDuration(item.duration)
+            : PPQN.SemiQuaver;
     } else {
       position = Math.round(item.position ?? 0);
-      duration = Math.round(item.duration ?? PPQN.SemiQuaver);
+      duration =
+        item.dur !== undefined
+          ? parseDuration(item.dur)
+          : parseDuration(item.duration ?? PPQN.SemiQuaver);
     }
 
-    const pitch = parsePitch(item.pitch);
-    const velocity = Math.max(
-      0,
-      Math.min(1, item.velocity !== undefined ? Number(item.velocity) : 0.8),
-    );
+    const rawPitch = item.pitch !== undefined ? item.pitch : item.note;
+    const pitch = parsePitch(rawPitch);
+
+    let rawVelocity =
+      item.velocity !== undefined
+        ? Number(item.velocity)
+        : item.vel !== undefined
+          ? Number(item.vel)
+          : 0.8;
+    // Canonical velocity handling: if velocity is in legacy MIDI range > 1, rescale / 127
+    if (rawVelocity > 1) {
+      rawVelocity = rawVelocity / 127;
+    }
+    const velocity = Math.max(0, Math.min(1, rawVelocity));
 
     return { position, duration, pitch, velocity };
   });
@@ -474,11 +626,127 @@ export function applyCommand(project, name, params = {}) {
 
   switch (name) {
     case "new_project": {
-      const template = params.template || "basic-beat";
+      const template = params.template || "empty";
       const created = createProject(template);
       if (params.name) created.name = String(params.name);
       if (params.bpm) created.bpm = Number(params.bpm);
-      return { project: created, result: { ok: true, name: created.name } };
+
+      let seededTracks = [];
+      let totalNotes = 0;
+      if (Array.isArray(created.tracks) && created.tracks.length > 0) {
+        for (const trk of created.tracks) {
+          const count = Array.isArray(trk.notes) ? trk.notes.length : 0;
+          totalNotes += count;
+          seededTracks.push({
+            id: trk.id,
+            name: trk.name,
+            kind: trk.kind,
+            noteCount: count,
+            preset: trk.preset || trk.params?.preset || null,
+          });
+        }
+      }
+
+      if (params.clear) {
+        for (const trk of created.tracks) {
+          trk.notes = [];
+        }
+      }
+
+      const warning =
+        totalNotes > 0 && !params.clear
+          ? `Template '${template}' seeded ${totalNotes} notes across ${seededTracks.length} tracks. Use clear: true or scdaw_clear_project_notes to start with blank tracks.`
+          : undefined;
+
+      return {
+        project: created,
+        result: {
+          ok: true,
+          name: created.name,
+          template,
+          trackCount: created.tracks.length,
+          seededTracks,
+          warning,
+        },
+      };
+    }
+
+    case "clear_project_notes": {
+      let clearedNotesCount = 0;
+      if (Array.isArray(next.tracks)) {
+        for (const trk of next.tracks) {
+          if (Array.isArray(trk.notes)) {
+            clearedNotesCount += trk.notes.length;
+            trk.notes = [];
+          }
+        }
+      }
+      return {
+        project: next,
+        result: {
+          ok: true,
+          clearedNotesCount,
+          trackCount: next.tracks?.length || 0,
+        },
+      };
+    }
+
+    case "compose_song": {
+      const composed = compileSong(params);
+      const val = validateProject(composed);
+      if (!val.valid) {
+        throw new Error(
+          `Failed to compile valid song: ${val.errors.join(", ")}`,
+        );
+      }
+      return {
+        project: composed,
+        result: {
+          ok: true,
+          name: composed.name,
+          bpm: composed.bpm,
+          lengthBars: composed.lengthBars,
+          trackCount: composed.tracks.length,
+          tracks: composed.tracks.map((t) => ({
+            id: t.id,
+            name: t.name,
+            kind: t.kind,
+            noteCount: t.notes.length,
+          })),
+        },
+      };
+    }
+
+    case "describe_arrangement": {
+      const p = next;
+      const bpBar = beatsPerBar(p.signature || [4, 4]);
+      const barPulseCount = Math.round(bpBar * PPQN.Quarter);
+      const totalPulses = (p.lengthBars || 1) * barPulseCount;
+
+      const trackSummaries = (p.tracks || []).map((t) => {
+        const noteCount = t.notes ? t.notes.length : 0;
+        const clipCount = t.audioClips ? t.audioClips.length : 0;
+        return `- Track '${t.name}' (id: ${t.id}, kind: ${t.kind}, instrument: ${t.instrument || t.kind}): ${noteCount} notes, ${clipCount} audio clips, volume: ${t.volume}, pan: ${t.pan}`;
+      });
+
+      const summary = [
+        `Song: "${p.name || "Untitled"}"`,
+        `Tempo: ${p.bpm} BPM | Time Signature: ${(p.signature || [4, 4]).join("/")} | Length: ${p.lengthBars || 1} bars`,
+        `Loop Region: ${p.loop?.enabled ? `Enabled (${p.loop.startPulse || 0} to ${p.loop.endPulse || totalPulses} pulses)` : "Off (linear playback)"}`,
+        `Tracks (${(p.tracks || []).length}):`,
+        ...trackSummaries,
+      ].join("\n");
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          summary,
+          lengthBars: p.lengthBars,
+          bpm: p.bpm,
+          trackCount: p.tracks.length,
+        },
+      };
     }
 
     case "load_project": {
@@ -495,9 +763,16 @@ export function applyCommand(project, name, params = {}) {
         next.bpm = Math.max(40, Math.min(240, Number(params.bpm)));
       if (params.signature !== undefined) next.signature = params.signature;
       if (params.lengthBars !== undefined)
-        next.lengthBars = Math.max(1, Math.min(4, Number(params.lengthBars)));
+        next.lengthBars = Math.max(1, Math.min(512, Number(params.lengthBars)));
       if (params.swing !== undefined)
         next.swing = Math.max(0, Math.min(0.5, Number(params.swing)));
+      if (params.loop !== undefined) {
+        if (typeof params.loop === "boolean") {
+          next.loop = { ...(next.loop || {}), enabled: params.loop };
+        } else if (typeof params.loop === "object" && params.loop !== null) {
+          next.loop = { ...(next.loop || {}), ...params.loop };
+        }
+      }
       return {
         project: next,
         result: {
@@ -505,13 +780,14 @@ export function applyCommand(project, name, params = {}) {
           signature: next.signature,
           lengthBars: next.lengthBars,
           swing: next.swing,
+          loop: next.loop,
         },
       };
     }
 
     case "add_track": {
-      if (next.tracks.length >= 8) {
-        throw new Error("Cannot add track: maximum 8 tracks reached");
+      if (next.tracks.length >= 64) {
+        throw new Error("Cannot add track: maximum 64 tracks reached");
       }
       const kind =
         params.kind === "drums"
@@ -527,6 +803,28 @@ export function applyCommand(project, name, params = {}) {
           : kind === "audio"
             ? `Audio ${next.tracks.length + 1}`
             : `Synth ${next.tracks.length + 1}`);
+
+      let initParams =
+        kind === "synth"
+          ? {
+              waveform: "sawtooth",
+              cutoff: 1000,
+              resonance: 2,
+              attack: 0.01,
+              decay: 0.2,
+              sustain: 0.5,
+              release: 0.2,
+            }
+          : {};
+
+      let ignoredParams = [];
+      if (params.params && typeof params.params === "object") {
+        const schema = INSTRUMENT_SCHEMAS[kind] || SYNTH_PARAM_SCHEMA;
+        const res = validateAndFilterParams(schema, params.params);
+        initParams = { ...initParams, ...res.filtered };
+        ignoredParams = res.ignoredParams;
+      }
+
       const newTrack = {
         id,
         name,
@@ -535,26 +833,17 @@ export function applyCommand(project, name, params = {}) {
         pan: 0,
         mute: false,
         solo: false,
-        params:
-          kind === "synth"
-            ? {
-                waveform: "sawtooth",
-                cutoff: 1000,
-                resonance: 2,
-                attack: 0.01,
-                decay: 0.2,
-                sustain: 0.5,
-                release: 0.2,
-                ...(params.params || {}),
-              }
-            : params.params || {},
+        params: initParams,
         notes: [],
         audioClips: kind === "audio" ? [] : undefined,
         automation: {},
         sends: [],
       };
       next.tracks.push(newTrack);
-      return { project: next, result: { trackId: id, name, kind } };
+      return {
+        project: next,
+        result: { trackId: id, name, kind, ignoredParams },
+      };
     }
 
     case "remove_track": {
@@ -634,10 +923,20 @@ export function applyCommand(project, name, params = {}) {
       if (params.solo !== undefined) track.solo = Boolean(params.solo);
       if (params.instrument !== undefined)
         track.instrument = String(params.instrument);
+
+      let ignoredParams = [];
       if (params.params && typeof params.params === "object") {
-        track.params = { ...track.params, ...params.params };
+        const instKey = (
+          track.instrument ||
+          track.kind ||
+          "synth"
+        ).toLowerCase();
+        const schema = INSTRUMENT_SCHEMAS[instKey] || SYNTH_PARAM_SCHEMA;
+        const res = validateAndFilterParams(schema, params.params);
+        track.params = { ...track.params, ...res.filtered };
+        ignoredParams = res.ignoredParams;
       }
-      return { project: next, result: { ok: true, track } };
+      return { project: next, result: { ok: true, track, ignoredParams } };
     }
 
     case "set_instrument": {
@@ -646,12 +945,22 @@ export function applyCommand(project, name, params = {}) {
       if (!track) throw new Error(`Track not found: ${trackId}`);
       const inst = String(params.instrument || "synth").toLowerCase();
       track.instrument = inst;
+      let ignoredParams = [];
       if (params.params && typeof params.params === "object") {
-        track.params = { ...track.params, ...params.params };
+        const schema = INSTRUMENT_SCHEMAS[inst] || SYNTH_PARAM_SCHEMA;
+        const res = validateAndFilterParams(schema, params.params);
+        track.params = { ...track.params, ...res.filtered };
+        ignoredParams = res.ignoredParams;
       }
       return {
         project: next,
-        result: { ok: true, trackId, instrument: inst, track },
+        result: {
+          ok: true,
+          trackId,
+          instrument: inst,
+          track,
+          ignoredParams,
+        },
       };
     }
 
@@ -662,6 +971,7 @@ export function applyCommand(project, name, params = {}) {
       const normalized = normalizeNotes(
         params.units || "ppqn",
         params.notes || [],
+        next.signature || [4, 4],
       );
       const mode = params.mode || "replace";
 
@@ -1209,6 +1519,108 @@ export function applyCommand(project, name, params = {}) {
       };
     }
 
+    case "analyze_mix": {
+      const durSec = Math.max(
+        0.2,
+        Math.min(
+          60.0,
+          Number(params.durationSeconds || params.duration || 2.0),
+        ),
+      );
+      const sampleRate = Number(params.sampleRate || 44100);
+      const totalFrames = Math.round(durSec * sampleRate);
+      const left = new Float32Array(totalFrames);
+      const right = new Float32Array(totalFrames);
+
+      const bpm = next.bpm || 120;
+      const masterVol =
+        typeof next.master?.volume === "number" ? next.master.volume : 0.8;
+
+      const tracks = next.tracks || [];
+      const hasSolo = tracks.some((t) => t.solo);
+
+      for (const track of tracks) {
+        if (track.mute) continue;
+        if (hasSolo && !track.solo) continue;
+
+        const trkVol =
+          (typeof track.volume === "number" ? track.volume : 0.8) * masterVol;
+        const pan =
+          typeof track.pan === "number"
+            ? Math.max(-1, Math.min(1, track.pan))
+            : 0;
+        const panAngle = (pan + 1) * (Math.PI / 4);
+        const gainL = Math.cos(panAngle) * trkVol;
+        const gainR = Math.sin(panAngle) * trkVol;
+
+        const isDrums = track.kind === "drums";
+        const notes = track.notes || [];
+
+        for (const note of notes) {
+          const noteStartSec = pulsesToSeconds(note.position, bpm);
+          if (noteStartSec >= durSec) continue;
+
+          const noteDurSec = Math.min(
+            durSec - noteStartSec,
+            pulsesToSeconds(note.duration || PPQN.SemiQuaver, bpm),
+          );
+          const startFrame = Math.floor(noteStartSec * sampleRate);
+          const noteFrames = Math.floor(noteDurSec * sampleRate);
+          const vel =
+            typeof note.velocity === "number"
+              ? note.velocity > 1.0
+                ? note.velocity / 127
+                : note.velocity
+              : 0.8;
+
+          const pitch = typeof note.pitch === "number" ? note.pitch : 60;
+          const freq = isDrums
+            ? pitch === 36
+              ? 55
+              : pitch === 38
+                ? 200
+                : 8000
+            : 440 * Math.pow(2, (pitch - 69) / 12);
+
+          for (let f = 0; f < noteFrames && startFrame + f < totalFrames; f++) {
+            const t = f / sampleRate;
+            const env = Math.exp(-t * (isDrums ? 12 : 3));
+            let s = Math.sin(2 * Math.PI * freq * t) * env * vel;
+            if (isDrums && pitch === 38) {
+              s = (s * 0.5 + (Math.random() * 2 - 1) * 0.5) * env * vel;
+            }
+            left[startFrame + f] += s * gainL;
+            right[startFrame + f] += s * gainR;
+          }
+        }
+      }
+
+      if (next.master?.limiter?.enabled) {
+        const ceilingLin = Math.pow(
+          10,
+          (next.master.limiter.ceilingDb ?? -0.3) / 20,
+        );
+        for (let i = 0; i < totalFrames; i++) {
+          if (Math.abs(left[i]) > ceilingLin) {
+            left[i] = Math.tanh(left[i] / ceilingLin) * ceilingLin;
+          }
+          if (Math.abs(right[i]) > ceilingLin) {
+            right[i] = Math.tanh(right[i] / ceilingLin) * ceilingLin;
+          }
+        }
+      }
+
+      const analysis = analyzeAudioBuffer({ left, right, sampleRate });
+      return {
+        project: next,
+        result: {
+          ...analysis,
+          project: next.name || "Untitled",
+          durationSeconds: durSec,
+        },
+      };
+    }
+
     default:
       throw new Error(`Unknown command: ${name}`);
   }
@@ -1394,7 +1806,8 @@ export function resolveTrackNotes(
 ) {
   const loopCount =
     typeof loops === "number" ? Math.max(1, Math.floor(loops)) : 1;
-  const totalPulses = (project.lengthBars || 1) * PPQN.Bar;
+  const totalPulses =
+    (project.lengthBars || 1) * barPulses(project.signature || [4, 4]);
   const swing = bakeSwing ? project.swing || 0 : 0;
   let trackNotes = track.notes || [];
 
@@ -1513,7 +1926,9 @@ export function resolveTrackNotes(
 }
 
 export function computeEventsInRange(project, fromPpqn, toPpqn) {
-  const totalPulses = (project.lengthBars || 1) * PPQN.Bar;
+  const totalPulses =
+    (project.lengthBars || 1) * barPulses(project.signature || [4, 4]);
+  const isLooping = project.loop ? project.loop.enabled !== false : true;
   const events = [];
   const hasSolo = project.tracks.some((t) => t.solo);
 
@@ -1528,7 +1943,9 @@ export function computeEventsInRange(project, fromPpqn, toPpqn) {
     });
 
     for (const note of resolvedNotes) {
-      const triggerPos = note.position % totalPulses;
+      const triggerPos = isLooping
+        ? note.position % totalPulses
+        : note.position;
       let inRange = false;
       if (fromPpqn <= toPpqn) {
         inRange = triggerPos >= fromPpqn && triggerPos < toPpqn;

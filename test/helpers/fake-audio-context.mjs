@@ -81,6 +81,10 @@ class FakeOscillatorNode extends FakeAudioNode {
     this.started = false;
     this.stopped = false;
   }
+  setPeriodicWave(wave) {
+    this.periodicWave = wave;
+    this.type = "custom";
+  }
   start(when = 0) {
     this.started = true;
     this.startTime = when;
@@ -158,6 +162,8 @@ export class FakeAudioContext extends EventTarget {
     this.currentTime = 0;
     this.state = "suspended";
     this.destination = new FakeAudioNode(this);
+    this.oscillators = [];
+    this.bufferSources = [];
   }
 
   createGain() {
@@ -170,7 +176,12 @@ export class FakeAudioContext extends EventTarget {
     return new FakeBiquadFilterNode(this);
   }
   createOscillator() {
-    return new FakeOscillatorNode(this);
+    const osc = new FakeOscillatorNode(this);
+    this.oscillators.push(osc);
+    return osc;
+  }
+  createPeriodicWave(real, imag) {
+    return { real, imag };
   }
   createAnalyser() {
     return new FakeAnalyserNode(this);
@@ -185,7 +196,9 @@ export class FakeAudioContext extends EventTarget {
     return new FakeDelayNode(this, maxDelay);
   }
   createBufferSource() {
-    return new FakeAudioBufferSourceNode(this);
+    const node = new FakeAudioBufferSourceNode(this);
+    this.bufferSources.push(node);
+    return node;
   }
   createMediaStreamSource(stream) {
     const node = new FakeAudioNode(this);

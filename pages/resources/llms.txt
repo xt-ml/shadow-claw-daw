@@ -1,16 +1,16 @@
 # [ShadowClaw DAW](https://xt-ml.github.io/shadow-claw-daw/)
 
-> In-browser Digital Audio Workstation template powered by ShadowClaw. Features zero-dependency Web Audio API synthesis, TC39 Signals, custom Web Components, declarative WebMCP tools, and autonomous agent composition skills.
+> In-browser Digital Audio Workstation template powered by ShadowClaw. Features zero-dependency Web Audio API synthesis, General MIDI SoundFont 2 engine, autonomous song composition, TC39 Signals, custom Web Components, declarative WebMCP tools, and autonomous agent composition skills.
 
 ## Workbench & Interactive Surface
 
-- [Interactive Workbench](https://xt-ml.github.io/shadow-claw-daw/main/): Real-time Web Audio API synthesis, step sequencer, mixer console with peak meters, and offline WAV bouncing.
+- [Interactive Workbench](https://xt-ml.github.io/shadow-claw-daw/main/): Real-time Web Audio API synthesis, SoundFont instruments, step sequencer, mixer console with peak meters, and offline WAV bouncing.
 
 ## Documentation Guides
 
-- [Architecture](https://xt-ml.github.io/shadow-claw-daw/main/architecture/): Four-tier runtime architecture, Web Audio graph, lookahead scheduler, OPFS storage, and signal reactivity.
-- [WebMCP Tools](https://xt-ml.github.io/shadow-claw-daw/main/tools/): 25 declarative `scdaw_*` tools for agentic music production, MIDI/DAWproject interchange, and stem exports.
-- [Agent Skills](https://xt-ml.github.io/shadow-claw-daw/main/skills/): Autonomous slash skills (`/beat`, `/jam`, `/mixdown`, `/bounce`, `/scdaw-status`, `/scdaw-doctor`).
+- [Architecture](https://xt-ml.github.io/shadow-claw-daw/main/architecture/): Four-tier runtime architecture, composition engine, SoundFont synthesis, Web Audio graph, lookahead scheduler, OPFS storage, and signal reactivity.
+- [WebMCP Tools](https://xt-ml.github.io/shadow-claw-daw/main/tools/): 40 declarative `scdaw_*` tools for agentic music production, autonomous song composition, SoundFont synthesis, mix analysis, MIDI/DAWproject interchange, and stem exports.
+- [Agent Skills](https://xt-ml.github.io/shadow-claw-daw/main/skills/): Autonomous slash skills (`/song`, `/beat`, `/jam`, `/acid-jam`, `/trap-beat`, `/lofi-session`, `/soundfont-orchestra`, `/mixdown`, `/bounce`, `/scdaw-status`, `/scdaw-doctor`, `/scdaw-automate`, `/scdaw-audio-clip`, `/scdaw-record`).
 - [Workbench UI](https://xt-ml.github.io/shadow-claw-daw/main/workbench/): 11 mobile-first custom elements (`<scdaw-workbench>`, `<scdaw-transport>`, `<scdaw-browser>`, `<scdaw-timeline>`, `<scdaw-editor>`, `<scdaw-sequencer>`, `<scdaw-devices>`, `<scdaw-mixer>`, `<scdaw-knob>`, `<scdaw-resize-handle>`, `<scdaw-statusbar>`).
 - [Porting & Attribution](https://xt-ml.github.io/shadow-claw-daw/main/porting-and-attribution/): Provenance ledger and porting map from openDAW (AGPL-3.0-or-later).
 - [Troubleshooting](https://xt-ml.github.io/shadow-claw-daw/main/troubleshooting/): Browser audio autoplay policy, leader election, and offline bounce tips.

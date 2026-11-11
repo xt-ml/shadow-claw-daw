@@ -20,7 +20,14 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
   waveform: {
     default: "sawtooth",
     type: "enum",
-    values: ["sine", "triangle", "sawtooth", "square"],
+    values: ["sine", "triangle", "sawtooth", "square", "pulse"],
+  },
+  pulseWidth: {
+    default: 0.5,
+    min: 0.05,
+    max: 0.95,
+    step: 0.01,
+    unit: "ratio",
   },
   cutoff: {
     default: 1200,
@@ -482,6 +489,20 @@ export function migrateProject(project) {
   if (!project || typeof project !== "object") return project;
   const next = structuredClone(project);
   next.version = 2;
+  if (!Array.isArray(next.tempoMap)) {
+    next.tempoMap = [{ pulse: 0, bpm: Number(next.bpm) || 120 }];
+  }
+  if (!Array.isArray(next.signatureMap)) {
+    next.signatureMap = [
+      {
+        pulse: 0,
+        signature: Array.isArray(next.signature) ? next.signature : [4, 4],
+      },
+    ];
+  }
+  if (!Array.isArray(next.sections)) {
+    next.sections = [];
+  }
   next.meta = {
     title: next.name || "Untitled",
     artist: "ShadowClaw",
@@ -500,6 +521,9 @@ export function migrateProject(project) {
   for (const track of next.tracks) {
     if (!track.id) {
       track.id = `trk_${Math.random().toString(36).slice(2, 8)}`;
+    }
+    if (!track.kind && track.type) {
+      track.kind = track.type;
     }
     if (!track.color) {
       track.color =
@@ -525,6 +549,16 @@ export function migrateProject(project) {
     if (track.pan === undefined) track.pan = 0.0;
     if (track.mute === undefined) track.mute = false;
     if (track.solo === undefined) track.solo = false;
+
+    // Normalize legacy velocities > 1.0
+    for (const note of track.notes) {
+      if (typeof note.velocity === "number" && note.velocity > 1.0) {
+        note.velocity = Math.min(
+          1.0,
+          Math.max(0.0, +(note.velocity / 127).toFixed(3)),
+        );
+      }
+    }
   }
   return next;
 }
@@ -543,4 +577,42 @@ export function getDefaultParams(kind) {
     return defaults;
   }
   return {};
+}
+
+export function validateAndFilterParams(schema, inputParams = {}) {
+  if (!schema || typeof inputParams !== "object" || inputParams === null) {
+    return { filtered: inputParams || {}, ignoredParams: [] };
+  }
+
+  const filtered = {};
+  const ignoredParams = [];
+
+  for (const [key, val] of Object.entries(inputParams)) {
+    const spec = schema[key];
+    if (!spec) {
+      ignoredParams.push(key);
+      continue;
+    }
+
+    if (spec.type === "enum" && Array.isArray(spec.values)) {
+      if (!spec.values.includes(val)) {
+        throw new Error(
+          `Invalid value '${val}' for param '${key}'. Allowed values: ${spec.values.join(", ")}`,
+        );
+      }
+    }
+
+    if (spec.min !== undefined && typeof val === "number" && val < spec.min) {
+      filtered[key] = spec.min;
+      continue;
+    }
+    if (spec.max !== undefined && typeof val === "number" && val > spec.max) {
+      filtered[key] = spec.max;
+      continue;
+    }
+
+    filtered[key] = val;
+  }
+
+  return { filtered, ignoredParams };
 }

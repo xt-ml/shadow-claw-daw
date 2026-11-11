@@ -90,10 +90,10 @@ test("createProject & validateProject: creates compliant schema and catches inva
   const badBpm = { ...p, bpm: 500 };
   assert.equal(validateProject(badBpm).valid, false);
 
-  // Invalid tracks count (> 8)
+  // Invalid tracks count (> 64)
   const tooManyTracks = {
     ...p,
-    tracks: Array.from({ length: 9 }, (_, i) => ({
+    tracks: Array.from({ length: 65 }, (_, i) => ({
       id: `trk_${i}`,
       name: `Track ${i}`,
       kind: "synth",

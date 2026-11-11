@@ -25,3 +25,7 @@ Worker tools dispatch commands via `BroadcastChannel("scdaw-commands")`. If no b
 Only one tab acts as the primary audio leader to avoid audio stutter and duplicate tool executions.
 
 - Web Locks elect the first tab as the leader. Closing the leader tab automatically passes control to the next open workbench tab.
+
+### 4. Metronome Click Sound
+
+- **How it Works**: Clicking **"🔔 Metro"** (`#metro-btn`) enables the metronome click track. When toggled on while stopped, the DAW unlocks audio (if needed) and plays an instant audition click. During playback or recording, the metronome synthesizes woodblock-style click pulses on every quarter-note beat with an accented pitch on beat 1 (downbeat) following the project tempo and time signature.

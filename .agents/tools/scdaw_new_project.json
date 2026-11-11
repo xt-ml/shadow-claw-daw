@@ -25,7 +25,11 @@
           "trap",
           "synthwave"
         ],
-        "description": "Starter template"
+        "description": "Starter template (defaults to 'empty')"
+      },
+      "clear": {
+        "type": "boolean",
+        "description": "If true, clears all notes from the template so tracks start blank"
       }
     },
     "additionalProperties": false

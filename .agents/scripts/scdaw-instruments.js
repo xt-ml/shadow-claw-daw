@@ -8,6 +8,10 @@
  */
 
 import { pulsesToSeconds } from "./scdaw.js";
+import {
+  triggerDrumSoundfont,
+  triggerSoundfontNote,
+} from "./scdaw-soundfont.js";
 
 // Global cache for preloaded sample audio buffers (decoded via ctx.decodeAudioData)
 const sampleCache = new Map();
@@ -102,6 +106,7 @@ export function triggerDrums(
   when,
   trackVolume = 1,
   trackPan = 0,
+  params = {},
 ) {
   const pitch = note.pitch ?? 36;
   const velocity = Math.max(
@@ -126,7 +131,28 @@ export function triggerDrums(
     return createVoiceHandle([gain], [src], stopTime, ctx);
   }
 
-  // Pure Web Audio procedural synthesizers for drums
+  // If explicitly configured for SoundFont drum kit samples, use triggerDrumSoundfont
+  if (
+    params?.kit === "soundfont" ||
+    params?.kit === "rock-kit" ||
+    params?.kit === "acoustic" ||
+    params?.source === "soundfont" ||
+    params?.instrument === "soundfont"
+  ) {
+    const sfDrumVoice = triggerDrumSoundfont(
+      ctx,
+      dest,
+      note,
+      when,
+      trackVolume,
+      trackPan,
+    );
+    if (sfDrumVoice) {
+      return sfDrumVoice;
+    }
+  }
+
+  // Pure Web Audio procedural synthesizers for drums (Playfield 12-Drum kit)
   switch (pitch) {
     case 36: {
       // 36: Kick drum - pitch-dropped sine wave + snappy transient
@@ -421,6 +447,17 @@ export function triggerDrums(
   }
 }
 
+function getPulseWave(ctx, pulseWidth = 0.5) {
+  const d = Math.max(0.05, Math.min(0.95, Number(pulseWidth || 0.5)));
+  const nHarmonics = 64;
+  const real = new Float32Array(nHarmonics);
+  const imag = new Float32Array(nHarmonics);
+  for (let n = 1; n < nHarmonics; n++) {
+    imag[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * d);
+  }
+  return ctx.createPeriodicWave(real, imag);
+}
+
 export function triggerSynth(
   ctx,
   dest,
@@ -455,7 +492,16 @@ export function triggerSynth(
 
   // Main Oscillator 1
   const osc1 = ctx.createOscillator();
-  osc1.type = waveform;
+  if (waveform === "pulse") {
+    try {
+      const pw = getPulseWave(ctx, params.pulseWidth || 0.5);
+      osc1.setPeriodicWave(pw);
+    } catch (_) {
+      osc1.type = "square";
+    }
+  } else {
+    osc1.type = waveform;
+  }
   osc1.frequency.setValueAtTime(freq, when);
   if (params.detune) {
     osc1.detune.setValueAtTime(Number(params.detune), when);
@@ -505,7 +551,16 @@ export function triggerSynth(
   let osc2Gain = null;
   if (params.osc2Waveform && params.osc2Waveform !== "off") {
     osc2 = ctx.createOscillator();
-    osc2.type = params.osc2Waveform;
+    if (params.osc2Waveform === "pulse") {
+      try {
+        const pw = getPulseWave(ctx, params.pulseWidth || 0.5);
+        osc2.setPeriodicWave(pw);
+      } catch (_) {
+        osc2.type = "square";
+      }
+    } else {
+      osc2.type = params.osc2Waveform;
+    }
     const osc2Oct = Number(params.osc2Octave || 0);
     const osc2Freq = freq * Math.pow(2, osc2Oct);
     osc2.frequency.setValueAtTime(osc2Freq, when);
@@ -1206,6 +1261,20 @@ export function triggerSoundfont(
   bpm = 120,
   trackVolume = 1,
 ) {
+  // Try real General MIDI SoundFont voice first
+  const sfVoice = triggerSoundfontNote(
+    ctx,
+    dest,
+    note,
+    when,
+    params,
+    bpm,
+    trackVolume,
+  );
+  if (sfVoice) {
+    return sfVoice;
+  }
+
   const pitch = note.pitch ?? 60;
   const velocity = Math.max(
     0.01,
@@ -1300,7 +1369,33 @@ export function triggerInstrumentVoice(ctx, dest, event, when, bpm = 120) {
   switch (inst) {
     case "drums":
     case "playfield":
-      return triggerDrums(ctx, dest, event.note, when, trackVol, trackPan);
+      if (
+        event.trackInstrument === "soundfont" ||
+        params.kit === "soundfont" ||
+        params.kit === "rock-kit" ||
+        params.kit === "acoustic" ||
+        params.instrument === "soundfont" ||
+        params.source === "soundfont"
+      ) {
+        const sfDrumVoice = triggerDrumSoundfont(
+          ctx,
+          dest,
+          event.note,
+          when,
+          trackVol,
+          trackPan,
+        );
+        if (sfDrumVoice) return sfDrumVoice;
+      }
+      return triggerDrums(
+        ctx,
+        dest,
+        event.note,
+        when,
+        trackVol,
+        trackPan,
+        params,
+      );
     case "808":
       return trigger808(ctx, dest, event.note, when, params, bpm, trackVol);
     case "cubed":
@@ -1327,6 +1422,23 @@ export function triggerInstrumentVoice(ctx, dest, event, when, bpm = 120) {
     case "nano":
       return triggerNano(ctx, dest, event.note, when, params, bpm, trackVol);
     case "soundfont":
+      if (
+        event.trackKind === "drums" ||
+        params.kit === "soundfont" ||
+        params.kit === "rock-kit" ||
+        params.kit === "acoustic" ||
+        params.isDrum
+      ) {
+        const sfDrumVoice = triggerDrumSoundfont(
+          ctx,
+          dest,
+          event.note,
+          when,
+          trackVol,
+          trackPan,
+        );
+        if (sfDrumVoice) return sfDrumVoice;
+      }
       return triggerSoundfont(
         ctx,
         dest,

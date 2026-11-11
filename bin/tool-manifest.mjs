@@ -1,7 +1,7 @@
 /**
  * bin/tool-manifest.mjs
  *
- * Single source of truth for all 36 declarative scdaw_* tools.
+ * Single source of truth for all 40 declarative scdaw_* tools.
  * Generates .agents/tools/scdaw_*.json via bin/generate-tools.mjs.
  */
 
@@ -103,7 +103,12 @@ export const TOOLS = [
             "trap",
             "synthwave",
           ],
-          description: "Starter template",
+          description: "Starter template (defaults to 'empty')",
+        },
+        clear: {
+          type: "boolean",
+          description:
+            "If true, clears all notes from the template so tracks start blank",
         },
       },
       additionalProperties: false,
@@ -311,8 +316,9 @@ export const TOOLS = [
         trackId: { type: "string", description: "Target track ID" },
         units: {
           type: "string",
-          enum: ["steps", "beats", "ppqn"],
-          description: "Timebase units used in notes array (default 'steps')",
+          enum: ["steps", "beats", "ppqn", "bars"],
+          description:
+            "Timebase units used in notes array: 'bars' (1-indexed bar & beat), 'steps' (0-15 per bar), 'beats', or 'ppqn'",
         },
         mode: {
           type: "string",
@@ -325,18 +331,32 @@ export const TOOLS = [
           items: {
             type: "object",
             properties: {
+              bar: {
+                type: "number",
+                description: "1-based bar number (e.g. 1, 2, 3...)",
+              },
+              beat: {
+                type: "number",
+                description:
+                  "Beat position within bar (1-based, e.g. 1, 2, 2.5, 3...)",
+              },
               step: {
                 type: "number",
                 description: "16th step index (0-15 per bar)",
               },
-              beat: {
-                type: "number",
-                description: "Beat position (0, 0.5, 1, 1.25...)",
-              },
               position: { type: "number", description: "PPQN position" },
+              note: {
+                description:
+                  "Note pitch alias (e.g. 'C4', 'Eb3', 60, or 'kick')",
+              },
               pitch: {
                 description:
                   "Note pitch (MIDI number 0-127, note string 'C4', or drum name 'kick')",
+              },
+              dur: {
+                type: "string",
+                description:
+                  "Musical duration string ('1/16', '1/8', 'q'/'1/4', 'h'/'1/2', '1 bar', '2 beats')",
               },
               durationSteps: {
                 type: "number",
@@ -346,13 +366,18 @@ export const TOOLS = [
                 type: "number",
                 description: "Duration in PPQN pulses",
               },
+              vel: {
+                type: "number",
+                description: "Velocity alias (0.0 to 1.0)",
+              },
               velocity: {
                 type: "number",
                 description: "Velocity (0.0 to 1.0)",
               },
             },
           },
-          description: "List of notes to write",
+          description:
+            "List of notes to write (e.g. [{ bar: 1, beat: 1, note: 'E3', dur: '1/8', vel: 0.8 }])",
         },
       },
       required: ["trackId", "notes"],
@@ -394,6 +419,24 @@ export const TOOLS = [
     execution: {
       type: "javascript",
       code: makeBroadcastCode("scdaw_clear_notes"),
+    },
+  },
+  {
+    name: "scdaw_clear_project_notes",
+    description:
+      "Clears all notes across all tracks in the project, preserving tracks, instruments, and effects.",
+    input_schema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_clear_project_notes"),
     },
   },
   {
@@ -1299,6 +1342,172 @@ export const TOOLS = [
     execution: {
       type: "javascript",
       code: makeBroadcastCode("scdaw_apply_groove"),
+    },
+  },
+  {
+    name: "scdaw_compose_song",
+    description:
+      "Compile a complete multi-bar, multi-track song in one call from a high-level SongSpec (chords, feel, tempo, sections, form, instrumentation, custom riffs). Supports SoundFont GM instruments (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio, multiple chords per bar (e.g. 'F Bb | C Bb'), and custom riffs with rests (e.g. motifs: { bass: 'F2:8 F2:8 r:8 A2:8 C3:8' }). Example: scdaw_compose_song({ title: 'Keep on the Sunny Side', bpm: 86, feel: 'blues-rock', swing: 0.3, instruments: { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }, sections: [{ name: 'verse', bars: 8, chords: 'F Bb | C Bb' }], form: ['verse'] })",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Song title" },
+        bpm: { type: "number", description: "Tempo in BPM (e.g. 82, 122)" },
+        signature: {
+          type: "array",
+          items: { type: "integer" },
+          description: "Time signature [numerator, denominator] e.g. [4, 4]",
+        },
+        key: {
+          type: "string",
+          description: "Musical key root e.g. 'F', 'E', 'C', 'G'",
+        },
+        mode: {
+          type: "string",
+          enum: [
+            "major",
+            "minor",
+            "mixolydian",
+            "dorian",
+            "blues",
+            "ionian",
+            "aeolian",
+            "pentatonic_major",
+            "pentatonic_minor",
+          ],
+          description: "Musical mode/scale",
+        },
+        feel: {
+          type: "string",
+          enum: [
+            "straight-rock",
+            "blues-rock",
+            "funk",
+            "four-on-floor",
+            "trap",
+            "lofi",
+          ],
+          description: "Rhythm and genre feel preset",
+        },
+        swing: {
+          type: "number",
+          description:
+            "Swing factor between 0.0 and 1.0 (e.g. 0.3 for blues-rock shuffle)",
+        },
+        soundfontProfile: {
+          type: "string",
+          enum: ["lofi", "hifi", "generaluser-gs"],
+          description: "SoundFont playback profile",
+        },
+        instruments: {
+          type: "object",
+          description:
+            "Map of track roles to instrument names e.g. { drums: 'rock-kit', bass: 'electric-bass-finger', rhythm: 'electric-guitar-clean', lead: 'overdriven-guitar' }. Use SoundFont GM names (electric-bass-finger, acoustic-guitar-steel, electric-guitar-clean, overdriven-guitar, rock-organ, rock-kit) for realistic audio. Use 'synth' only when electronic chiptune/synthwave is desired.",
+        },
+        sections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description:
+                  "Section name (e.g. 'intro', 'verse', 'chorus', 'solo', 'outro')",
+              },
+              bars: {
+                type: "integer",
+                description: "Length of section in bars",
+              },
+              chords: {
+                type: "string",
+                description:
+                  "Chord progression string. Supports bar delimiters and multiple chords per bar (e.g. 'F Bb | C Bb' or 'E | E | A | B')",
+              },
+              energy: {
+                type: "number",
+                description: "Energy dynamic curve between 0.0 and 1.0",
+              },
+            },
+            required: ["name", "bars"],
+          },
+          description:
+            "Defined musical sections with chord progressions and bar lengths",
+        },
+        form: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Arrangement structure ordering the sections e.g. ['intro', 'verse', 'chorus', 'verse', 'chorus', 'solo', 'outro']",
+        },
+        motifs: {
+          type: "object",
+          description:
+            "Melodic motifs and custom signature riffs mapped by role (e.g. { bass: 'F2:8 F2:8 r:8 A2:8 C3:8 D3:8 F3:4', rhythm: 'r:4 F4:8 r:8', lead: 'F4:8 A4:8 C5:4' }). Supports pitch tokens (e.g. F2:8, C3:4) and rests (e.g. r:8, _:16, rest:4). When a bass or rhythm motif is provided, it repeats across sections as the song's signature hook.",
+        },
+        riffs: {
+          type: "object",
+          description:
+            "Alias for motifs: custom riffs mapped by role (bass, rhythm, lead, drums)",
+        },
+        seed: { type: "number", description: "Deterministic PRNG seed" },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: true,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_compose_song", 15000),
+    },
+  },
+  {
+    name: "scdaw_describe_arrangement",
+    description:
+      "Inspect and return a human-readable summary of the active project arrangement (tempo, signature, total bars, track roles, note counts, and looping state) to verify structure.",
+    input_schema: {
+      type: "object",
+      properties: {
+        detail: {
+          type: "string",
+          enum: ["summary", "full"],
+          description: "Level of arrangement detail",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_describe_arrangement"),
+    },
+  },
+  {
+    name: "scdaw_analyze_mix",
+    description:
+      "Analyze the current mix levels, dynamic range, clipping, and 3-band energy distribution (low, mid, high) across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, and actionable mix suggestions.",
+    input_schema: {
+      type: "object",
+      properties: {
+        durationSeconds: {
+          type: "number",
+          description:
+            "Duration of the mix to analyze in seconds (default 2.0, max 60.0)",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_analyze_mix"),
     },
   },
 ];

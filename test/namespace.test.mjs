@@ -16,8 +16,8 @@ test("Namespace isolation: verifies scoped naming conventions and zero conflicts
   );
   assert.equal(
     result.report.tools.length,
-    36,
-    "Must define 36 tools in enabledTools",
+    40,
+    "Must define 40 tools in enabledTools",
   );
   assert.equal(
     result.report.elements.length,

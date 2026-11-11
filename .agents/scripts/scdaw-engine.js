@@ -10,6 +10,7 @@
 import { State } from "./scdaw-signals.js";
 import {
   PPQN,
+  barPulses,
   createProject,
   validateProject,
   applyCommand,
@@ -30,7 +31,11 @@ import { encodeZip } from "./scdaw-zip.js";
 import { encodeMidiFile, midiToProject } from "./scdaw-midi.js";
 import { encodeDawProject, decodeDawProject } from "./scdaw-dawproject.js";
 import { triggerInstrumentVoice } from "./scdaw-instruments.js";
-import { processMaximizer, processStereoTool } from "./scdaw-dsp.js";
+import {
+  processMaximizer,
+  processStereoTool,
+  analyzeAudioBuffer,
+} from "./scdaw-dsp.js";
 import {
   writeConversationFile,
   readConversationFile,
@@ -39,12 +44,18 @@ import {
   DEFAULT_GROUP_ID,
 } from "./scdaw-fs.js";
 import { AudioRecorder } from "./scdaw-recorder.js";
+import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
 
 export class DawEngine extends EventTarget {
   constructor(options = {}) {
     super();
     this.options = options;
     this.history = createHistory(50);
+
+    if (typeof fetch === "function") {
+      loadBundledSoundfontAsync("drums").catch(() => {});
+      loadBundledSoundfontAsync("gm").catch(() => {});
+    }
 
     const initialProject =
       this.options.project ||
@@ -195,6 +206,7 @@ export class DawEngine extends EventTarget {
 
       this.graph = {
         masterGain,
+        master: masterGain,
         masterCompressor,
         masterAnalyser,
         tracks: new Map(),
@@ -334,6 +346,20 @@ export class DawEngine extends EventTarget {
     return "unsupported";
   }
 
+  async previewMetronomeClick(isAccent = true) {
+    if (!this.ctx) return;
+    if (this.ctx.state === "suspended") {
+      try {
+        await this.unlockAudio();
+      } catch (_) {}
+    }
+    if (!this.graph) {
+      this._updateGraph();
+    }
+    const when = this.ctx.currentTime || 0;
+    this._scheduleMetronomeClick(when, isAccent);
+  }
+
   async play() {
     if (this.ctx && this.ctx.state === "suspended") {
       try {
@@ -402,7 +428,7 @@ export class DawEngine extends EventTarget {
 
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
 
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
     const deltaSec = Math.max(0.001, nowAudio - this._lastScheduleAudioTime);
@@ -535,13 +561,19 @@ export class DawEngine extends EventTarget {
       // Schedule Metronome Clicks if enabled
       if (p.metronome && p.metronome.enabled) {
         const sigBeats = (p.signature && p.signature[0]) || 4;
-        const startBeat = Math.ceil(fromPpqn / PPQN.Quarter);
-        const endBeat = Math.floor(toPpqn / PPQN.Quarter);
-        for (let b = startBeat; b <= endBeat; b++) {
-          const beatPulse = (b * PPQN.Quarter) % totalPulses;
-          const deltaBeat =
-            (beatPulse - (fromPpqn % totalPulses) + totalPulses) % totalPulses;
-          if (deltaBeat < lookaheadPulses) {
+        const totalBeats = Math.round(totalPulses / PPQN.Quarter);
+        for (let b = 0; b < totalBeats; b++) {
+          const beatPulse = b * PPQN.Quarter;
+          let inRange = false;
+          if (schedStart <= schedEnd) {
+            inRange = beatPulse >= schedStart && beatPulse < schedEnd;
+          } else {
+            inRange = beatPulse >= schedStart || beatPulse < schedEnd;
+          }
+          if (inRange) {
+            const deltaBeat =
+              (beatPulse - (fromPpqn % totalPulses) + totalPulses) %
+              totalPulses;
             const beatTime = Math.max(
               nowAudio,
               nowAudio + pulsesToSeconds(deltaBeat, bpm),
@@ -602,25 +634,51 @@ export class DawEngine extends EventTarget {
   }
 
   _scheduleMetronomeClick(when, isAccent) {
-    if (!this.ctx || !this.graph || !this.graph.master) return;
+    if (!this.ctx || !this.graph) return;
+    const masterNode = this.graph.masterGain || this.graph.master;
+    if (!masterNode) return;
     try {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const p = this.project.get();
       const metroVol = (p.metronome?.volume ?? 0.8) * 0.4;
+      const actualWhen = Math.max(this.ctx.currentTime || 0, when);
+      const duration = 0.05;
+
       osc.type = "sine";
-      osc.frequency.setValueAtTime(isAccent ? 800 : 500, when);
-      gain.gain.setValueAtTime(isAccent ? metroVol * 1.2 : metroVol, when);
-      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+      const startFreq = isAccent ? 1200 : 800;
+      const endFreq = isAccent ? 400 : 300;
+      osc.frequency.setValueAtTime(startFreq, actualWhen);
+      if (typeof osc.frequency.exponentialRampToValueAtTime === "function") {
+        osc.frequency.exponentialRampToValueAtTime(
+          endFreq,
+          actualWhen + duration,
+        );
+      }
+
+      const peakGain = isAccent ? metroVol * 1.2 : metroVol;
+      gain.gain.setValueAtTime(0.0001, actualWhen);
+      if (typeof gain.gain.linearRampToValueAtTime === "function") {
+        gain.gain.linearRampToValueAtTime(peakGain, actualWhen + 0.002);
+      } else {
+        gain.gain.setValueAtTime(peakGain, actualWhen);
+      }
+      if (typeof gain.gain.exponentialRampToValueAtTime === "function") {
+        gain.gain.exponentialRampToValueAtTime(0.0001, actualWhen + duration);
+      } else {
+        gain.gain.setValueAtTime(0.0001, actualWhen + duration);
+      }
+
       osc.connect(gain);
-      gain.connect(this.graph.master);
+      gain.connect(masterNode);
       osc.onended = () => {
         try {
+          osc.disconnect();
           gain.disconnect();
         } catch (_) {}
       };
-      osc.start(when);
-      osc.stop(when + 0.05);
+      osc.start(actualWhen);
+      osc.stop(actualWhen + duration);
     } catch (_) {}
   }
 
@@ -660,7 +718,7 @@ export class DawEngine extends EventTarget {
     } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
     const bouncePulses = loops * totalPulses;
     const durationSec = pulsesToSeconds(bouncePulses, bpm);
     const totalFrames = Math.ceil((durationSec + tailSeconds) * sampleRate);
@@ -955,7 +1013,7 @@ export class DawEngine extends EventTarget {
     } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
     const bouncePulses = loops * totalPulses;
     const durationSec = pulsesToSeconds(bouncePulses, bpm);
     const totalFrames = Math.ceil((durationSec + tailSeconds) * sampleRate);
@@ -1225,6 +1283,103 @@ export class DawEngine extends EventTarget {
       bitDepth,
       tap,
     };
+  }
+
+  async analyzeMix(options = {}) {
+    const OfflineCtxClass =
+      this.options.offlineAudioContextClass ||
+      (typeof window !== "undefined"
+        ? window.OfflineAudioContext || window.webkitOfflineAudioContext
+        : null);
+
+    if (!OfflineCtxClass) {
+      const { result } = applyCommand(
+        this.project.get(),
+        "analyze_mix",
+        options,
+      );
+      return result;
+    }
+
+    try {
+      const p = this.project.get();
+      const durSec = Math.max(
+        0.2,
+        Math.min(
+          60.0,
+          Number(options.durationSeconds || options.duration || 2.0),
+        ),
+      );
+      const sampleRate = options.sampleRate || 44100;
+      const totalFrames = Math.ceil(durSec * sampleRate);
+      const offlineCtx = new OfflineCtxClass(2, totalFrames, sampleRate);
+
+      const bpm = p.bpm || 120;
+      const masterGain = offlineCtx.createGain();
+      masterGain.gain.setValueAtTime(p.master?.volume ?? 0.8, 0);
+
+      const compressor = offlineCtx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-3, 0);
+      compressor.ratio.setValueAtTime(12, 0);
+
+      masterGain.connect(compressor);
+      compressor.connect(offlineCtx.destination);
+
+      const trackGains = new Map();
+      const hasSolo = p.tracks.some((t) => t.solo);
+
+      for (const track of p.tracks) {
+        const effectiveVol =
+          track.mute || (hasSolo && !track.solo) ? 0 : (track.volume ?? 0.8);
+        const gain = offlineCtx.createGain();
+        gain.gain.setValueAtTime(effectiveVol, 0);
+        gain.connect(masterGain);
+        trackGains.set(track.id, gain);
+
+        const resolvedNotes = resolveTrackNotes(p, track, {
+          loops: 1,
+          bakeMidiFx: true,
+          bakeSwing: true,
+        });
+
+        for (const note of resolvedNotes) {
+          const when = pulsesToSeconds(note.position, bpm);
+          if (when >= durSec) continue;
+
+          triggerInstrumentVoice(
+            offlineCtx,
+            gain,
+            {
+              trackKind: track.kind || track.type,
+              trackInstrument: track.instrument || track.kind || track.type,
+              trackParams: track.params,
+              trackVolume: track.volume,
+              trackPan: track.pan,
+              note,
+            },
+            when,
+            bpm,
+          );
+        }
+      }
+
+      const rendered = await offlineCtx.startRendering();
+      const left = rendered.getChannelData(0);
+      const right = rendered.getChannelData(1);
+      const analysis = analyzeAudioBuffer({ left, right, sampleRate });
+      return {
+        ...analysis,
+        project: p.name || "Untitled",
+        durationSeconds: durSec,
+      };
+    } catch {
+      const { result } = applyCommand(
+        this.project.get(),
+        "analyze_mix",
+        options,
+      );
+      return result;
+    }
   }
 
   exportMidi(options = {}) {
@@ -1576,9 +1731,19 @@ export class DawEngine extends EventTarget {
       return { ok: true, undone: true, project: prev };
     }
 
+    if (name === "describe_arrangement") {
+      const { result } = applyCommand(this.project.get(), name, params);
+      return result;
+    }
+
+    if (name === "analyze_mix") {
+      return await this.analyzeMix(params);
+    }
+
     if (
       name === "reset_project" ||
       name === "new_project" ||
+      name === "compose_song" ||
       (name === "reset" && (!params.scope || params.scope === "project"))
     ) {
       if (this.state.get().playing) {

@@ -108,6 +108,7 @@
     "scdaw_set_track",
     "scdaw_write_notes",
     "scdaw_clear_notes",
+    "scdaw_clear_project_notes",
     "scdaw_get_levels",
     "scdaw_bounce",
     "scdaw_export_stems",
@@ -131,6 +132,9 @@
     "scdaw_set_instrument",
     "scdaw_set_808",
     "scdaw_configure_fx",
-    "scdaw_apply_groove"
+    "scdaw_apply_groove",
+    "scdaw_compose_song",
+    "scdaw_describe_arrangement",
+    "scdaw_analyze_mix"
   ]
 }

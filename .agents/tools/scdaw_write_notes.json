@@ -11,8 +11,8 @@
       },
       "units": {
         "type": "string",
-        "enum": ["steps", "beats", "ppqn"],
-        "description": "Timebase units used in notes array (default 'steps')"
+        "enum": ["steps", "beats", "ppqn", "bars"],
+        "description": "Timebase units used in notes array: 'bars' (1-indexed bar & beat), 'steps' (0-15 per bar), 'beats', or 'ppqn'"
       },
       "mode": {
         "type": "string",
@@ -24,20 +24,31 @@
         "items": {
           "type": "object",
           "properties": {
-            "step": {
+            "bar": {
               "type": "number",
-              "description": "16th step index (0-15 per bar)"
+              "description": "1-based bar number (e.g. 1, 2, 3...)"
             },
             "beat": {
               "type": "number",
-              "description": "Beat position (0, 0.5, 1, 1.25...)"
+              "description": "Beat position within bar (1-based, e.g. 1, 2, 2.5, 3...)"
+            },
+            "step": {
+              "type": "number",
+              "description": "16th step index (0-15 per bar)"
             },
             "position": {
               "type": "number",
               "description": "PPQN position"
             },
+            "note": {
+              "description": "Note pitch alias (e.g. 'C4', 'Eb3', 60, or 'kick')"
+            },
             "pitch": {
               "description": "Note pitch (MIDI number 0-127, note string 'C4', or drum name 'kick')"
+            },
+            "dur": {
+              "type": "string",
+              "description": "Musical duration string ('1/16', '1/8', 'q'/'1/4', 'h'/'1/2', '1 bar', '2 beats')"
             },
             "durationSteps": {
               "type": "number",
@@ -47,13 +58,17 @@
               "type": "number",
               "description": "Duration in PPQN pulses"
             },
+            "vel": {
+              "type": "number",
+              "description": "Velocity alias (0.0 to 1.0)"
+            },
             "velocity": {
               "type": "number",
               "description": "Velocity (0.0 to 1.0)"
             }
           }
         },
-        "description": "List of notes to write"
+        "description": "List of notes to write (e.g. [{ bar: 1, beat: 1, note: 'E3', dur: '1/8', vel: 0.8 }])"
       }
     },
     "required": ["trackId", "notes"],

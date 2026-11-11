@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const TOOLS_DIR = resolve(ROOT, ".agents/tools");
 
-test("Tools: all 36 tools defined in manifest exist on disk and match schema", () => {
-  assert.equal(TOOLS.length, 36);
+test("Tools: all 40 tools defined in manifest exist on disk and match schema", () => {
+  assert.equal(TOOLS.length, 40);
 
   for (const tool of TOOLS) {
     const filePath = resolve(TOOLS_DIR, `${tool.name}.json`);
@@ -188,11 +188,54 @@ test("Adapter: handleToolDispatch dispatches status, project, transport, and sur
   assert.ok(grooveRes.ok);
   assert.equal(grooveRes.fx.template, "mpc60");
 
+  const clearNotesRes = await handleToolDispatch(
+    "scdaw_clear_project_notes",
+    {},
+  );
+  assert.ok(clearNotesRes.ok);
+
   const resetRes = await handleToolDispatch("scdaw_reset", {
     scope: "project",
     template: "basic-beat",
   });
   assert.ok(resetRes.ok);
+});
+
+test("WebMCP adapter: registerNativeWebMcp registers all 40 tools into modelContext", async () => {
+  const registered = [];
+  globalThis.document = {
+    modelContext: {
+      registerTool: (tool) => {
+        registered.push(tool);
+        return Promise.resolve();
+      },
+    },
+  };
+
+  await registerNativeWebMcp();
+  assert.equal(
+    registered.length,
+    40,
+    "All 40 tools must be registered with WebMCP",
+  );
+  assert.ok(
+    registered.some((t) => t.name === "scdaw_compose_song"),
+    "scdaw_compose_song must be registered",
+  );
+  assert.ok(
+    registered.some((t) => t.name === "scdaw_write_notes"),
+    "scdaw_write_notes must be registered",
+  );
+  assert.ok(
+    registered.some((t) => t.name === "scdaw_bounce"),
+    "scdaw_bounce must be registered",
+  );
+
+  // Verify execution handler routes cleanly
+  const composeTool = registered.find((t) => t.name === "scdaw_compose_song");
+  assert.equal(typeof composeTool.execute, "function");
+
+  delete globalThis.document;
 });
 
 test("WebMCP adapter: registerNativeWebMcp handles Duplicate tool name InvalidStateError cleanly", async () => {

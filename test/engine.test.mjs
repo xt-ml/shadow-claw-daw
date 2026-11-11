@@ -6,6 +6,11 @@ import {
 } from "./helpers/fake-audio-context.mjs";
 import { triggerInstrumentVoice } from "../.agents/scripts/scdaw-instruments.js";
 import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+import {
+  computeEventsInRange,
+  createProject,
+  PPQN,
+} from "../.agents/scripts/scdaw.js";
 
 test("Instruments: triggers drum synth voices with parameter automation", () => {
   const ctx = new FakeAudioContext();
@@ -475,4 +480,171 @@ test("Instruments: voices disconnect their audio nodes and invoke onended on com
   };
   pluckVoice.stop(0);
   assert.equal(pluckEnded, true, "pluckVoice onended should fire on stop");
+});
+
+test("DawEngine: metronome click scheduling and preview sound generation", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    // 1. Initial state: metronome disabled
+    assert.equal(engine.getProject().metronome?.enabled, false);
+
+    // 2. previewMetronomeClick generates an audible oscillator click connected to master
+    await engine.previewMetronomeClick(true);
+    assert.ok(
+      ctx.oscillators.length > 0,
+      "previewMetronomeClick should create an oscillator",
+    );
+    const accentOsc = ctx.oscillators[ctx.oscillators.length - 1];
+    assert.equal(
+      accentOsc.frequency.events[0].val,
+      1200,
+      "accent preview click frequency should start at 1200Hz",
+    );
+    assert.equal(
+      accentOsc.frequency.events[1].val,
+      400,
+      "accent preview click frequency should ramp down to 400Hz",
+    );
+
+    // Test unaccented preview click
+    await engine.previewMetronomeClick(false);
+    const unaccentOsc = ctx.oscillators[ctx.oscillators.length - 1];
+    assert.equal(
+      unaccentOsc.frequency.events[0].val,
+      800,
+      "regular preview click frequency should start at 800Hz",
+    );
+    assert.equal(
+      unaccentOsc.frequency.events[1].val,
+      300,
+      "regular preview click frequency should ramp down to 300Hz",
+    );
+
+    // 3. Enable metronome
+    await engine.sendCommand("set_metronome", { enabled: true, volume: 0.9 });
+    assert.equal(engine.getProject().metronome.enabled, true);
+
+    const oscCountBeforePlay = ctx.oscillators.length;
+
+    // 4. Start playback - downbeat click scheduled immediately in initial lookahead
+    await engine.play();
+    engine._onClockTick();
+
+    assert.ok(
+      ctx.oscillators.length > oscCountBeforePlay,
+      "playing with metronome enabled should schedule oscillator clicks",
+    );
+
+    // Verify downbeat accent on beat 1 (pos 0)
+    const playOscs = ctx.oscillators.slice(oscCountBeforePlay);
+    const playDownbeatOsc = playOscs.find(
+      (o) => o.frequency.events[0]?.val === 1200,
+    );
+    assert.ok(
+      playDownbeatOsc,
+      "downbeat click at beat 1 should be scheduled with accent frequency (1200Hz)",
+    );
+    assert.equal(
+      playDownbeatOsc.frequency.events[1].val,
+      400,
+      "downbeat click should ramp to 400Hz",
+    );
+
+    // 5. Disable metronome - subsequent clock ticks should not schedule metronome clicks
+    await engine.sendCommand("set_metronome", { enabled: false });
+    const oscCountAfterDisable = ctx.oscillators.length;
+    // Step forward by 1 beat
+    ctx.currentTime += 0.5;
+    engine._onClockTick();
+    // In our starter project drums/bass notes might be scheduled, but no new metronome click
+    const newOscs = ctx.oscillators.slice(oscCountAfterDisable);
+    const hasNewMetroOsc = newOscs.some(
+      (o) =>
+        o.frequency.events.length > 0 &&
+        (o.frequency.events[0].val === 1200 ||
+          o.frequency.events[0].val === 800),
+    );
+    assert.equal(
+      hasNewMetroOsc,
+      false,
+      "no metronome oscillators should be created when metronome is disabled",
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("computeEventsInRange and DawEngine: seamless loop wrap without pause or dropped boundary notes", async () => {
+  // 1. Create a 1-bar project with 16 continuous 16th notes on Closed Hat (pitch 42)
+  const project = createProject("empty");
+  project.bpm = 128;
+  project.lengthBars = 1;
+  const drumNotes = [];
+  for (let i = 0; i < 16; i++) {
+    drumNotes.push({
+      position: i * PPQN.SemiQuaver,
+      duration: PPQN.SemiQuaver,
+      pitch: 42,
+      velocity: 0.8,
+    });
+  }
+  project.tracks.push({
+    id: "trk_drums",
+    name: "Drums",
+    kind: "drums",
+    volume: 0.85,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: {},
+    notes: drumNotes,
+  });
+
+  // 2. Test computeEventsInRange directly across the loop wrap (e.g. from 3800 to 200 pulses)
+  const wrappedEvents = computeEventsInRange(project, 3800, 200);
+  assert.ok(
+    wrappedEvents.length > 0,
+    "Wrapped range across loop boundary must return events",
+  );
+  const noteAtZero = wrappedEvents.find(
+    (e) => e.position === 0 || e.note.position === 0,
+  );
+  assert.ok(
+    noteAtZero,
+    "Note at position 0 must be captured when scheduling window wraps around the loop boundary (e.g. 3800 -> 200)",
+  );
+
+  // 3. Test DawEngine playback: simulate advancing near the loop boundary
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    engine._onClockTick();
+
+    // Advance audio clock to near the end of bar 1 (e.g. 1.82s at 128bpm; 1 bar = 1.875s)
+    ctx.currentTime = 1.82;
+    const sourcesCountBeforeWrap = ctx.bufferSources.length;
+
+    // Tick when scheduling window crosses over the loop boundary
+    engine._onClockTick();
+
+    // Notes at the beginning of the next loop (step 0 at position 0) must be scheduled without a pause
+    const sourcesCountAfterWrap = ctx.bufferSources.length;
+    assert.ok(
+      sourcesCountAfterWrap > sourcesCountBeforeWrap,
+      "Notes at the start of the next loop repetition must be scheduled during loop boundary wrap",
+    );
+  } finally {
+    await engine.stop();
+  }
 });
