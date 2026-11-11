@@ -430,13 +430,16 @@ export function parseSf2(arrayBuffer) {
 // 2. SF2 Simplification (Port of openDAW packages/studio/core-wasm/src/soundfont-simplify.ts)
 // ---------------------------------------------------------------------------
 
-const numeric = (zone, type) => zone.generators[type]?.value;
-const combined = (preset, inst, type) =>
-  numeric(inst, type) ?? numeric(preset, type);
+const numeric = (zone, type) => zone?.generators?.[type]?.value;
+const combined = (preset, inst, type, globalPreset = null, globalInst = null) =>
+  numeric(inst, type) ??
+  numeric(globalInst, type) ??
+  numeric(preset, type) ??
+  numeric(globalPreset, type);
 const timecentsToSeconds = (value) =>
   value !== undefined ? Math.pow(2.0, value / 1200.0) : 0.005;
 const rangeOf = (zone, type) =>
-  zone.generators[type]?.range ?? { lo: 0, hi: 127 };
+  zone?.generators?.[type]?.range ?? { lo: 0, hi: 127 };
 
 export function simplifySoundfont(soundfont) {
   const samples = [];
@@ -461,16 +464,66 @@ export function simplifySoundfont(soundfont) {
     return index;
   };
 
-  const presets = soundfont.presets.map((preset) => {
+  const presetsMeta = [];
+  const programMap = Object.create(null);
+
+  const presets = soundfont.presets.map((preset, idx) => {
+    const bank = preset.bank ?? 0;
+    const program = preset.preset ?? idx;
+    presetsMeta.push({
+      name: preset.name || "",
+      bank,
+      preset: program,
+    });
+    const bankKey = `${bank}:${program}`;
+    if (programMap[bankKey] === undefined) {
+      programMap[bankKey] = idx;
+    }
+
     const regions = [];
-    for (const presetZone of preset.zones || []) {
-      const presetKey = rangeOf(presetZone, GeneratorType.KeyRange);
-      const presetVel = rangeOf(presetZone, GeneratorType.VelRange);
+    const presetZones = preset.zones || [];
+    const globalPresetZone =
+      presetZones.length > 1 &&
+      presetZones[0]?.generators?.[41] === undefined &&
+      !presetZones[0]?.instrument?.zones?.length
+        ? presetZones[0]
+        : null;
+
+    for (const presetZone of presetZones) {
+      if (presetZone === globalPresetZone) continue;
+      const presetKey = presetZone.generators?.[GeneratorType.KeyRange]
+        ?.range ??
+        globalPresetZone?.generators?.[GeneratorType.KeyRange]?.range ?? {
+          lo: 0,
+          hi: 127,
+        };
+      const presetVel = presetZone.generators?.[GeneratorType.VelRange]
+        ?.range ??
+        globalPresetZone?.generators?.[GeneratorType.VelRange]?.range ?? {
+          lo: 0,
+          hi: 127,
+        };
 
       const instZones = presetZone.instrument?.zones || [];
+      const globalInstZone =
+        instZones.length > 1 &&
+        instZones[0]?.generators?.[GeneratorType.SampleId] === undefined &&
+        !instZones[0]?.sample
+          ? instZones[0]
+          : null;
+
       for (const instZone of instZones) {
-        const instKey = rangeOf(instZone, GeneratorType.KeyRange);
-        const instVel = rangeOf(instZone, GeneratorType.VelRange);
+        if (instZone === globalInstZone) continue;
+        const instKey = instZone.generators?.[GeneratorType.KeyRange]?.range ??
+          globalInstZone?.generators?.[GeneratorType.KeyRange]?.range ?? {
+            lo: 0,
+            hi: 127,
+          };
+        const instVel = instZone.generators?.[GeneratorType.VelRange]?.range ??
+          globalInstZone?.generators?.[GeneratorType.VelRange]?.range ?? {
+            lo: 0,
+            hi: 127,
+          };
 
         // Intersection of preset and instrument key/vel ranges
         const keyLo = Math.max(presetKey.lo, instKey.lo);
@@ -488,15 +541,43 @@ export function simplifySoundfont(soundfont) {
         const sampleIndex = internSample(sample);
         const rootKey =
           numeric(instZone, GeneratorType.OverridingRootKey) ??
+          numeric(globalInstZone, GeneratorType.OverridingRootKey) ??
           sample.header.originalPitch ??
           60;
         const sampleModes =
-          combined(presetZone, instZone, GeneratorType.SampleModes) ?? 0;
+          combined(
+            presetZone,
+            instZone,
+            GeneratorType.SampleModes,
+            globalPresetZone,
+            globalInstZone,
+          ) ?? 0;
         const sustain = combined(
           presetZone,
           instZone,
           GeneratorType.SustainVolEnv,
+          globalPresetZone,
+          globalInstZone,
         );
+        const coarseTune =
+          combined(
+            presetZone,
+            instZone,
+            GeneratorType.CoarseTune,
+            globalPresetZone,
+            globalInstZone,
+          ) ?? 0;
+        const fineTune =
+          combined(
+            presetZone,
+            instZone,
+            GeneratorType.FineTune,
+            globalPresetZone,
+            globalInstZone,
+          ) ?? 0;
+        const pitchCorrection = sample.header?.pitchCorrection ?? 0;
+        const tuningSemis =
+          (coarseTune * 100 + fineTune + pitchCorrection) / 100;
 
         regions.push({
           keyLo,
@@ -505,18 +586,43 @@ export function simplifySoundfont(soundfont) {
           velHi,
           sampleIndex,
           rootKey,
+          tuningSemis,
           loopMode: sampleModes === 1 || sampleModes === 3 ? 1 : 0,
           pan:
-            (combined(presetZone, instZone, GeneratorType.Pan) ?? 0) / 1000.0,
+            (combined(
+              presetZone,
+              instZone,
+              GeneratorType.Pan,
+              globalPresetZone,
+              globalInstZone,
+            ) ?? 0) / 1000.0,
           attack: timecentsToSeconds(
-            combined(presetZone, instZone, GeneratorType.AttackVolEnv),
+            combined(
+              presetZone,
+              instZone,
+              GeneratorType.AttackVolEnv,
+              globalPresetZone,
+              globalInstZone,
+            ),
           ),
           decay: timecentsToSeconds(
-            combined(presetZone, instZone, GeneratorType.DecayVolEnv),
+            combined(
+              presetZone,
+              instZone,
+              GeneratorType.DecayVolEnv,
+              globalPresetZone,
+              globalInstZone,
+            ),
           ),
           sustain: 1.0 - (sustain ?? 0.0) / 1000.0,
           release: timecentsToSeconds(
-            combined(presetZone, instZone, GeneratorType.ReleaseVolEnv),
+            combined(
+              presetZone,
+              instZone,
+              GeneratorType.ReleaseVolEnv,
+              globalPresetZone,
+              globalInstZone,
+            ),
           ),
         });
       }
@@ -527,7 +633,29 @@ export function simplifySoundfont(soundfont) {
   return {
     samples,
     presets,
+    presetsMeta,
+    programMap,
   };
+}
+
+export function findPresetIndex(simpleSoundfont, program = 0, bank = 0) {
+  if (!simpleSoundfont || !Array.isArray(simpleSoundfont.presets)) return 0;
+  const maxIdx = Math.max(0, simpleSoundfont.presets.length - 1);
+  if (simpleSoundfont.programMap) {
+    const exact = simpleSoundfont.programMap[`${bank}:${program}`];
+    if (typeof exact === "number") return exact;
+    if (bank !== 0) {
+      const bank0 = simpleSoundfont.programMap[`0:${program}`];
+      if (typeof bank0 === "number") return bank0;
+    }
+    // Fall back to first program in requested bank if specific program missing
+    const meta = simpleSoundfont.presetsMeta;
+    if (Array.isArray(meta)) {
+      const sameBank = meta.findIndex((p) => p.bank === bank);
+      if (sameBank !== -1) return sameBank;
+    }
+  }
+  return Math.max(0, Math.min(program, maxIdx));
 }
 
 // ---------------------------------------------------------------------------
@@ -836,6 +964,9 @@ export function registerSoundfont(name, simpleSoundfont) {
 }
 
 export function getSoundfont(name = "default") {
+  if (name === "drums") {
+    return activeSoundfonts.get("drums") || null;
+  }
   return activeSoundfonts.get(name) || activeSoundfonts.get("default") || null;
 }
 
@@ -939,6 +1070,7 @@ export async function loadBundledSoundfontAsync(type = "drums") {
   if (typeof fetch === "function") {
     const urls = [
       `assets/soundfonts/${filename}`,
+      `../assets/soundfonts/${filename}`,
       `/assets/soundfonts/${filename}`,
       `pages/resources/assets/soundfonts/${filename}`,
       `/pages/resources/assets/soundfonts/${filename}`,
@@ -1028,7 +1160,13 @@ export function triggerDrumSoundfont(
   const sf = getSoundfont("drums") || ensureBundledSoundfontLoaded("drums");
   if (!sf || !sf.presets || sf.presets.length === 0) return null;
 
-  const region = findRegionForNote(sf, 0, pitch, Math.round(velocity * 127));
+  const drumPresetIndex = findPresetIndex(sf, 0, 128);
+  const region = findRegionForNote(
+    sf,
+    drumPresetIndex,
+    pitch,
+    Math.round(velocity * 127),
+  );
   if (!region) return null;
 
   const sample = sf.samples[region.sampleIndex];
@@ -1040,9 +1178,9 @@ export function triggerDrumSoundfont(
   const src = ctx.createBufferSource();
   src.buffer = audioBuf;
 
-  // Drum/percussion samples in GM kits are fixed-pitch per key and play at 1:1 speed,
-  // not transposed relative to rootKey.
-  const pitchRatio = sample.sampleRate / (ctx.sampleRate || 44100);
+  // Drum/percussion samples in GM kits are fixed-pitch per key and play at 1:1 speed.
+  // AudioBuffer.sampleRate already tells Web Audio the sample rate, so playbackRate stays 1.0.
+  const pitchRatio = 1.0;
   src.playbackRate.setValueAtTime(pitchRatio, when);
 
   const gain = ctx.createGain();
@@ -1088,6 +1226,7 @@ export function triggerSoundfontNote(
   params = {},
   bpm = 120,
   trackVolume = 1,
+  trackPan = 0,
 ) {
   const pitch = note.pitch ?? 60;
   const velocity = Math.max(
@@ -1112,8 +1251,8 @@ export function triggerSoundfontNote(
     program = resolveGmProgram(params.instrument);
   }
 
-  // Find preset by program index (within range)
-  const presetIndex = Math.min(program, sf.presets.length - 1);
+  // Resolve preset by MIDI bank & program number (not raw preset array index)
+  const presetIndex = findPresetIndex(sf, program, params.bank ?? 0);
   const region = findRegionForNote(
     sf,
     presetIndex,
@@ -1130,33 +1269,57 @@ export function triggerSoundfontNote(
 
   const src = ctx.createBufferSource();
   src.buffer = audioBuf;
-  src.loop = region.loopMode !== 0;
-  if (region.loopMode !== 0 && region.loopEnd > region.loopStart) {
-    src.loopStart = region.loopStart / (sample.sampleRate || 44100);
-    src.loopEnd = region.loopEnd / (sample.sampleRate || 44100);
+
+  const sampleSr = sample.sampleRate || 44100;
+  const loopStart = region.loopStart ?? sample.loopStart ?? 0;
+  const loopEnd = region.loopEnd ?? sample.loopEnd ?? 0;
+  src.loop = region.loopMode !== 0 && loopEnd > loopStart;
+  if (src.loop) {
+    src.loopStart = loopStart / sampleSr;
+    src.loopEnd = loopEnd / sampleSr;
   }
 
-  const semis = pitch - region.rootKey;
-  const pitchRatio =
-    Math.pow(2.0, semis / 12.0) *
-    (sample.sampleRate / (ctx.sampleRate || 44100));
+  // AudioBuffer.sampleRate already handles sample-rate conversion to ctx.sampleRate;
+  // playbackRate only applies semitone/cent pitch transposition relative to rootKey.
+  const semis = pitch - region.rootKey + (region.tuningSemis || 0);
+  const pitchRatio = Math.pow(2.0, semis / 12.0);
   src.playbackRate.setValueAtTime(pitchRatio, when);
+
   const gain = ctx.createGain();
   const attack = Math.max(0.001, region.attack);
   const decay = Math.max(0.005, region.decay);
-  const sustainLevel = Math.max(0.0, Math.min(1.0, region.sustain)) * velocity;
+  const sustainLevel =
+    Math.max(0.0001, Math.min(1.0, region.sustain)) * velocity;
   const release = Math.max(0.01, region.release);
 
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.linearRampToValueAtTime(velocity, when + attack);
-  gain.gain.linearRampToValueAtTime(sustainLevel, when + attack + decay);
-
+  const attackEnd = when + attack;
+  const decayEnd = attackEnd + decay;
   const releaseStart = when + durationSec;
-  gain.gain.setValueAtTime(sustainLevel, releaseStart);
-  gain.gain.linearRampToValueAtTime(0.0001, releaseStart + release);
+
+  gain.gain.setValueAtTime(0.0001, when);
+  if (releaseStart <= attackEnd) {
+    const frac = Math.max(0, Math.min(1, durationSec / attack));
+    const releaseLevel = Math.max(0.0001, 0.0001 + (velocity - 0.0001) * frac);
+    gain.gain.linearRampToValueAtTime(releaseLevel, releaseStart);
+    gain.gain.linearRampToValueAtTime(0.0001, releaseStart + release);
+  } else if (releaseStart < decayEnd) {
+    gain.gain.linearRampToValueAtTime(velocity, attackEnd);
+    const frac = Math.max(0, Math.min(1, (releaseStart - attackEnd) / decay));
+    const releaseLevel = Math.max(
+      0.0001,
+      velocity + (sustainLevel - velocity) * frac,
+    );
+    gain.gain.linearRampToValueAtTime(releaseLevel, releaseStart);
+    gain.gain.linearRampToValueAtTime(0.0001, releaseStart + release);
+  } else {
+    gain.gain.linearRampToValueAtTime(velocity, attackEnd);
+    gain.gain.linearRampToValueAtTime(sustainLevel, decayEnd);
+    gain.gain.setValueAtTime(sustainLevel, releaseStart);
+    gain.gain.linearRampToValueAtTime(0.0001, releaseStart + release);
+  }
 
   let panNode = null;
-  const panVal = Math.max(-1, Math.min(1, region.pan || 0));
+  const panVal = Math.max(-1, Math.min(1, (region.pan || 0) + trackPan));
   if (typeof ctx.createStereoPanner === "function" && panVal !== 0) {
     panNode = ctx.createStereoPanner();
     panNode.pan.setValueAtTime(panVal, when);

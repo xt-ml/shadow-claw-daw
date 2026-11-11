@@ -1100,7 +1100,7 @@
       "name": "scdaw-soundfont",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-soundfont.",
       "url": "../../.agents/scripts/scdaw-soundfont.js",
-      "digest": "sha256:607d98c41f1486222d624f194668412d37ea72879271750495824933613b19df"
+      "digest": "sha256:67be49cc50a12bfa6feacfc3eda0d2c1e14aaf63ad0638e092415c8a3b979db3"
     },
     {
       "name": "scdaw-tools-metadata",

@@ -259,3 +259,106 @@ test("WP3.2: triggerSoundfontNote triggers GM instrument note with ADSR and pan"
   assert.equal(typeof voice.stop, "function");
   assert.equal(typeof voice.disconnect, "function");
 });
+
+test("WP3.3: triggerSoundfontNote resolves GM preset by MIDI program (not array index) in gm-lofi.sf2", async () => {
+  const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
+  const { registerSoundfont, triggerSoundfontNote } =
+    await import("../.agents/scripts/scdaw-soundfont.js");
+
+  const gmPath = resolve(ROOT, "pages/resources/assets/soundfonts/gm-lofi.sf2");
+  assert.ok(existsSync(gmPath), "gm-lofi.sf2 must exist");
+  const parsed = parseSf2(readFileSync(gmPath).buffer);
+  const simple = simplifySoundfont(parsed);
+  registerSoundfont("gm", simple);
+
+  // Verify presetsMeta / findPresetIndex resolves bank 0 MIDI programs accurately
+  const expected = [
+    { program: 27, expectedName: "Clean Gt." },
+    { program: 29, expectedName: "Overdrive Gt" },
+    { program: 33, expectedName: "Fingered Bs." },
+  ];
+  for (const { program, expectedName } of expected) {
+    const idx = simple.programMap?.[`0:${program}`];
+    assert.ok(
+      typeof idx === "number",
+      `simplifySoundfont must map bank 0 program ${program}`,
+    );
+    assert.equal(
+      parsed.presets[idx]?.name,
+      expectedName,
+      `MIDI program ${program} must map to ${expectedName}, not presets[${program}] (${parsed.presets[program]?.name})`,
+    );
+  }
+
+  // Trigger Clean Guitar (prog 27, 22050Hz sample, rootKey 48) on a 48kHz AudioContext
+  const ctx = new FakeAudioContext();
+  ctx.sampleRate = 48000;
+  const voice = triggerSoundfontNote(
+    ctx,
+    ctx.destination,
+    { pitch: 48, velocity: 0.9, duration: 960 },
+    0,
+    { instrument: "electric-guitar-clean" },
+    120,
+    1.0,
+  );
+  assert.ok(voice, "Must trigger Clean Guitar voice");
+  const src = ctx.bufferSources[ctx.bufferSources.length - 1];
+  assert.equal(src.buffer.sampleRate, 22050, "Buffer preserves SF2 sampleRate");
+  assert.ok(
+    Math.abs(src.playbackRate.value - 1.0) < 0.02,
+    `Expected ~1.0 playbackRate at rootKey on 48kHz AudioContext, got ${src.playbackRate.value}`,
+  );
+  assert.equal(
+    src.loop,
+    true,
+    "Clean Gt. sampleModes=1 must enable sustain loop",
+  );
+  assert.ok(
+    src.loopStart > 0 && src.loopEnd > src.loopStart,
+    `Expected valid sample loop points in seconds, got loopStart=${src.loopStart}, loopEnd=${src.loopEnd}`,
+  );
+
+  // Envelope events must be monotonically non-decreasing in time and never snap to 0 at note-off during long decay
+  const gainNode = src.outputs[0];
+  assert.ok(gainNode?.gain?.events, "Source must connect to GainNode");
+  const events = gainNode.gain.events;
+  for (let i = 1; i < events.length; i++) {
+    assert.ok(
+      events[i].time >= events[i - 1].time,
+      `Gain Automation events must be monotonic: ${JSON.stringify(events)}`,
+    );
+  }
+  const releaseStartEvent = events.find((e) => Math.abs(e.time - 0.5) < 0.01);
+  assert.ok(
+    releaseStartEvent,
+    "Must schedule releaseStart event at note-off (0.5s)",
+  );
+  assert.ok(
+    releaseStartEvent.val > 0.5,
+    `Release start amplitude should not snap to 0 during 20s decay, got ${releaseStartEvent.val}`,
+  );
+});
+
+test("WP3.3: triggerDrumSoundfont plays at 1.0 playbackRate even when ctx.sampleRate is 48000", async () => {
+  const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
+  const { triggerDrumSoundfont } =
+    await import("../.agents/scripts/scdaw-soundfont.js");
+
+  const ctx = new FakeAudioContext();
+  ctx.sampleRate = 48000;
+  triggerDrumSoundfont(
+    ctx,
+    ctx.destination,
+    { pitch: 36, velocity: 0.9 },
+    0,
+    1.0,
+    0.0,
+  );
+  const src = ctx.bufferSources[ctx.bufferSources.length - 1];
+  assert.equal(
+    src.playbackRate.value,
+    1.0,
+    `Drums must play at 1.0 playbackRate regardless of ctx.sampleRate, got ${src.playbackRate.value}`,
+  );
+});
