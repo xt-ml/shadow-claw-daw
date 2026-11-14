@@ -8,6 +8,7 @@
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
+import { effect } from "../scdaw-signals.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -38,25 +39,22 @@ export class DawStatusBarElement extends BaseElement {
 
   connectedCallback() {
     this.render();
-    this._startLoop();
+    this._dispose = effect(() => {
+      scdaw.state.get();
+      scdaw.project.get();
+      this._sync();
+    });
   }
 
   disconnectedCallback() {
     if (this._rafId) cancelAnimationFrame(this._rafId);
-  }
-
-  _startLoop() {
-    const update = () => {
-      this._sync();
-      this._rafId = requestAnimationFrame(update);
-    };
-    this._rafId = requestAnimationFrame(update);
+    if (this._dispose) this._dispose();
   }
 
   _sync() {
     if (!this.shadowRoot) return;
     const s = scdaw.getState();
-    const p = scdaw.getProject();
+    const p = scdaw.project.get();
 
     const audioIndicator = this.shadowRoot.getElementById("audio-stat");
     const projIndicator = this.shadowRoot.getElementById("proj-stat");

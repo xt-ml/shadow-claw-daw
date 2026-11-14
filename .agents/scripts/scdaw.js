@@ -1925,6 +1925,73 @@ export function resolveTrackNotes(
   return resolved.sort((a, b) => a.position - b.position);
 }
 
+const RESOLVED_TRACK_CACHE = new WeakMap();
+
+function lowerBoundNotePos(notes, targetPos) {
+  let lo = 0;
+  let hi = notes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (notes[mid].position < targetPos) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function getCachedPlaybackNotes(project, track, totalPulses, isLooping) {
+  const swing = project.swing || 0;
+  const notesRef = track.notes;
+  const notesLen = notesRef ? notesRef.length : 0;
+  const midiFxRef = track.midiFx;
+  const cached = RESOLVED_TRACK_CACHE.get(track);
+  if (
+    cached &&
+    cached.notesRef === notesRef &&
+    cached.notesLen === notesLen &&
+    cached.midiFxRef === midiFxRef &&
+    cached.swing === swing &&
+    cached.totalPulses === totalPulses &&
+    cached.isLooping === isLooping
+  ) {
+    return cached.notes;
+  }
+
+  let resolved = resolveTrackNotes(project, track, {
+    loops: 1,
+    bakeMidiFx: true,
+    bakeSwing: true,
+  });
+
+  if (isLooping) {
+    let needsResort = false;
+    const wrapped = resolved.map((n) => {
+      if (n.position >= totalPulses || n.position < 0) {
+        needsResort = true;
+        return {
+          ...n,
+          position: ((n.position % totalPulses) + totalPulses) % totalPulses,
+        };
+      }
+      return n;
+    });
+    if (needsResort) {
+      wrapped.sort((a, b) => a.position - b.position);
+    }
+    resolved = wrapped;
+  }
+
+  RESOLVED_TRACK_CACHE.set(track, {
+    notesRef,
+    notesLen,
+    midiFxRef,
+    swing,
+    totalPulses,
+    isLooping,
+    notes: resolved,
+  });
+  return resolved;
+}
+
 export function computeEventsInRange(project, fromPpqn, toPpqn) {
   const totalPulses =
     (project.lengthBars || 1) * barPulses(project.signature || [4, 4]);
@@ -1932,45 +1999,51 @@ export function computeEventsInRange(project, fromPpqn, toPpqn) {
   const events = [];
   const hasSolo = project.tracks.some((t) => t.solo);
 
+  const pushSlice = (track, notes, start, end) => {
+    let idx = lowerBoundNotePos(notes, start);
+    const len = notes.length;
+    while (idx < len) {
+      const note = notes[idx];
+      if (note.position >= end) break;
+      events.push({
+        trackId: track.id,
+        trackKind: track.kind,
+        trackInstrument:
+          track.instrument || track.params?.instrument || track.kind,
+        trackParams: track.params,
+        trackVolume: track.volume,
+        trackPan: track.pan,
+        position: note.position,
+        note,
+      });
+      idx++;
+    }
+  };
+
   for (const track of project.tracks) {
     if (track.mute) continue;
     if (hasSolo && !track.solo) continue;
 
-    const resolvedNotes = resolveTrackNotes(project, track, {
-      loops: 1,
-      bakeMidiFx: true,
-      bakeSwing: true,
-    });
+    const resolvedNotes = getCachedPlaybackNotes(
+      project,
+      track,
+      totalPulses,
+      isLooping,
+    );
 
-    for (const note of resolvedNotes) {
-      const triggerPos = isLooping
-        ? note.position % totalPulses
-        : note.position;
-      let inRange = false;
-      if (fromPpqn <= toPpqn) {
-        inRange = triggerPos >= fromPpqn && triggerPos < toPpqn;
-      } else {
-        // wrapped range (e.g. from 3800 to 200)
-        inRange = triggerPos >= fromPpqn || triggerPos < toPpqn;
-      }
-
-      if (inRange) {
-        events.push({
-          trackId: track.id,
-          trackKind: track.kind,
-          trackInstrument:
-            track.instrument || track.params?.instrument || track.kind,
-          trackParams: track.params,
-          trackVolume: track.volume,
-          trackPan: track.pan,
-          position: triggerPos,
-          note,
-        });
-      }
+    if (fromPpqn <= toPpqn) {
+      pushSlice(track, resolvedNotes, fromPpqn, toPpqn);
+    } else {
+      // wrapped range (e.g. from 3800 to 200)
+      pushSlice(track, resolvedNotes, fromPpqn, Infinity);
+      pushSlice(track, resolvedNotes, 0, toPpqn);
     }
   }
 
-  return events.sort((a, b) => a.position - b.position);
+  if (events.length > 1) {
+    events.sort((a, b) => a.position - b.position);
+  }
+  return events;
 }
 
 export function linToDb(linear) {

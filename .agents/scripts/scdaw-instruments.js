@@ -597,12 +597,44 @@ export function triggerSynth(
   if (osc2) osc2.stop(stopTime);
   if (subOsc) subOsc.stop(stopTime);
 
-  return createVoiceHandle(
+  const handle = createVoiceHandle(
     [amp, filter, osc2Gain, subGain].filter(Boolean),
     [osc1, osc2, subOsc].filter(Boolean),
     stopTime,
     ctx,
   );
+  handle.updateParams = (nextParams = {}, now = ctx.currentTime) => {
+    try {
+      if (nextParams.cutoff !== undefined && filter.frequency) {
+        const nextCutoff = Math.max(
+          20,
+          Math.min(20000, Number(nextParams.cutoff)),
+        );
+        if (typeof filter.frequency.setTargetAtTime === "function") {
+          filter.frequency.setTargetAtTime(nextCutoff, now, 0.015);
+        } else {
+          filter.frequency.setValueAtTime(nextCutoff, now);
+        }
+      }
+      if (nextParams.resonance !== undefined && filter.Q) {
+        const nextQ = Math.max(0.1, Math.min(30, Number(nextParams.resonance)));
+        if (typeof filter.Q.setTargetAtTime === "function") {
+          filter.Q.setTargetAtTime(nextQ, now, 0.015);
+        } else {
+          filter.Q.setValueAtTime(nextQ, now);
+        }
+      }
+      if (nextParams.detune !== undefined && osc1.detune) {
+        const nextDetune = Number(nextParams.detune);
+        if (typeof osc1.detune.setTargetAtTime === "function") {
+          osc1.detune.setTargetAtTime(nextDetune, now, 0.015);
+        } else {
+          osc1.detune.setValueAtTime(nextDetune, now);
+        }
+      }
+    } catch (_) {}
+  };
+  return handle;
 }
 
 /**

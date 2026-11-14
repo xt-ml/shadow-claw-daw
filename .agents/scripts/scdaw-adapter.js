@@ -104,13 +104,20 @@ function setupLeaderBridge() {
   }, 100);
 }
 
+let lastBroadcastProjectRef = null;
+
 function broadcastState() {
   if (!stateChannel) return;
-  stateChannel.postMessage({
+  const projRef = scdaw.project.get();
+  const payload = {
     type: "snapshot",
     state: scdaw.getState(),
-    project: scdaw.getProject(),
-  });
+  };
+  if (projRef !== lastBroadcastProjectRef) {
+    lastBroadcastProjectRef = projRef;
+    payload.project = scdaw.getProject();
+  }
+  stateChannel.postMessage(payload);
 }
 
 export async function handleToolDispatch(name, params) {

@@ -77,7 +77,10 @@ export function shouldPreserveMixerDom({
   return true;
 }
 
-export function setupVolumeSlider(slider, { onVolumeChange, onReset }) {
+export function setupVolumeSlider(
+  slider,
+  { onVolumeChange, onVolumeCommit, onReset },
+) {
   if (!slider) return;
 
   const handlePointerDown = (e) => {
@@ -122,6 +125,7 @@ export function setupVolumeSlider(slider, { onVolumeChange, onReset }) {
       try {
         slider.releasePointerCapture?.(e.pointerId);
       } catch {}
+      onVolumeCommit?.(Number(slider.value));
     }
   };
 
@@ -143,8 +147,15 @@ export function setupVolumeSlider(slider, { onVolumeChange, onReset }) {
   };
 
   const handleInput = (e) => {
+    if (slider._isDragging) return;
     const val = Number(e.target.value);
     onVolumeChange?.(val);
+  };
+
+  const handleChange = (e) => {
+    if (slider._isDragging) return;
+    const val = Number(e.target.value);
+    onVolumeCommit?.(val);
   };
 
   const handleDblClick = () => {
@@ -157,6 +168,7 @@ export function setupVolumeSlider(slider, { onVolumeChange, onReset }) {
   slider.addEventListener("pointercancel", handlePointerUp);
   slider.addEventListener("wheel", handleWheel, { passive: false });
   slider.addEventListener("input", handleInput);
+  slider.addEventListener("change", handleChange);
   slider.addEventListener("dblclick", handleDblClick);
 }
 
@@ -548,7 +560,18 @@ export class DawMixerElement extends BaseElement {
       const id = s.dataset.track;
       setupVolumeSlider(s, {
         onVolumeChange: (val) => {
-          scdaw.sendCommand("set_track", { trackId: id, volume: val / 100 });
+          if (typeof scdaw.setLiveTrackParam === "function") {
+            scdaw.setLiveTrackParam(id, { volume: val / 100 });
+          } else {
+            scdaw.sendCommand("set_track", { trackId: id, volume: val / 100 });
+          }
+        },
+        onVolumeCommit: (val) => {
+          if (typeof scdaw.commitLiveTrackParam === "function") {
+            scdaw.commitLiveTrackParam(id);
+          } else {
+            scdaw.sendCommand("set_track", { trackId: id, volume: val / 100 });
+          }
         },
         onReset: () => {
           scdaw.sendCommand("reset_param", {
@@ -561,9 +584,20 @@ export class DawMixerElement extends BaseElement {
     });
 
     this.shadowRoot.querySelectorAll("scdaw-knob").forEach((k) => {
+      k.addEventListener("input", (e) => {
+        const id = k.dataset.track;
+        if (typeof scdaw.setLiveTrackParam === "function") {
+          scdaw.setLiveTrackParam(id, { pan: e.detail.value });
+        }
+      });
       k.addEventListener("change", (e) => {
         const id = k.dataset.track;
-        scdaw.sendCommand("set_track", { trackId: id, pan: e.detail.value });
+        if (typeof scdaw.commitLiveTrackParam === "function") {
+          scdaw.setLiveTrackParam?.(id, { pan: e.detail.value });
+          scdaw.commitLiveTrackParam(id);
+        } else {
+          scdaw.sendCommand("set_track", { trackId: id, pan: e.detail.value });
+        }
       });
       k.addEventListener("reset", (e) => {
         const id = k.dataset.track;
@@ -611,7 +645,18 @@ export class DawMixerElement extends BaseElement {
     if (masterFader) {
       setupVolumeSlider(masterFader, {
         onVolumeChange: (val) => {
-          scdaw.sendCommand("set_master", { volume: val / 100 });
+          if (typeof scdaw.setLiveMasterParam === "function") {
+            scdaw.setLiveMasterParam({ volume: val / 100 });
+          } else {
+            scdaw.sendCommand("set_master", { volume: val / 100 });
+          }
+        },
+        onVolumeCommit: (val) => {
+          if (typeof scdaw.commitLiveMasterParam === "function") {
+            scdaw.commitLiveMasterParam();
+          } else {
+            scdaw.sendCommand("set_master", { volume: val / 100 });
+          }
         },
         onReset: () => {
           scdaw.sendCommand("reset_param", {

@@ -648,3 +648,336 @@ test("computeEventsInRange and DawEngine: seamless loop wrap without pause or dr
     await engine.stop();
   }
 });
+
+test("DawEngine Scheduler: maps event timestamps relative to true musical time, never shifting pre-stall notes into the future", async () => {
+  const project = createProject("empty");
+  project.bpm = 120; // 1920 PPQN/sec (1 beat = 960 PPQN = 0.5s)
+  project.lengthBars = 4;
+  project.tracks.push({
+    id: "trk_synth",
+    name: "Synth",
+    kind: "synth",
+    volume: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: { waveform: "sawtooth", cutoff: 1200 },
+    notes: [
+      { position: 0, duration: 240, pitch: 60, velocity: 0.8 },
+      { position: 960, duration: 240, pitch: 62, velocity: 0.8 },
+      { position: 1920, duration: 240, pitch: 64, velocity: 0.8 },
+      { position: 2880, duration: 240, pitch: 65, velocity: 0.8 },
+    ],
+  });
+
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    // Initial tick at t=0 schedules [0, lookahead) -> note at 0
+    engine._onClockTick();
+    const initialOscCount = ctx.oscillators.length;
+    assert.equal(
+      initialOscCount,
+      1,
+      "Only note at 0 should be scheduled at t=0",
+    );
+
+    // Simulate a 0.81s main-thread stall (past note at 960 = 0.5s, approaching note at 1920 = 1.0s)
+    ctx.currentTime = 0.81;
+    engine._onClockTick();
+
+    // Note at 960 (0.5s) is > 50ms in the past and must be dropped, NOT shifted to 0.81 + 0.5 = 1.31s.
+    // Note at 1920 (1.0s) is inside the 200ms lookahead (0.81 + 0.2 = 1.01s) and must start at ~1.0s.
+    const postStallOscs = ctx.oscillators.slice(initialOscCount);
+    assert.equal(
+      postStallOscs.length,
+      1,
+      "Only the upcoming note at 1920 (1.0s) should be scheduled, dropping stale pre-stall note at 960",
+    );
+    assert.ok(
+      Math.abs(postStallOscs[0].startTime - 1.0) < 0.002,
+      `Expected note at 1920 to schedule at 1.0s, got ${postStallOscs[0].startTime}`,
+    );
+
+    // Simulate a duplicate queued Worker tick firing at the same audio time
+    engine._onClockTick();
+    assert.equal(
+      ctx.oscillators.length,
+      initialOscCount + 1,
+      "Queued duplicate tick at same audioTime must not double-trigger notes",
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine Scheduler: live BPM change during playback re-anchors timebase without position jump", async () => {
+  const project = createProject("empty");
+  project.bpm = 120; // 1920 PPQN/sec
+  project.lengthBars = 4;
+  project.tracks.push({
+    id: "trk_synth",
+    name: "Synth",
+    kind: "synth",
+    volume: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: { waveform: "sawtooth", cutoff: 1200 },
+    notes: [
+      { position: 0, duration: 240, pitch: 60, velocity: 0.8 },
+      { position: 2880, duration: 240, pitch: 64, velocity: 0.8 },
+    ],
+  });
+
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    engine._onClockTick();
+
+    // Advance 1.0s at 120 BPM -> position should be 1920 PPQN
+    ctx.currentTime = 1.0;
+    engine._onClockTick();
+    assert.ok(
+      Math.abs(engine.getState().positionPpqn - 1920) < 1,
+      `Expected positionPpqn ~1920 at 1.0s, got ${engine.getState().positionPpqn}`,
+    );
+
+    // Double BPM to 240 (3840 PPQN/sec) mid-playback
+    await engine.sendCommand("set_transport", { bpm: 240 });
+
+    // Position must stay continuous at 1920 (not jump to 3840)
+    engine._onClockTick();
+    assert.ok(
+      Math.abs(engine.getState().positionPpqn - 1920) < 1,
+      `Position jumped on live BPM change: ${engine.getState().positionPpqn}`,
+    );
+
+    // Advance 0.1s at 240 BPM -> position = 1920 + 384 = 2304; lookahead = 0.2s (768 PPQN) -> 3072 (covers 2880)
+    // Note at 2880 is 960 pulses after 1920 -> at 240 BPM (3840 PPQN/s), 960 pulses = 0.25s -> 1.0 + 0.25 = 1.25s
+    const beforeNoteCount = ctx.oscillators.length;
+    ctx.currentTime = 1.1;
+    engine._onClockTick();
+    const addedOscs = ctx.oscillators.slice(beforeNoteCount);
+    assert.equal(
+      addedOscs.length,
+      1,
+      "Note at 2880 should be scheduled at 1.1s",
+    );
+    assert.ok(
+      Math.abs(addedOscs[0].startTime - 1.25) < 0.002,
+      `Expected note at 2880 to schedule at 1.25s after BPM change, got ${addedOscs[0].startTime}`,
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine Fast Path: setLiveTrackParam smoothly ramps GainNode/StereoPannerNode without pushing undo history or notifying project signal", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+
+    let historyPushCount = 0;
+    const origPush = engine.history.push.bind(engine.history);
+    engine.history.push = (...args) => {
+      historyPushCount++;
+      return origPush(...args);
+    };
+
+    let projectNotifyCount = 0;
+    const origSet = engine.project.set.bind(engine.project);
+    engine.project.set = (...args) => {
+      projectNotifyCount++;
+      return origSet(...args);
+    };
+
+    const initialVol = engine.project.get().tracks[0].volume;
+
+    // Simulate 50 rapid pointermove slider updates
+    for (let i = 1; i <= 50; i++) {
+      engine.setLiveTrackParam("trk_drums", {
+        volume: i / 50,
+        pan: (i - 25) / 25,
+      });
+    }
+
+    assert.equal(
+      historyPushCount,
+      0,
+      "Live param drag must not push undo history",
+    );
+    assert.equal(
+      projectNotifyCount,
+      0,
+      "Live param drag must not notify project signal",
+    );
+
+    const trackNodes = engine.graph.tracks.get("trk_drums");
+    const rampEvents = trackNodes.gain.gain.events.filter(
+      (e) => e.type === "setTargetAtTime",
+    );
+    assert.ok(
+      rampEvents.length >= 50,
+      "Live volume changes must use de-zippered setTargetAtTime ramping",
+    );
+
+    // Commit once on pointerup
+    engine.commitLiveTrackParam("trk_drums");
+    assert.equal(
+      historyPushCount,
+      1,
+      "Commit on pointerup must push exactly 1 undo entry",
+    );
+    assert.equal(
+      projectNotifyCount,
+      1,
+      "Commit on pointerup must notify project signal once",
+    );
+    assert.equal(engine.project.get().tracks[0].volume, 1);
+
+    // Undo restores pre-drag volume
+    await engine.sendCommand("undo");
+    assert.equal(engine.project.get().tracks[0].volume, initialVol);
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("Instruments & Engine: track volume is applied once at track GainNode, not squared in triggerInstrumentVoice", async () => {
+  const project = createProject("empty");
+  project.bpm = 120;
+  project.lengthBars = 2;
+  project.tracks.push({
+    id: "trk_synth",
+    name: "Synth",
+    kind: "synth",
+    volume: 0.5,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: {
+      waveform: "sawtooth",
+      cutoff: 1200,
+      attack: 0.01,
+      decay: 0.1,
+      sustain: 0.8,
+      release: 0.1,
+    },
+    notes: [{ position: 0, duration: 480, pitch: 60, velocity: 0.8 }],
+  });
+
+  const ctx = new FakeAudioContext();
+  const capturedGains = [];
+  const origCreateGain = ctx.createGain.bind(ctx);
+  ctx.createGain = () => {
+    const g = origCreateGain();
+    capturedGains.push(g);
+    return g;
+  };
+
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    const beforeVoiceGainCount = capturedGains.length;
+    engine._onClockTick();
+    const voiceGains = capturedGains.slice(beforeVoiceGainCount);
+    // Voice envelope gain should peak at velocity (0.8), not velocity * 0.5 (0.4)
+    const peakEvent = voiceGains
+      .flatMap((g) => g.gain.events)
+      .find((e) => e.type === "linearRampToValueAtTime" && e.val > 0);
+    assert.ok(peakEvent, "Expected synth voice envelope ramp event");
+    assert.ok(
+      Math.abs(peakEvent.val - 0.8) < 0.05,
+      `Expected voice envelope peak ~0.8 (track volume applied once at track GainNode), got ${peakEvent.val}`,
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine Fast Path: live synth param changes modulate active voices in-place without calling voice.stop(0)", async () => {
+  const project = createProject("empty");
+  project.bpm = 120;
+  project.lengthBars = 2;
+  project.tracks.push({
+    id: "trk_bass",
+    name: "Bass",
+    kind: "synth",
+    volume: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: { waveform: "sawtooth", cutoff: 800, resonance: 2 },
+    notes: [{ position: 0, duration: 1920, pitch: 48, velocity: 0.8 }],
+  });
+
+  const ctx = new FakeAudioContext();
+  const createdFilters = [];
+  const origCreateFilter = ctx.createBiquadFilter.bind(ctx);
+  ctx.createBiquadFilter = () => {
+    const f = origCreateFilter();
+    createdFilters.push(f);
+    return f;
+  };
+
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    engine._onClockTick();
+    assert.equal(engine._activeVoices.size, 1, "Expected 1 active synth voice");
+    const activeOsc = ctx.oscillators[0];
+
+    engine.setLiveTrackParam("trk_bass", {
+      params: { cutoff: 2400, resonance: 6 },
+    });
+
+    assert.equal(
+      engine._activeVoices.size,
+      1,
+      "Active voice must remain in _activeVoices",
+    );
+    assert.ok(
+      activeOsc.stopTime > 0,
+      "Live param change must not call voice.stop(0)",
+    );
+    const voiceFilter = createdFilters[createdFilters.length - 1];
+    const cutoffRamp = voiceFilter.frequency.events.find(
+      (e) => e.type === "setTargetAtTime" && e.val === 2400,
+    );
+    const qRamp = voiceFilter.Q.events.find(
+      (e) => e.type === "setTargetAtTime" && e.val === 6,
+    );
+    assert.ok(cutoffRamp, "Active voice filter frequency must ramp to 2400");
+    assert.ok(qRamp, "Active voice filter Q must ramp to 6");
+  } finally {
+    await engine.stop();
+  }
+});

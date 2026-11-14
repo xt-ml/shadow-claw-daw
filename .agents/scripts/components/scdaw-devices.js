@@ -463,6 +463,22 @@ export class DawDevicesElement extends BaseElement {
 
     // Knob parameter adjustments
     this.shadowRoot.querySelectorAll("scdaw-knob").forEach((knob) => {
+      knob.addEventListener("input", (e) => {
+        if (!this._selectedTrackId) return;
+        const card = knob.closest(".scdaw-devices__card");
+        const role = card?.dataset.role;
+        const param = knob.dataset.param;
+        const val = e.detail.value;
+        if (
+          role === "instrument" &&
+          typeof scdaw.setLiveTrackParam === "function"
+        ) {
+          scdaw.setLiveTrackParam(this._selectedTrackId, {
+            params: { [param]: val },
+          });
+        }
+      });
+
       knob.addEventListener("change", (e) => {
         if (!this._selectedTrackId) return;
         const card = knob.closest(".scdaw-devices__card");
@@ -473,10 +489,17 @@ export class DawDevicesElement extends BaseElement {
         const val = e.detail.value;
 
         if (role === "instrument") {
-          scdaw.sendCommand("set_track", {
-            trackId: this._selectedTrackId,
-            params: { [param]: val },
-          });
+          if (typeof scdaw.commitLiveTrackParam === "function") {
+            scdaw.setLiveTrackParam?.(this._selectedTrackId, {
+              params: { [param]: val },
+            });
+            scdaw.commitLiveTrackParam(this._selectedTrackId);
+          } else {
+            scdaw.sendCommand("set_track", {
+              trackId: this._selectedTrackId,
+              params: { [param]: val },
+            });
+          }
         } else if (role === "audio-fx" || role === "midi-fx") {
           scdaw.sendCommand("manage_fx", {
             action: "update",

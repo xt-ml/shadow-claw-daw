@@ -104,7 +104,7 @@ export function calculateKnobValueFromWheel({
 
 export function setupKnobInteraction(
   target,
-  { getState, onValueChange, onReset },
+  { getState, onValueChange, onCommit, onReset },
 ) {
   if (!target) return () => {};
 
@@ -157,6 +157,7 @@ export function setupKnobInteraction(
           target.releasePointerCapture?.(e.pointerId);
         }
       } catch {}
+      onCommit?.(state.value);
     }
   };
 
@@ -264,7 +265,17 @@ export class DawKnobElement extends BaseElement {
       onValueChange: (nextVal) => {
         this.value = nextVal;
         this.dispatchEvent(
-          new CustomEvent("change", { detail: { value: nextVal } }),
+          new CustomEvent("input", { detail: { value: nextVal } }),
+        );
+        if (!this._isDragging) {
+          this.dispatchEvent(
+            new CustomEvent("change", { detail: { value: nextVal } }),
+          );
+        }
+      },
+      onCommit: (val) => {
+        this.dispatchEvent(
+          new CustomEvent("change", { detail: { value: val ?? this.value } }),
         );
       },
       onReset: (defaultVal) => {

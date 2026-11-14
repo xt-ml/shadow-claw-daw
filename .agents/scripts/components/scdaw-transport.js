@@ -965,7 +965,20 @@ export class DawTransportElement extends BaseElement {
       swingInput.addEventListener("input", (e) => {
         const val = Number(e.target.value);
         this.shadowRoot.getElementById("swing-val").textContent = `${val}%`;
-        scdaw.sendCommand("set_transport", { swing: val / 100 });
+        if (typeof scdaw.setLiveTransportParam === "function") {
+          scdaw.setLiveTransportParam({ swing: val / 100 });
+        } else {
+          scdaw.sendCommand("set_transport", { swing: val / 100 });
+        }
+      });
+      swingInput.addEventListener("change", (e) => {
+        const val = Number(e.target.value);
+        if (typeof scdaw.commitLiveTransportParam === "function") {
+          scdaw.setLiveTransportParam?.({ swing: val / 100 });
+          scdaw.commitLiveTransportParam();
+        } else {
+          scdaw.sendCommand("set_transport", { swing: val / 100 });
+        }
       });
       swingInput.addEventListener("dblclick", () => {
         scdaw.sendCommand("set_transport", { swing: 0 });

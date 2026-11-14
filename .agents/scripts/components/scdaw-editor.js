@@ -105,6 +105,22 @@ export function resolveEditorScrollPosition({
   return 0;
 }
 
+function computeNotesSignature(notes) {
+  if (!Array.isArray(notes) || notes.length === 0) return "0";
+  let hash = notes.length;
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    hash =
+      ((hash * 31) ^
+        ((n.position | 0) +
+          ((n.pitch | 0) << 7) +
+          ((n.duration | 0) << 14) +
+          Math.round((n.velocity ?? 0.8) * 1000))) |
+      0;
+  }
+  return `${notes.length}:${hash}`;
+}
+
 export class DawEditorElement extends BaseElement {
   constructor() {
     super();
@@ -137,7 +153,7 @@ export class DawEditorElement extends BaseElement {
 
   render() {
     if (!this.shadowRoot) return;
-    const p = scdaw.getProject();
+    const p = scdaw.project.get();
     const sharedTrackId = scdaw.selectedTrackId?.get();
     if (sharedTrackId && p.tracks.some((t) => t.id === sharedTrackId)) {
       this._selectedTrackId = sharedTrackId;
@@ -166,7 +182,14 @@ export class DawEditorElement extends BaseElement {
         hasSkeleton,
       })
     ) {
-      this._syncNotes(currentTrack, numSteps);
+      const notesSig = computeNotesSignature(currentTrack?.notes);
+      if (
+        this._lastSyncedTrackId !== this._selectedTrackId ||
+        this._lastSyncedNotesSig !== notesSig ||
+        this._lastSyncedNumSteps !== numSteps
+      ) {
+        this._syncNotes(currentTrack, numSteps);
+      }
       return;
     }
 
@@ -202,11 +225,17 @@ export class DawEditorElement extends BaseElement {
 
     this._renderedTrackId = this._selectedTrackId;
     this._renderedNumSteps = numSteps;
+    this._lastSyncedTrackId = this._selectedTrackId;
+    this._lastSyncedNotesSig = computeNotesSignature(currentTrack?.notes);
+    this._lastSyncedNumSteps = numSteps;
     this._attachEventListeners();
   }
 
   _syncNotes(currentTrack, numSteps) {
     if (!this.shadowRoot) return;
+    this._lastSyncedTrackId = this._selectedTrackId;
+    this._lastSyncedNotesSig = computeNotesSignature(currentTrack?.notes);
+    this._lastSyncedNumSteps = numSteps;
 
     // Update note inspector text
     const trackNameEl = this.shadowRoot.getElementById("inspector-track-name");

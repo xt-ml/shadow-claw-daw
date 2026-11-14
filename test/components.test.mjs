@@ -1510,6 +1510,60 @@ test("scdaw-mixer: setupVolumeSlider binds pointer dragging, wheel scrolling, an
   assert.equal(resetCalled, true);
 });
 
+test("scdaw-mixer: setupVolumeSlider suppresses duplicate input during drag and invokes onVolumeCommit once on pointerup", () => {
+  const liveChanges = [];
+  const commits = [];
+
+  const mockSlider = {
+    min: "0",
+    max: "150",
+    value: "100",
+    listeners: {},
+    addEventListener(event, fn) {
+      this.listeners[event] = fn;
+    },
+    getBoundingClientRect() {
+      return { top: 100, bottom: 220, height: 120 };
+    },
+    setPointerCapture() {},
+    releasePointerCapture() {},
+    focus() {},
+  };
+
+  setupVolumeSlider(mockSlider, {
+    onVolumeChange(val) {
+      liveChanges.push(val);
+    },
+    onVolumeCommit(val) {
+      commits.push(val);
+    },
+  });
+
+  mockSlider.listeners.pointerdown({
+    pointerId: 1,
+    clientY: 160,
+    preventDefault() {},
+  });
+  // Native input firing while dragging must NOT double-dispatch
+  mockSlider.listeners.input({ target: { value: "75" } });
+  mockSlider.listeners.pointermove({ pointerId: 1, clientY: 130 });
+  mockSlider.listeners.input({ target: { value: "113" } });
+
+  assert.equal(
+    liveChanges.length,
+    2,
+    "Expected 2 live updates, no duplicate input dispatch",
+  );
+  assert.equal(commits.length, 0, "No commit before pointerup");
+
+  mockSlider.listeners.pointerup({ pointerId: 1 });
+  assert.deepEqual(
+    commits,
+    [liveChanges[1]],
+    "Expected exactly 1 commit on pointerup",
+  );
+});
+
 test("scdaw-transport: formats musical position string", () => {
   assert.equal(formatPosition(1, 1, 0), "001 : 1 : 1");
   assert.equal(formatPosition(2, 3, 2), "002 : 3 : 3");
@@ -3574,5 +3628,165 @@ test("scdaw-browser: _getItems lists all 9 roster instruments, Audio FX, and MID
     );
     assert.ok(found, `MIDI FX '${mfx}' missing from browser devices`);
     assert.equal(found.category, "MIDI FX");
+  }
+});
+
+test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor skip DOM rebuilds when only track volume/pan/params change", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { DawSequencerElement } =
+    await import("../.agents/scripts/components/scdaw-sequencer.js");
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+
+  // 1. DawTimelineElement
+  const timeline = new DawTimelineElement();
+  let timelineHtmlSets = 0;
+  let timelineHtml = "";
+  timeline.shadowRoot = {
+    get innerHTML() {
+      return timelineHtml;
+    },
+    set innerHTML(v) {
+      timelineHtmlSets++;
+      timelineHtml = v;
+    },
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  const origRaf = globalThis.requestAnimationFrame;
+  const origCaf = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+
+  // 2. DawSequencerElement (hidden)
+  const sequencer = new DawSequencerElement();
+  let seqHtmlSets = 0;
+  let seqHtml = "";
+  sequencer.classList = { contains: (c) => c === "hidden" };
+  sequencer.shadowRoot = {
+    get innerHTML() {
+      return seqHtml;
+    },
+    set innerHTML(v) {
+      seqHtmlSets++;
+      seqHtml = v;
+    },
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+
+  // 3. DawEditorElement
+  const editor = new DawEditorElement();
+  let editorHtml = "";
+  let syncNotesCalls = 0;
+  const fakeGridEl = {
+    scrollTop: 0,
+    scrollLeft: 0,
+    clientHeight: 340,
+    addEventListener: () => {},
+  };
+  editor.shadowRoot = {
+    get innerHTML() {
+      return editorHtml;
+    },
+    set innerHTML(v) {
+      editorHtml = v;
+    },
+    getElementById: () => null,
+    querySelector: (sel) => (sel === ".grid-area" ? fakeGridEl : null),
+    querySelectorAll: () => [],
+  };
+  const origSyncNotes = editor._syncNotes.bind(editor);
+  editor._syncNotes = (...args) => {
+    syncNotesCalls++;
+    return origSyncNotes(...args);
+  };
+
+  try {
+    timeline.connectedCallback();
+    sequencer.connectedCallback();
+    editor.connectedCallback();
+
+    const initialTimelineSets = timelineHtmlSets;
+    const initialSeqSets = seqHtmlSets;
+    const initialSyncCalls = syncNotesCalls;
+
+    // Mutate volume & pan via sendCommand (e.g. on pointerup commit)
+    await scdaw.sendCommand("set_track", {
+      trackId: "trk_drums",
+      volume: 0.42,
+      pan: -0.25,
+    });
+
+    assert.equal(
+      seqHtmlSets,
+      initialSeqSets,
+      "Hidden scdaw-sequencer must not rebuild DOM",
+    );
+    assert.equal(
+      timelineHtmlSets,
+      initialTimelineSets,
+      "scdaw-timeline must not rebuild DOM when only mixer volume/pan change",
+    );
+    assert.equal(
+      syncNotesCalls,
+      initialSyncCalls,
+      "scdaw-editor must not run _syncNotes when track notes did not change",
+    );
+  } finally {
+    timeline.disconnectedCallback();
+    sequencer.disconnectedCallback();
+    editor.disconnectedCallback();
+    globalThis.requestAnimationFrame = origRaf;
+    globalThis.cancelAnimationFrame = origCaf;
+  }
+});
+
+test("Performance: scdaw-statusbar._sync() and scdaw-timeline._updatePlayhead() never call scdaw.getProject()", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawStatusBarElement } =
+    await import("../.agents/scripts/components/scdaw-statusbar.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+
+  const statusbar = new DawStatusBarElement();
+  statusbar.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => ({ textContent: "", style: {} }),
+  };
+
+  const timeline = new DawTimelineElement();
+  timeline.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => ({ style: {} }),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+
+  let getProjectCalls = 0;
+  const origGetProject = scdaw.getProject.bind(scdaw);
+  scdaw.getProject = () => {
+    getProjectCalls++;
+    return origGetProject();
+  };
+
+  try {
+    statusbar._sync();
+    timeline._updatePlayhead(480);
+    assert.equal(
+      getProjectCalls,
+      0,
+      "60fps _sync() and _updatePlayhead() must read scdaw.project.get() directly without cloning via scdaw.getProject()",
+    );
+  } finally {
+    scdaw.getProject = origGetProject;
   }
 });

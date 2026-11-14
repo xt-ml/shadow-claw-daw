@@ -772,13 +772,32 @@ export class DawTimelineElement extends BaseElement {
   }
 
   connectedCallback() {
+    this._lastRenderSignature = null;
     this.render();
     this._startPlayheadLoop();
     this._dispose = effect(() => {
-      scdaw.project.get();
-      scdaw.selectedTrackId?.get();
-      this.render();
+      const p = scdaw.project.get();
+      const sel = scdaw.selectedTrackId?.get();
+      const sig = this._computeRenderSignature(p, sel);
+      if (sig !== this._lastRenderSignature) {
+        this.render();
+      }
     });
+  }
+
+  _computeRenderSignature(p, selectedTrackId) {
+    if (!p) return "";
+    const trackSigs = (p.tracks || [])
+      .map((t) => {
+        const autoKeys = t.automation
+          ? Object.entries(t.automation)
+              .map(([k, v]) => `${k}:${Array.isArray(v) ? v.length : 0}`)
+              .join(",")
+          : "";
+        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.armed)}|${t.notes?.length || 0}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
+      })
+      .join(";");
+    return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${trackSigs}`;
   }
 
   disconnectedCallback() {
@@ -801,7 +820,7 @@ export class DawTimelineElement extends BaseElement {
 
   _updatePlayhead(posPpqn) {
     if (!this.shadowRoot) return;
-    const p = scdaw.getProject();
+    const p = scdaw.project.get();
     const total = (p.lengthBars || 1) * PPQN.Bar;
     const pct = (posPpqn / total) * 100;
     const marker = this.shadowRoot.getElementById("playhead-marker");
@@ -812,7 +831,11 @@ export class DawTimelineElement extends BaseElement {
 
   render() {
     if (!this.shadowRoot) return;
-    const p = scdaw.getProject();
+    const p = scdaw.project.get();
+    this._lastRenderSignature = this._computeRenderSignature(
+      p,
+      scdaw.selectedTrackId?.get(),
+    );
     const ticks = computeTimelineTicks(p.lengthBars, p.signature);
     const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
     const totalBeats = (p.lengthBars || 1) * 4;

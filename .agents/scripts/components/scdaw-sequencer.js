@@ -22,17 +22,55 @@ export class DawSequencerElement extends BaseElement {
   }
 
   connectedCallback() {
-    this.render();
-    this._startLoop();
-    this._dispose = effect(() => {
-      scdaw.project.get();
+    this._dirty = false;
+    this._lastRenderSignature = null;
+    if (!this.classList?.contains("hidden")) {
       this.render();
+    } else {
+      this._dirty = true;
+    }
+    this._startLoop();
+    if (
+      typeof MutationObserver !== "undefined" &&
+      typeof this.getAttribute === "function"
+    ) {
+      try {
+        this._classObserver = new MutationObserver(() => {
+          if (this._dirty && !this.classList?.contains("hidden")) {
+            this.render();
+          }
+        });
+        this._classObserver.observe(this, {
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+      } catch (_) {}
+    }
+    this._dispose = effect(() => {
+      const p = scdaw.project.get();
+      if (this.classList?.contains("hidden")) {
+        this._dirty = true;
+        return;
+      }
+      const sig = this._computeRenderSignature(p);
+      if (sig !== this._lastRenderSignature) {
+        this.render();
+      }
     });
   }
 
   disconnectedCallback() {
     if (this._rafId) cancelAnimationFrame(this._rafId);
     if (this._dispose) this._dispose();
+    if (this._classObserver) this._classObserver.disconnect();
+  }
+
+  _computeRenderSignature(p) {
+    if (!p) return "";
+    const trackSigs = (p.tracks || [])
+      .map((t) => `${t.id}|${t.kind}|${t.name}|${t.notes?.length || 0}`)
+      .join(";");
+    return `${p.lengthBars}|${trackSigs}`;
   }
 
   _startLoop() {
@@ -59,12 +97,22 @@ export class DawSequencerElement extends BaseElement {
 
   render() {
     if (!this.shadowRoot) return;
-    const p = scdaw.getProject();
+    if (this.classList?.contains("hidden")) {
+      this._dirty = true;
+      return;
+    }
+    this._dirty = false;
+    const p = scdaw.project.get();
+    this._lastRenderSignature = this._computeRenderSignature(p);
     const numSteps = (p.lengthBars || 1) * 16;
 
     let rowsHtml = "";
     for (const track of p.tracks) {
       if (track.kind === "drums") {
+        const drumStepSet = new Set();
+        for (const n of track.notes) {
+          drumStepSet.add(`${n.pitch}:${ppqnToStep(n.position)}`);
+        }
         const drumLanes = [
           { pitch: 36, name: "Kick" },
           { pitch: 38, name: "Snare" },
@@ -78,10 +126,7 @@ export class DawSequencerElement extends BaseElement {
               <div class="seq-label">${lane.name}</div>
               <div class="seq-cells">
                 ${Array.from({ length: numSteps }, (_, step) => {
-                  const hasNote = track.notes.some(
-                    (n) =>
-                      n.pitch === lane.pitch && ppqnToStep(n.position) === step,
-                  );
+                  const hasNote = drumStepSet.has(`${lane.pitch}:${step}`);
                   const isBeatStart = step % 4 === 0;
                   return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-track="${track.id}" data-pitch="${lane.pitch}" data-step="${step}"></div>`;
                 }).join("")}
@@ -91,14 +136,17 @@ export class DawSequencerElement extends BaseElement {
         }
       } else {
         // Synth track overview row
+        const stepNoteMap = new Map();
+        for (const n of track.notes) {
+          const st = ppqnToStep(n.position);
+          if (!stepNoteMap.has(st)) stepNoteMap.set(st, n);
+        }
         rowsHtml += `
           <div class="seq-row">
             <div class="seq-label">${track.name}</div>
             <div class="seq-cells">
               ${Array.from({ length: numSteps }, (_, step) => {
-                const note = track.notes.find(
-                  (n) => ppqnToStep(n.position) === step,
-                );
+                const note = stepNoteMap.get(step);
                 const hasNote = Boolean(note);
                 const isBeatStart = step % 4 === 0;
                 return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-track="${track.id}" data-pitch="${note ? note.pitch : track.defaultPitch || 60}" data-step="${step}" title="${note ? pitchToName(note.pitch) : ""}"></div>`;

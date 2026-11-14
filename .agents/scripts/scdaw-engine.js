@@ -86,6 +86,9 @@ export class DawEngine extends EventTarget {
     this._intervalId = null;
     this._lastSchedulePpqn = 0;
     this._lastScheduleAudioTime = 0;
+    this._anchorPpqn = 0;
+    this._anchorAudioTime = 0;
+    this._scheduledUntilUnwrapped = null;
     this._activeVoices = new Set();
     this._sampleCache = new Map();
     this._recorder = null;
@@ -117,6 +120,17 @@ export class DawEngine extends EventTarget {
         localStorage.setItem("scdaw:project", JSON.stringify(p));
       }
     } catch (_) {}
+  }
+
+  _schedulePersistProject(p) {
+    if (this._persistTimer) clearTimeout(this._persistTimer);
+    this._persistTimer = setTimeout(() => {
+      this._persistTimer = null;
+      this._persistProject(p);
+    }, 500);
+    if (typeof this._persistTimer?.unref === "function") {
+      this._persistTimer.unref();
+    }
   }
 
   _initAudioContext() {
@@ -368,11 +382,13 @@ export class DawEngine extends EventTarget {
     }
     this._updateAudioState();
 
-    this._lastScheduleAudioTime = this.ctx
-      ? this.ctx.currentTime
-      : Date.now() / 1000;
+    const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+    this._lastScheduleAudioTime = nowAudio;
     this._lastSchedulePpqn = 0;
+    this._anchorAudioTime = nowAudio;
+    this._anchorPpqn = 0;
     this._scheduledUntilPpqn = null;
+    this._scheduledUntilUnwrapped = null;
     this._updateState({ playing: true });
 
     if (this._worker) {
@@ -391,7 +407,10 @@ export class DawEngine extends EventTarget {
       step: 0,
     });
     this._lastSchedulePpqn = 0;
+    this._anchorPpqn = 0;
+    this._anchorAudioTime = 0;
     this._scheduledUntilPpqn = null;
+    this._scheduledUntilUnwrapped = null;
 
     for (const voice of this._activeVoices) {
       try {
@@ -420,6 +439,31 @@ export class DawEngine extends EventTarget {
     }
     this._activeVoices.clear();
     this._scheduledUntilPpqn = null;
+    this._scheduledUntilUnwrapped = null;
+  }
+
+  _reanchorPlaybackClock(nowAudio, oldBpm) {
+    if (!this.state.get().playing) return;
+    const elapsedSec = Math.max(0, nowAudio - this._anchorAudioTime);
+    const unwrappedNow = this._anchorPpqn + secondsToPulses(elapsedSec, oldBpm);
+    this._anchorPpqn = unwrappedNow;
+    this._anchorAudioTime = nowAudio;
+  }
+
+  _resolveEventAudioTime(
+    evPos,
+    nextPos,
+    totalPulses,
+    nowAudio,
+    bpm,
+    maxLateSec,
+  ) {
+    let offsetPulses = evPos - nextPos;
+    if (offsetPulses < -totalPulses / 2) offsetPulses += totalPulses;
+    if (offsetPulses > totalPulses / 2) offsetPulses -= totalPulses;
+    const rawEvTime = nowAudio + pulsesToSeconds(offsetPulses, bpm);
+    if (rawEvTime < nowAudio - maxLateSec) return null;
+    return Math.max(nowAudio, rawEvTime);
   }
 
   _onClockTick() {
@@ -431,159 +475,183 @@ export class DawEngine extends EventTarget {
     const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
 
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
-    const deltaSec = Math.max(0.001, nowAudio - this._lastScheduleAudioTime);
+    const elapsedSec = Math.max(0, nowAudio - this._anchorAudioTime);
+    const unwrappedNow = this._anchorPpqn + secondsToPulses(elapsedSec, bpm);
+    const nextPos = unwrappedNow % totalPulses;
+
     this._lastScheduleAudioTime = nowAudio;
 
-    const deltaPulses = secondsToPulses(deltaSec, bpm);
-    let fromPpqn = this._lastSchedulePpqn;
-    let toPpqn = fromPpqn + deltaPulses;
-    const nextPos = toPpqn % totalPulses;
+    const LOOKAHEAD_SEC = 0.2;
+    const MAX_LATE_CATCHUP_SEC = 0.05;
+    const lookaheadPulses = secondsToPulses(LOOKAHEAD_SEC, bpm);
+    const maxCatchupPulses = secondsToPulses(MAX_LATE_CATCHUP_SEC, bpm);
+    const unwrappedLookaheadEnd = unwrappedNow + lookaheadPulses;
 
-    // Schedule audio voices in lookahead window (100ms) without duplication
-    const lookaheadPulses = secondsToPulses(0.1, bpm);
-    let schedStart, schedEnd;
-
+    let schedFromUnwrapped;
     if (
-      this._scheduledUntilPpqn === null ||
-      this._scheduledUntilPpqn === undefined
+      this._scheduledUntilUnwrapped === null ||
+      this._scheduledUntilUnwrapped === undefined
     ) {
-      schedStart = fromPpqn % totalPulses;
-      schedEnd = (fromPpqn + lookaheadPulses) % totalPulses;
-      this._scheduledUntilPpqn = (fromPpqn + lookaheadPulses) % totalPulses;
+      schedFromUnwrapped = unwrappedNow;
     } else {
-      schedStart = this._scheduledUntilPpqn;
-      schedEnd = (this._scheduledUntilPpqn + deltaPulses) % totalPulses;
-      this._scheduledUntilPpqn = schedEnd;
+      schedFromUnwrapped = Math.max(
+        this._scheduledUntilUnwrapped,
+        unwrappedNow - maxCatchupPulses,
+      );
     }
 
-    const events = computeEventsInRange(p, schedStart, schedEnd);
+    if (unwrappedLookaheadEnd > schedFromUnwrapped + 1e-6) {
+      const schedStart = schedFromUnwrapped % totalPulses;
+      const schedEnd = unwrappedLookaheadEnd % totalPulses;
+      this._scheduledUntilPpqn = schedEnd;
+      this._scheduledUntilUnwrapped = unwrappedLookaheadEnd;
+
+      const events = computeEventsInRange(p, schedStart, schedEnd);
+
+      if (this.ctx && this.graph) {
+        const hasSolo = p.tracks.some((t) => t.solo);
+
+        for (const ev of events) {
+          const nodes = this.graph.tracks.get(ev.trackId);
+          if (nodes) {
+            const track = p.tracks.find((t) => t.id === ev.trackId);
+            if (track && track.automation?.cutoff?.length > 0) {
+              const autoCutoff = automationValueAt(
+                track,
+                "cutoff",
+                ev.position,
+                ev.trackParams?.cutoff ?? 1200,
+              );
+              ev.trackParams = {
+                ...(ev.trackParams || {}),
+                cutoff: autoCutoff,
+              };
+            }
+
+            const evTime = this._resolveEventAudioTime(
+              ev.position,
+              nextPos,
+              totalPulses,
+              nowAudio,
+              bpm,
+              MAX_LATE_CATCHUP_SEC,
+            );
+            if (evTime === null) continue;
+
+            const voice = triggerInstrumentVoice(
+              this.ctx,
+              nodes.gain,
+              { ...ev, trackVolume: 1, trackPan: 0 },
+              evTime,
+              bpm,
+            );
+            if (voice) {
+              voice.trackId = ev.trackId;
+              this._activeVoices.add(voice);
+              const origEnded = voice.onended;
+              voice.onended = () => {
+                this._activeVoices.delete(voice);
+                if (typeof origEnded === "function") origEnded();
+              };
+            }
+          }
+        }
+
+        // Schedule audio clips for audio tracks without duplication
+        for (const track of p.tracks) {
+          if (track.kind === "audio" && Array.isArray(track.audioClips)) {
+            const nodes = this.graph.tracks.get(track.id);
+            if (!nodes || track.mute || (hasSolo && !track.solo)) continue;
+            for (const clip of track.audioClips) {
+              const clipStartPulses = Math.round(
+                (clip.time || 0) * PPQN.Quarter,
+              );
+              const clipDurPulses = Math.round(
+                (clip.duration || 4) * PPQN.Quarter,
+              );
+              const clipPos = clipStartPulses % totalPulses;
+              let clipInRange = false;
+              if (schedStart <= schedEnd) {
+                clipInRange = clipPos >= schedStart && clipPos < schedEnd;
+              } else {
+                clipInRange = clipPos >= schedStart || clipPos < schedEnd;
+              }
+              if (clipInRange) {
+                const evTime = this._resolveEventAudioTime(
+                  clipPos,
+                  nextPos,
+                  totalPulses,
+                  nowAudio,
+                  bpm,
+                  MAX_LATE_CATCHUP_SEC,
+                );
+                if (evTime === null) continue;
+                const source = this.ctx.createBufferSource();
+                const sampleBuf =
+                  this._sampleCache.get(clip.sample) ||
+                  (this.ctx.createBuffer
+                    ? this.ctx.createBuffer(
+                        2,
+                        Math.max(1, Math.round(this.ctx.sampleRate * 0.1)),
+                        this.ctx.sampleRate,
+                      )
+                    : null);
+                if (sampleBuf) source.buffer = sampleBuf;
+                const clipGain = this.ctx.createGain();
+                clipGain.gain.setValueAtTime(
+                  clip.gain ?? 1.0,
+                  this.ctx.currentTime,
+                );
+                source.connect(clipGain);
+                clipGain.connect(nodes.gain);
+                const durSec = pulsesToSeconds(clipDurPulses, bpm);
+                source.start(evTime, clip.offset || 0, durSec);
+                source.trackId = track.id;
+                this._activeVoices.add(source);
+                const cleanupClip = () => {
+                  this._activeVoices.delete(source);
+                  try {
+                    clipGain.disconnect();
+                  } catch (_) {}
+                };
+                source.onended = cleanupClip;
+              }
+            }
+          }
+        }
+
+        // Schedule Metronome Clicks if enabled
+        if (p.metronome && p.metronome.enabled) {
+          const sigBeats = (p.signature && p.signature[0]) || 4;
+          const totalBeats = Math.round(totalPulses / PPQN.Quarter);
+          for (let b = 0; b < totalBeats; b++) {
+            const beatPulse = b * PPQN.Quarter;
+            let inRange = false;
+            if (schedStart <= schedEnd) {
+              inRange = beatPulse >= schedStart && beatPulse < schedEnd;
+            } else {
+              inRange = beatPulse >= schedStart || beatPulse < schedEnd;
+            }
+            if (inRange) {
+              const beatTime = this._resolveEventAudioTime(
+                beatPulse,
+                nextPos,
+                totalPulses,
+                nowAudio,
+                bpm,
+                MAX_LATE_CATCHUP_SEC,
+              );
+              if (beatTime === null) continue;
+              const isAccent = b % sigBeats === 0;
+              this._scheduleMetronomeClick(beatTime, isAccent);
+            }
+          }
+        }
+      }
+    }
 
     if (this.ctx && this.graph) {
       const hasSolo = p.tracks.some((t) => t.solo);
-
-      for (const ev of events) {
-        const nodes = this.graph.tracks.get(ev.trackId);
-        if (nodes) {
-          const track = p.tracks.find((t) => t.id === ev.trackId);
-          if (track && track.automation?.cutoff?.length > 0) {
-            const autoCutoff = automationValueAt(
-              track,
-              "cutoff",
-              ev.position,
-              ev.trackParams?.cutoff ?? 1200,
-            );
-            ev.trackParams = { ...(ev.trackParams || {}), cutoff: autoCutoff };
-          }
-
-          const deltaEvPulses =
-            (ev.position - fromPpqn + totalPulses) % totalPulses;
-          const evTime = Math.max(
-            nowAudio,
-            nowAudio + pulsesToSeconds(deltaEvPulses, bpm),
-          );
-          const voice = triggerInstrumentVoice(
-            this.ctx,
-            nodes.gain,
-            ev,
-            evTime,
-            bpm,
-          );
-          if (voice) {
-            voice.trackId = ev.trackId;
-            this._activeVoices.add(voice);
-            const origEnded = voice.onended;
-            voice.onended = () => {
-              this._activeVoices.delete(voice);
-              if (typeof origEnded === "function") origEnded();
-            };
-          }
-        }
-      }
-
-      // Schedule audio clips for audio tracks without duplication
-      for (const track of p.tracks) {
-        if (track.kind === "audio" && Array.isArray(track.audioClips)) {
-          const nodes = this.graph.tracks.get(track.id);
-          if (!nodes || track.mute || (hasSolo && !track.solo)) continue;
-          for (const clip of track.audioClips) {
-            const clipStartPulses = Math.round((clip.time || 0) * PPQN.Quarter);
-            const clipDurPulses = Math.round(
-              (clip.duration || 4) * PPQN.Quarter,
-            );
-            const clipPos = clipStartPulses % totalPulses;
-            let clipInRange = false;
-            if (schedStart <= schedEnd) {
-              clipInRange = clipPos >= schedStart && clipPos < schedEnd;
-            } else {
-              clipInRange = clipPos >= schedStart || clipPos < schedEnd;
-            }
-            if (clipInRange) {
-              const deltaEvPulses =
-                (clipPos - fromPpqn + totalPulses) % totalPulses;
-              const evTime = Math.max(
-                nowAudio,
-                nowAudio + pulsesToSeconds(deltaEvPulses, bpm),
-              );
-              const source = this.ctx.createBufferSource();
-              const sampleBuf =
-                this._sampleCache.get(clip.sample) ||
-                (this.ctx.createBuffer
-                  ? this.ctx.createBuffer(
-                      2,
-                      Math.max(1, Math.round(this.ctx.sampleRate * 0.1)),
-                      this.ctx.sampleRate,
-                    )
-                  : null);
-              if (sampleBuf) source.buffer = sampleBuf;
-              const clipGain = this.ctx.createGain();
-              clipGain.gain.setValueAtTime(
-                clip.gain ?? 1.0,
-                this.ctx.currentTime,
-              );
-              source.connect(clipGain);
-              clipGain.connect(nodes.gain);
-              const durSec = pulsesToSeconds(clipDurPulses, bpm);
-              source.start(evTime, clip.offset || 0, durSec);
-              source.trackId = track.id;
-              this._activeVoices.add(source);
-              const cleanupClip = () => {
-                this._activeVoices.delete(source);
-                try {
-                  clipGain.disconnect();
-                } catch (_) {}
-              };
-              source.onended = cleanupClip;
-            }
-          }
-        }
-      }
-
-      // Schedule Metronome Clicks if enabled
-      if (p.metronome && p.metronome.enabled) {
-        const sigBeats = (p.signature && p.signature[0]) || 4;
-        const totalBeats = Math.round(totalPulses / PPQN.Quarter);
-        for (let b = 0; b < totalBeats; b++) {
-          const beatPulse = b * PPQN.Quarter;
-          let inRange = false;
-          if (schedStart <= schedEnd) {
-            inRange = beatPulse >= schedStart && beatPulse < schedEnd;
-          } else {
-            inRange = beatPulse >= schedStart || beatPulse < schedEnd;
-          }
-          if (inRange) {
-            const deltaBeat =
-              (beatPulse - (fromPpqn % totalPulses) + totalPulses) %
-              totalPulses;
-            const beatTime = Math.max(
-              nowAudio,
-              nowAudio + pulsesToSeconds(deltaBeat, bpm),
-            );
-            const isAccent = b % sigBeats === 0;
-            this._scheduleMetronomeClick(beatTime, isAccent);
-          }
-        }
-      }
-
       // Continuous parameter automation ramping (volume & pan)
       for (const track of p.tracks) {
         const nodes = this.graph.tracks.get(track.id);
@@ -1781,6 +1849,16 @@ export class DawEngine extends EventTarget {
     const current = this.project.get();
     this.history.push(current);
 
+    if (
+      name === "set_transport" &&
+      params &&
+      params.bpm !== undefined &&
+      this.state.get().playing
+    ) {
+      const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+      this._reanchorPlaybackClock(nowAudio, current.bpm || 120);
+    }
+
     // If changing preset, instrument, or track params, stop active voices on that track
     if (
       (name === "apply_preset" ||
@@ -1807,6 +1885,139 @@ export class DawEngine extends EventTarget {
     this._updateState({ trackCount: next.tracks.length });
 
     return result;
+  }
+
+  _rampAudioParam(param, val, now, timeConstant = 0.012) {
+    if (!param) return;
+    if (typeof param.setTargetAtTime === "function") {
+      param.setTargetAtTime(val, now, timeConstant);
+    } else if (typeof param.setValueAtTime === "function") {
+      param.setValueAtTime(val, now);
+    }
+  }
+
+  setLiveTrackParam(trackId, patch = {}) {
+    const p = this.project.get();
+    const idx = p.tracks.findIndex((t) => t.id === trackId);
+    if (idx === -1) return;
+
+    if (!this._liveGestureBaseProject) {
+      this._liveGestureBaseProject = structuredClone(p);
+    }
+
+    const track = p.tracks[idx];
+    const nextTrack = { ...track };
+    if (patch.volume !== undefined) {
+      nextTrack.volume = Math.max(0, Math.min(1.5, Number(patch.volume)));
+    }
+    if (patch.pan !== undefined) {
+      nextTrack.pan = Math.max(-1, Math.min(1, Number(patch.pan)));
+    }
+    if (patch.params && typeof patch.params === "object") {
+      nextTrack.params = { ...(track.params || {}), ...patch.params };
+    }
+    if (patch.mute !== undefined) nextTrack.mute = Boolean(patch.mute);
+    if (patch.solo !== undefined) nextTrack.solo = Boolean(patch.solo);
+
+    // Update live track reference in place without notifying project subscribers
+    p.tracks[idx] = nextTrack;
+
+    if (this.ctx && this.graph) {
+      const now = this.ctx.currentTime;
+      const nodes = this.graph.tracks.get(trackId);
+      if (nodes) {
+        const hasSolo = p.tracks.some((t) => t.solo);
+        const effectiveVol =
+          nextTrack.mute || (hasSolo && !nextTrack.solo)
+            ? 0
+            : (nextTrack.volume ?? 0.8);
+        this._rampAudioParam(nodes.gain?.gain, effectiveVol, now, 0.012);
+        this._rampAudioParam(nodes.panner?.pan, nextTrack.pan ?? 0, now, 0.012);
+      }
+
+      if (patch.params) {
+        for (const voice of this._activeVoices) {
+          if (
+            voice.trackId === trackId &&
+            typeof voice.updateParams === "function"
+          ) {
+            voice.updateParams(nextTrack.params, now);
+          }
+        }
+      }
+    }
+  }
+
+  commitLiveTrackParam(trackId) {
+    const base = this._liveGestureBaseProject;
+    this._liveGestureBaseProject = null;
+    if (!base) return { ok: true, noop: true };
+
+    const p = this.project.get();
+    this.history.push(base);
+    this.project.set({ ...p, tracks: [...p.tracks] });
+    this._schedulePersistProject(this.project.get());
+    return { ok: true, trackId };
+  }
+
+  setLiveMasterParam(patch = {}) {
+    const p = this.project.get();
+    if (!this._liveGestureBaseProject) {
+      this._liveGestureBaseProject = structuredClone(p);
+    }
+    const master = { ...(p.master || {}), ...patch };
+    p.master = master;
+    if (this.ctx && this.graph?.masterGain && patch.volume !== undefined) {
+      this._rampAudioParam(
+        this.graph.masterGain.gain,
+        Math.max(0, Math.min(1.5, Number(patch.volume))),
+        this.ctx.currentTime,
+        0.012,
+      );
+    }
+  }
+
+  commitLiveMasterParam() {
+    const base = this._liveGestureBaseProject;
+    this._liveGestureBaseProject = null;
+    if (!base) return { ok: true, noop: true };
+
+    const p = this.project.get();
+    this.history.push(base);
+    this.project.set({ ...p });
+    this._schedulePersistProject(this.project.get());
+    return { ok: true };
+  }
+
+  setLiveTransportParam(patch = {}) {
+    const p = this.project.get();
+    if (!this._liveGestureBaseProject) {
+      this._liveGestureBaseProject = structuredClone(p);
+    }
+    if (patch.bpm !== undefined) {
+      const nextBpm = Math.max(20, Math.min(300, Number(patch.bpm)));
+      if (this.state.get().playing && nextBpm !== p.bpm) {
+        const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+        this._reanchorPlaybackClock(nowAudio, p.bpm || 120);
+      }
+      p.bpm = nextBpm;
+      this._updateState({ bpm: nextBpm });
+    }
+    if (patch.swing !== undefined) {
+      p.swing = Math.max(0, Math.min(100, Number(patch.swing)));
+    }
+  }
+
+  commitLiveTransportParam() {
+    const base = this._liveGestureBaseProject;
+    this._liveGestureBaseProject = null;
+    if (!base) return { ok: true, noop: true };
+
+    const p = this.project.get();
+    this.history.push(base);
+    this.project.set({ ...p });
+    this._schedulePersistProject(this.project.get());
+    return { ok: true };
   }
 
   async resetProject(options = {}) {
@@ -2013,6 +2224,11 @@ export class DawEngine extends EventTarget {
         step,
       });
       this._lastSchedulePpqn = targetPpqn;
+      this._anchorPpqn = targetPpqn;
+      this._anchorAudioTime = this.ctx
+        ? this.ctx.currentTime
+        : Date.now() / 1000;
+      this._scheduledUntilUnwrapped = null;
     }
 
     this._recorder = new AudioRecorder({ audioContext: this.ctx });

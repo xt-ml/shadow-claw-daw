@@ -674,3 +674,54 @@ test("resolveTrackNotes: chains MIDI FX pipeline (NoteFilter -> Chord -> Arp -> 
   const resolved = resolveTrackNotes(p, track, { loops: 1, bakeMidiFx: true });
   assert.ok(resolved.length >= 3, "Chord expansion should produce 3 voices");
 });
+
+test("Performance: computeEventsInRange caches resolved notes per track and runs 1,000 ticks on a 5,000-note song in < 30ms", () => {
+  const p = createProject("empty");
+  p.bpm = 215;
+  p.lengthBars = 108;
+  p.swing = 0.2;
+  const totalPulses = p.lengthBars * PPQN.Bar;
+
+  // Build 7 tracks totaling ~5,000 notes
+  for (let t = 0; t < 7; t++) {
+    const notes = [];
+    for (let i = 0; i < 715; i++) {
+      notes.push({
+        position: Math.floor((i * totalPulses) / 715),
+        duration: 240,
+        pitch: 48 + (i % 24),
+        velocity: 0.8,
+      });
+    }
+    p.tracks.push({
+      id: `trk_${t}`,
+      name: `Track ${t}`,
+      kind: t === 0 ? "drums" : "synth",
+      volume: 0.8,
+      pan: 0,
+      mute: false,
+      solo: false,
+      params: {},
+      notes,
+    });
+  }
+
+  // Warmup + verify correctness across a wrapped window
+  const wrapped = computeEventsInRange(p, totalPulses - 200, 200);
+  assert.ok(wrapped.length > 0, "Wrapped range must return events near 0");
+
+  const startMs = performance.now();
+  let totalEvents = 0;
+  for (let tick = 0; tick < 1000; tick++) {
+    const from = (tick * 240) % totalPulses;
+    const to = (from + 240) % totalPulses;
+    totalEvents += computeEventsInRange(p, from, to).length;
+  }
+  const elapsedMs = performance.now() - startMs;
+
+  assert.ok(totalEvents > 0, "Expected events across 1,000 ticks");
+  assert.ok(
+    elapsedMs < 30,
+    `Expected 1,000 computeEventsInRange ticks on 5,000 notes in < 30ms, took ${elapsedMs.toFixed(2)}ms`,
+  );
+});
