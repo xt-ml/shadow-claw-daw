@@ -781,8 +781,32 @@ export class DawTimelineElement extends BaseElement {
       const sig = this._computeRenderSignature(p, sel);
       if (sig !== this._lastRenderSignature) {
         this.render();
+      } else {
+        this._syncTrackCounts(p);
       }
     });
+  }
+
+  _syncTrackCounts(p) {
+    if (!this.shadowRoot || !p?.tracks) return;
+    const countEls = this.shadowRoot.querySelectorAll(
+      ".scdaw-timeline__track-count",
+    );
+    if (!countEls.length) return;
+    const trackMap = new Map(p.tracks.map((t) => [t.id, t]));
+    for (let i = 0; i < countEls.length; i++) {
+      const el = countEls[i];
+      const t = trackMap.get(el.dataset?.track);
+      if (!t) continue;
+      const countLabel =
+        t.kind === "audio"
+          ? `${t.audioClips?.length || 0} clips`
+          : `${t.notes?.length || 0} notes`;
+      if (el.textContent !== countLabel) {
+        el.textContent = countLabel;
+        el.title = countLabel;
+      }
+    }
   }
 
   _computeRenderSignature(p, selectedTrackId) {
@@ -794,7 +818,7 @@ export class DawTimelineElement extends BaseElement {
               .map(([k, v]) => `${k}:${Array.isArray(v) ? v.length : 0}`)
               .join(",")
           : "";
-        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.armed)}|${t.notes?.length || 0}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
+        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
       })
       .join(";");
     return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${trackSigs}`;
@@ -1609,7 +1633,7 @@ export class DawTimelineElement extends BaseElement {
                       <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} scdaw-timeline__btn mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>
                       <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} scdaw-timeline__btn solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}" title="${t.solo ? `Unsolo ${t.name}` : `Solo ${t.name}`}">S</button>
                       <button type="button" class="btn btn-icon ${isAutoExpanded ? "btn-primary" : ""} scdaw-timeline__btn auto-btn" data-track="${t.id}" aria-label="Toggle automation for ${t.name}" aria-expanded="${isAutoExpanded}" title="Automation lanes">📈</button>
-                      <span class="scdaw-timeline__track-count" title="${countLabel}">${countLabel}</span>
+                      <span class="scdaw-timeline__track-count" data-track="${t.id}" title="${countLabel}">${countLabel}</span>
                     </div>
                   </div>
                   <div class="scdaw-timeline__lane lane-area">

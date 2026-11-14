@@ -981,3 +981,48 @@ test("DawEngine Fast Path: live synth param changes modulate active voices in-pl
     await engine.stop();
   }
 });
+
+test("DawEngine: sendCommand debounces localStorage persistence instead of blocking synchronously on every note edit", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  let syncPersistCalls = 0;
+  let scheduledPersistCalls = 0;
+  const origPersist = engine._persistProject.bind(engine);
+  const origSchedule = engine._schedulePersistProject.bind(engine);
+  engine._persistProject = (...args) => {
+    syncPersistCalls++;
+    return origPersist(...args);
+  };
+  engine._schedulePersistProject = (...args) => {
+    scheduledPersistCalls++;
+    return origSchedule(...args);
+  };
+
+  try {
+    for (let step = 0; step < 5; step++) {
+      await engine.sendCommand("toggle_step", {
+        trackId: "trk_drums",
+        step,
+        pitch: 36,
+      });
+    }
+
+    assert.equal(
+      syncPersistCalls,
+      0,
+      "sendCommand must not block the main thread with synchronous _persistProject on note edits",
+    );
+    assert.equal(
+      scheduledPersistCalls,
+      5,
+      "sendCommand should schedule debounced persistence",
+    );
+  } finally {
+    if (engine._persistTimer) clearTimeout(engine._persistTimer);
+    await engine.stop();
+  }
+});

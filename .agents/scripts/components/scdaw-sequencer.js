@@ -53,7 +53,12 @@ export class DawSequencerElement extends BaseElement {
         return;
       }
       const sig = this._computeRenderSignature(p);
-      if (sig !== this._lastRenderSignature) {
+      const hasGrid = Boolean(
+        this.shadowRoot?.querySelector(".grid-container"),
+      );
+      if (sig === this._lastRenderSignature && hasGrid) {
+        this._syncSteps(p);
+      } else {
         this.render();
       }
     });
@@ -68,9 +73,39 @@ export class DawSequencerElement extends BaseElement {
   _computeRenderSignature(p) {
     if (!p) return "";
     const trackSigs = (p.tracks || [])
-      .map((t) => `${t.id}|${t.kind}|${t.name}|${t.notes?.length || 0}`)
+      .map((t) => `${t.id}|${t.kind}|${t.name}`)
       .join(";");
     return `${p.lengthBars}|${trackSigs}`;
+  }
+
+  _syncSteps(p) {
+    if (!this.shadowRoot || !p) return;
+    const drumSet = new Set();
+    const synthStepMap = new Map();
+    for (const track of p.tracks) {
+      if (track.kind === "drums") {
+        for (const n of track.notes || []) {
+          drumSet.add(`${track.id}:${n.pitch}:${ppqnToStep(n.position)}`);
+        }
+      } else {
+        for (const n of track.notes || []) {
+          const key = `${track.id}:${ppqnToStep(n.position)}`;
+          if (!synthStepMap.has(key)) synthStepMap.set(key, n);
+        }
+      }
+    }
+
+    const cells = this.shadowRoot.querySelectorAll(".seq-cell");
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const trackId = cell.dataset?.track;
+      const pitch = cell.dataset?.pitch;
+      const step = cell.dataset?.step;
+      const isActive =
+        drumSet.has(`${trackId}:${pitch}:${step}`) ||
+        synthStepMap.has(`${trackId}:${step}`);
+      cell.classList.toggle("active", isActive);
+    }
   }
 
   _startLoop() {
@@ -265,23 +300,24 @@ export class DawSequencerElement extends BaseElement {
       </div>
     `;
 
-    this.shadowRoot.querySelectorAll(".seq-cell").forEach((cell) => {
-      cell.addEventListener("click", () => {
-        const trackId = cell.dataset.track;
-        const rawPitch = cell.dataset.pitch;
-        const pitch =
-          rawPitch !== undefined &&
-          rawPitch !== "" &&
-          !Number.isNaN(Number(rawPitch))
-            ? Number(rawPitch)
-            : undefined;
-        const step = Number(cell.dataset.step);
+    const gridContainer = this.shadowRoot.querySelector(".grid-container");
+    gridContainer?.addEventListener("click", (e) => {
+      const cell = e.target?.closest?.(".seq-cell");
+      if (!cell) return;
+      const trackId = cell.dataset.track;
+      const rawPitch = cell.dataset.pitch;
+      const pitch =
+        rawPitch !== undefined &&
+        rawPitch !== "" &&
+        !Number.isNaN(Number(rawPitch))
+          ? Number(rawPitch)
+          : undefined;
+      const step = Number(cell.dataset.step);
 
-        scdaw.sendCommand("toggle_step", {
-          trackId,
-          step,
-          pitch,
-        });
+      scdaw.sendCommand("toggle_step", {
+        trackId,
+        step,
+        pitch,
       });
     });
   }

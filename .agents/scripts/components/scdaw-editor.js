@@ -252,18 +252,28 @@ export class DawEditorElement extends BaseElement {
     // Fast O(1) set lookup for active cells
     const activeMap = computeCellActiveMap(currentTrack?.notes);
     const cells = this.shadowRoot.querySelectorAll(".pr-cell");
-    cells.forEach((cell) => {
-      const pitch = Number(cell.dataset.pitch);
-      const step = Number(cell.dataset.step);
-      const isActive = activeMap.has(`${pitch}:${step}`);
-      cell.classList.toggle("active", isActive);
-    });
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const key = `${cell.dataset.pitch}:${cell.dataset.step}`;
+      cell.classList.toggle("active", activeMap.has(key));
+    }
+
+    // Pre-index step velocities in O(N) instead of 1,728 x N scans
+    const stepVelMap = new Map();
+    if (Array.isArray(currentTrack?.notes)) {
+      for (const n of currentTrack.notes) {
+        const st = ppqnToStep(n.position);
+        const v = n.velocity ?? 0.8;
+        const prev = stepVelMap.get(st) ?? 0;
+        if (v > prev) stepVelMap.set(st, v);
+      }
+    }
 
     // Update velocity stalks
     const stalks = this.shadowRoot.querySelectorAll(".vel-stalk");
     const bars = this.shadowRoot.querySelectorAll(".vel-bar");
     for (let step = 0; step < numSteps && step < bars.length; step++) {
-      const vel = computeStepVelocity(currentTrack?.notes, step);
+      const vel = stepVelMap.get(step) ?? 0;
       const hasNote = vel > 0;
       const velPct = hasNote ? Math.round(vel * 100) : 0;
       if (bars[step]) {
@@ -280,6 +290,18 @@ export class DawEditorElement extends BaseElement {
   }
 
   _renderSkeleton(p, currentTrack, numSteps) {
+    // Pre-index active cells & step velocities in O(N) once per skeleton build
+    const activeMap = computeCellActiveMap(currentTrack?.notes);
+    const stepVelMap = new Map();
+    if (Array.isArray(currentTrack?.notes)) {
+      for (const n of currentTrack.notes) {
+        const st = ppqnToStep(n.position);
+        const v = n.velocity ?? 0.8;
+        const prev = stepVelMap.get(st) ?? 0;
+        if (v > prev) stepVelMap.set(st, v);
+      }
+    }
+
     // Build octave pitch rows (C6 down to C1)
     const rows = [];
     for (let pitch = 72; pitch >= 36; pitch--) {
@@ -530,10 +552,7 @@ export class DawEditorElement extends BaseElement {
                 <div class="pr-key ${r.isBlack ? "black" : ""}">${r.name}</div>
                 <div class="pr-cells">
                   ${Array.from({ length: numSteps }, (_, step) => {
-                    const hasNote = currentTrack?.notes.some(
-                      (n) =>
-                        n.pitch === r.pitch && ppqnToStep(n.position) === step,
-                    );
+                    const hasNote = activeMap.has(`${r.pitch}:${step}`);
                     const isBeatStart = step % 4 === 0;
                     return `<div class="pr-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-pitch="${r.pitch}" data-step="${step}"></div>`;
                   }).join("")}
@@ -546,7 +565,7 @@ export class DawEditorElement extends BaseElement {
               <div class="pr-key vel-key" title="Note Velocity (drag stalks vertically to adjust)">VEL</div>
               <div class="pr-cells vel-cells">
                 ${Array.from({ length: numSteps }, (_, step) => {
-                  const vel = computeStepVelocity(currentTrack?.notes, step);
+                  const vel = stepVelMap.get(step) ?? 0;
                   const hasNote = vel > 0;
                   const velPct = hasNote ? Math.round(vel * 100) : 0;
                   const isBeatStart = step % 4 === 0;

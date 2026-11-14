@@ -3834,3 +3834,156 @@ test("scdaw-mixer: clicking or releasing track slider/knob does not trigger scda
     "Releasing a track slider or knob must not switch selectedTrackId",
   );
 });
+
+test("Performance: scdaw-sequencer and scdaw-timeline update in-place without rebuilding Shadow DOM on toggle_step", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawSequencerElement } =
+    await import("../.agents/scripts/components/scdaw-sequencer.js");
+  const { DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+
+  const origRaf = globalThis.requestAnimationFrame;
+  const origCaf = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+
+  // 1. Visible DawSequencerElement with mock cells
+  const sequencer = new DawSequencerElement();
+  let seqHtmlSets = 0;
+  let seqHtml = "";
+  const mockCell = {
+    dataset: { track: "trk_drums", pitch: "36", step: "1" },
+    classList: {
+      _active: false,
+      toggle(cls, force) {
+        if (cls === "active") this._active = Boolean(force);
+      },
+    },
+  };
+  sequencer.shadowRoot = {
+    get innerHTML() {
+      return seqHtml;
+    },
+    set innerHTML(v) {
+      seqHtmlSets++;
+      seqHtml = v;
+    },
+    getElementById: () => null,
+    querySelector: (sel) =>
+      sel === ".grid-container" ? { addEventListener() {} } : null,
+    querySelectorAll: (sel) => (sel === ".seq-cell" ? [mockCell] : []),
+  };
+
+  // 2. DawTimelineElement with mock count element
+  const timeline = new DawTimelineElement();
+  let timelineHtmlSets = 0;
+  let timelineHtml = "";
+  const mockCountEl = {
+    dataset: { track: "trk_drums" },
+    textContent: "",
+    title: "",
+  };
+  timeline.shadowRoot = {
+    get innerHTML() {
+      return timelineHtml;
+    },
+    set innerHTML(v) {
+      timelineHtmlSets++;
+      timelineHtml = v;
+    },
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: (sel) =>
+      sel === ".scdaw-timeline__track-count" ? [mockCountEl] : [],
+  };
+
+  try {
+    sequencer.connectedCallback();
+    timeline.connectedCallback();
+
+    const initialSeqSets = seqHtmlSets;
+    const initialTimelineSets = timelineHtmlSets;
+
+    await scdaw.sendCommand("toggle_step", {
+      trackId: "trk_drums",
+      step: 1,
+      pitch: 36,
+    });
+
+    assert.equal(
+      seqHtmlSets,
+      initialSeqSets,
+      "Visible scdaw-sequencer must update cells in-place on toggle_step without rebuilding innerHTML",
+    );
+    assert.equal(
+      mockCell.classList._active,
+      true,
+      "scdaw-sequencer must toggle the active class on the edited cell in-place",
+    );
+    assert.equal(
+      timelineHtmlSets,
+      initialTimelineSets,
+      "scdaw-timeline must not rebuild innerHTML on toggle_step",
+    );
+  } finally {
+    sequencer.disconnectedCallback();
+    timeline.disconnectedCallback();
+    globalThis.requestAnimationFrame = origRaf;
+    globalThis.cancelAnimationFrame = origCaf;
+  }
+});
+
+test("Performance: scdaw-editor._syncNotes() pre-indexes step velocities in O(N) and runs < 25ms on 108 bars", async () => {
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+
+  const notes = [];
+  for (let i = 0; i < 2000; i++) {
+    notes.push({
+      position: i * 240,
+      duration: 240,
+      pitch: 48 + (i % 24),
+      velocity: 0.8,
+    });
+  }
+  const track = { id: "trk_0", name: "Banjo", notes };
+  const numSteps = 108 * 16; // 1,728 steps
+
+  const makeMockCell = (pitch, step) => ({
+    dataset: { pitch: String(pitch), step: String(step) },
+    classList: { toggle() {} },
+  });
+  const cells = [];
+  for (let p = 36; p <= 72; p++) {
+    for (let s = 0; s < 100; s++) {
+      cells.push(makeMockCell(p, s));
+    }
+  }
+  const bars = Array.from({ length: numSteps }, () => ({ style: {} }));
+  const stalks = Array.from({ length: numSteps }, () => ({
+    classList: { toggle() {} },
+    title: "",
+  }));
+
+  const editor = new DawEditorElement();
+  editor.shadowRoot = {
+    getElementById: () => null,
+    querySelectorAll: (sel) => {
+      if (sel === ".pr-cell") return cells;
+      if (sel === ".vel-bar") return bars;
+      if (sel === ".vel-stalk") return stalks;
+      return [];
+    },
+  };
+
+  const startMs = performance.now();
+  editor._syncNotes(track, numSteps);
+  const elapsedMs = performance.now() - startMs;
+
+  assert.ok(
+    elapsedMs < 25,
+    `Expected _syncNotes on 108 bars / 2,000 notes to run in < 25ms, took ${elapsedMs.toFixed(2)}ms`,
+  );
+});

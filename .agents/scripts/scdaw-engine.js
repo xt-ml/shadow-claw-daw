@@ -1880,8 +1880,17 @@ export class DawEngine extends EventTarget {
     const { project: next, result } = applyCommand(current, name, params);
     this.project.set(next);
     this._ensureValidSelectedTrack(next);
-    this._updateGraph();
-    this._persistProject(next);
+    if (
+      name !== "toggle_step" &&
+      name !== "write_notes" &&
+      name !== "remove_notes" &&
+      name !== "clear_notes" &&
+      name !== "toggle_note" &&
+      name !== "set_note_velocity"
+    ) {
+      this._updateGraph();
+    }
+    this._schedulePersistProject(next);
     this._updateState({ trackCount: next.tracks.length });
 
     return result;
