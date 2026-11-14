@@ -155,6 +155,29 @@ export function barPulses(signature = [4, 4]) {
   return Math.round(beatsPerBar(signature) * PPQN.Quarter);
 }
 
+export function stepsPerBar(signature = [4, 4]) {
+  return Math.max(1, Math.round(beatsPerBar(signature) * 4));
+}
+
+export function normalizeSignature(signature) {
+  if (!Array.isArray(signature) || signature.length < 2) return [4, 4];
+  const rawNum = Math.round(Number(signature[0]));
+  const num = Number.isFinite(rawNum) ? Math.max(1, Math.min(16, rawNum)) : 4;
+  const rawDen = Math.round(Number(signature[1]));
+  const validDens = [2, 4, 8, 16];
+  const den = validDens.includes(rawDen) ? rawDen : 4;
+  return [num, den];
+}
+
+export function ensureProjectCoversPulses(project, endPulses) {
+  if (!project || !Number.isFinite(endPulses) || endPulses <= 0) return;
+  const pulsesPerBar = Math.max(1, barPulses(project.signature || [4, 4]));
+  const neededBars = Math.min(512, Math.ceil(endPulses / pulsesPerBar));
+  if (neededBars > (project.lengthBars || 1)) {
+    project.lengthBars = neededBars;
+  }
+}
+
 export function parseDuration(dur) {
   if (typeof dur === "number") return Math.max(1, Math.round(dur));
   if (typeof dur !== "string") return PPQN.SemiQuaver;
@@ -761,9 +784,13 @@ export function applyCommand(project, name, params = {}) {
     case "set_transport": {
       if (params.bpm !== undefined)
         next.bpm = Math.max(40, Math.min(240, Number(params.bpm)));
-      if (params.signature !== undefined) next.signature = params.signature;
+      if (params.signature !== undefined)
+        next.signature = normalizeSignature(params.signature);
       if (params.lengthBars !== undefined)
-        next.lengthBars = Math.max(1, Math.min(512, Number(params.lengthBars)));
+        next.lengthBars = Math.max(
+          1,
+          Math.min(512, Math.round(Number(params.lengthBars))),
+        );
       if (params.swing !== undefined)
         next.swing = Math.max(0, Math.min(0.5, Number(params.swing)));
       if (params.loop !== undefined) {
@@ -983,6 +1010,11 @@ export function applyCommand(project, name, params = {}) {
       }
       // sort notes by position
       track.notes.sort((a, b) => a.position - b.position);
+      const maxEndPulse = track.notes.reduce(
+        (max, n) => Math.max(max, (n.position || 0) + (n.duration || 0)),
+        0,
+      );
+      ensureProjectCoversPulses(next, maxEndPulse);
       return {
         project: next,
         result: { trackId: track.id, count: track.notes.length },
@@ -1377,7 +1409,7 @@ export function applyCommand(project, name, params = {}) {
       if (!track) throw new Error(`Track not found: ${params.trackId}`);
       track.audioClips = track.audioClips || [];
 
-      const rawClip = params.clip || {};
+      const rawClip = params.clip || params || {};
       const clipId =
         rawClip.id ||
         `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -1393,6 +1425,10 @@ export function applyCommand(project, name, params = {}) {
 
       track.audioClips.push(clip);
       track.audioClips.sort((a, b) => a.time - b.time);
+      ensureProjectCoversPulses(
+        next,
+        (clip.time + clip.duration) * PPQN.Quarter,
+      );
 
       return {
         project: next,

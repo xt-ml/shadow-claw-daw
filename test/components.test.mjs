@@ -4025,3 +4025,106 @@ test("scdaw-timeline: calculateTimelineSeekPpqn maps ruler click/touch X coordin
     0,
   );
 });
+
+test("scdaw-transport: calculateBarsAdjustment and parseSignatureString handle clamping, shift-step, and validation", async () => {
+  const { calculateBarsAdjustment, parseSignatureString, DawTransportElement } =
+    await import("../.agents/scripts/components/scdaw-transport.js");
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+
+  assert.equal(calculateBarsAdjustment(1, 1, false), 2);
+  assert.equal(calculateBarsAdjustment(1, -1, false), 1); // clamped at 1
+  assert.equal(calculateBarsAdjustment(1, 1, true), 5); // Shift+click adds 4
+  assert.equal(calculateBarsAdjustment(510, 1, true), 512); // clamped at 512
+
+  assert.deepEqual(parseSignatureString("3/4"), [3, 4]);
+  assert.deepEqual(parseSignatureString("6/8"), [6, 8]);
+  assert.deepEqual(parseSignatureString("invalid"), [4, 4]);
+
+  await scdaw.resetProject({ template: "starter" });
+  const transport = new DawTransportElement();
+  transport.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  transport.render();
+
+  assert.match(transport.shadowRoot.innerHTML, /id="bars-dec-btn"[^>]*aria-label=/);
+  assert.match(transport.shadowRoot.innerHTML, /id="bars-input"[^>]*min="1"[^>]*max="512"/);
+  assert.match(transport.shadowRoot.innerHTML, /id="bars-inc-btn"[^>]*aria-label=/);
+  assert.match(transport.shadowRoot.innerHTML, /id="signature-select"[^>]*aria-label="Time signature"/);
+});
+
+test("scdaw-timeline: renders ARIA end-bar slider, + Bar button, and computes drag bars accurately", async () => {
+  const { calculateProjectBarsFromDrag, DawTimelineElement } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+
+  assert.equal(
+    calculateProjectBarsFromDrag({ startBars: 4, deltaX: 120, pxPerBar: 60 }),
+    6,
+  );
+  assert.equal(
+    calculateProjectBarsFromDrag({ startBars: 2, deltaX: -200, pxPerBar: 50 }),
+    1,
+  );
+  assert.equal(
+    calculateProjectBarsFromDrag({ startBars: 510, deltaX: 300, pxPerBar: 50 }),
+    512,
+  );
+
+  await scdaw.resetProject({ template: "starter" });
+  const timeline = new DawTimelineElement();
+  timeline.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  timeline.render();
+
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /id="timeline-end-handle"[^>]*role="slider"[^>]*aria-valuemin="1"[^>]*aria-valuemax="512"/,
+  );
+  assert.match(
+    timeline.shadowRoot.innerHTML,
+    /id="timeline-add-bar-btn"[^>]*aria-label=/,
+  );
+});
+
+test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 12 steps per bar)", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { DawSequencerElement } =
+    await import("../.agents/scripts/components/scdaw-sequencer.js");
+
+  await scdaw.resetProject({ template: "starter" });
+  await scdaw.sendCommand("set_transport", { lengthBars: 2, signature: [3, 4] });
+
+  const editor = new DawEditorElement();
+  editor.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  editor.render();
+  assert.equal(editor._renderedNumSteps, 24);
+
+  const seq = new DawSequencerElement();
+  seq.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  seq.render();
+  const stepMatches = seq.shadowRoot.innerHTML.match(/data-step="(\d+)"/g) || [];
+  const maxStep = Math.max(
+    ...stepMatches.map((m) => Number(m.match(/data-step="(\d+)"/)[1])),
+  );
+  assert.equal(maxStep, 23); // 0..23 = 24 steps for 2 bars of 3/4
+});

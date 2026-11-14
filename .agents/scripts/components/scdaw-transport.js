@@ -36,6 +36,29 @@ export function shouldPromptRecordOptions({ targetTrack, currentBeat = 0 }) {
   });
 }
 
+export const SIGNATURE_PRESETS = ["4/4", "3/4", "6/8", "2/4", "5/4", "7/8"];
+
+/**
+ * Adjusts project length in bars with Shift+click x4 multiplier and [1, 512] clamping.
+ */
+export function calculateBarsAdjustment(currentBars, delta, shiftKey = false) {
+  const base = Number.isFinite(Number(currentBars)) ? Number(currentBars) : 1;
+  const step = shiftKey ? delta * 4 : delta;
+  return Math.max(1, Math.min(512, Math.round(base + step)));
+}
+
+/**
+ * Parses a "num/den" time signature string into a validated [num, den] tuple.
+ */
+export function parseSignatureString(sigStr) {
+  if (typeof sigStr !== "string") return [4, 4];
+  const match = sigStr.trim().match(/^(\d{1,2})\s*\/\s*(\d{1,2})$/);
+  if (!match) return [4, 4];
+  const num = Math.max(1, Math.min(16, Number(match[1])));
+  const den = Number(match[2]);
+  return [num, [2, 4, 8, 16].includes(den) ? den : 4];
+}
+
 export function formatPosition(bar = 1, beat = 1, step = 0) {
   const padBar = String(bar).padStart(3, "0");
   const subStep = (step % 4) + 1;
@@ -285,7 +308,10 @@ export class DawTransportElement extends BaseElement {
     const bpmInput = this.shadowRoot.getElementById("bpm-input");
     const swingInput = this.shadowRoot.getElementById("swing-input");
     const swingVal = this.shadowRoot.getElementById("swing-val");
-    const lengthBadge = this.shadowRoot.getElementById("length-badge");
+    const barsInput = this.shadowRoot.getElementById("bars-input");
+    const barsDecBtn = this.shadowRoot.getElementById("bars-dec-btn");
+    const barsIncBtn = this.shadowRoot.getElementById("bars-inc-btn");
+    const sigSelect = this.shadowRoot.getElementById("signature-select");
 
     if (bpmInput && document.activeElement !== bpmInput) {
       bpmInput.value = p.bpm;
@@ -295,8 +321,26 @@ export class DawTransportElement extends BaseElement {
       swingInput.value = val;
       if (swingVal) swingVal.textContent = `${val}%`;
     }
-    if (lengthBadge) {
-      lengthBadge.textContent = `${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})`;
+    const bars = Math.max(1, Math.min(512, Number(p.lengthBars || 1)));
+    if (barsInput && document.activeElement !== barsInput) {
+      barsInput.value = bars;
+    }
+    if (barsDecBtn) barsDecBtn.disabled = bars <= 1;
+    if (barsIncBtn) barsIncBtn.disabled = bars >= 512;
+    if (sigSelect && Array.isArray(p.signature)) {
+      const sigVal = p.signature.join("/");
+      if (
+        sigSelect.options &&
+        !Array.from(sigSelect.options).some((o) => o.value === sigVal)
+      ) {
+        const opt = document.createElement("option");
+        opt.value = sigVal;
+        opt.textContent = sigVal;
+        sigSelect.appendChild(opt);
+      }
+      if (document.activeElement !== sigSelect) {
+        sigSelect.value = sigVal;
+      }
     }
     const metroBtn = this.shadowRoot.getElementById("metro-btn");
     if (metroBtn) {
@@ -479,7 +523,51 @@ export class DawTransportElement extends BaseElement {
         }
 
         .scdaw-transport__item--length {
-          flex: 0 0 auto;
+          flex: 1 1 auto;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .scdaw-transport__bars-stepper {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.2rem;
+          background: var(--bg-panel, #111317);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm, 4px);
+          padding: 0 0.2rem;
+          min-height: 36px;
+        }
+
+        .scdaw-transport__step-btn {
+          min-width: 32px;
+          min-height: 32px;
+          padding: 0 0.35rem;
+          font-weight: 700;
+          line-height: 1;
+        }
+
+        .scdaw-transport__input--bars {
+          width: 44px;
+          min-width: 38px;
+          text-align: center;
+          border: none;
+          background: transparent;
+          padding: 0.15rem 0;
+        }
+
+        .scdaw-transport__select {
+          background: var(--bg-panel, #111317);
+          color: var(--text-main);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm, 4px);
+          font-family: var(--mono);
+          font-size: 0.72rem;
+          min-height: 36px;
+          padding: 0.2rem 0.35rem;
+          cursor: pointer;
         }
 
         .scdaw-transport__badge {
@@ -736,8 +824,55 @@ export class DawTransportElement extends BaseElement {
             <span id="swing-val" class="scdaw-transport__val" aria-hidden="true">${Math.round((p.swing || 0) * 100)}%</span>
           </div>
 
-          <div class="scdaw-transport__item scdaw-transport__item--length">
-            <span id="length-badge" class="scdaw-transport__badge badge" title="Project length and musical time signature">${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})</span>
+          <div class="scdaw-transport__item scdaw-transport__item--length" role="group" aria-label="Project length and time signature">
+            <div class="scdaw-transport__bars-stepper">
+              <button
+                id="bars-dec-btn"
+                type="button"
+                class="scdaw-transport__step-btn btn btn-icon"
+                aria-label="Decrease project length by 1 bar (Shift+Click for -4)"
+                title="Decrease bars (-1, Shift+Click -4)"
+                ${(p.lengthBars || 1) <= 1 ? "disabled" : ""}
+              >−</button>
+              <label for="bars-input" class="scdaw-transport__label">Bars:</label>
+              <input
+                id="bars-input"
+                class="scdaw-transport__input scdaw-transport__input--bars"
+                type="number"
+                min="1"
+                max="512"
+                value="${p.lengthBars || 1}"
+                aria-label="Project length in bars (1 to 512)"
+                title="Project length in bars (1-512). Scroll or type to change"
+              />
+              <button
+                id="bars-inc-btn"
+                type="button"
+                class="scdaw-transport__step-btn btn btn-icon"
+                aria-label="Increase project length by 1 bar (Shift+Click for +4)"
+                title="Increase bars (+1, Shift+Click +4)"
+                ${(p.lengthBars || 1) >= 512 ? "disabled" : ""}
+              >+</button>
+            </div>
+            <select
+              id="signature-select"
+              class="scdaw-transport__select"
+              aria-label="Time signature"
+              title="Musical time signature"
+            >
+              ${(() => {
+                const curSig = (p.signature || [4, 4]).join("/");
+                const opts = SIGNATURE_PRESETS.includes(curSig)
+                  ? SIGNATURE_PRESETS
+                  : [curSig, ...SIGNATURE_PRESETS];
+                return opts
+                  .map(
+                    (sig) =>
+                      `<option value="${sig}" ${sig === curSig ? "selected" : ""}>${sig}</option>`,
+                  )
+                  .join("");
+              })()}
+            </select>
           </div>
 
           <div class="scdaw-transport__item scdaw-transport__item--panic">
@@ -1023,6 +1158,55 @@ export class DawTransportElement extends BaseElement {
       ?.addEventListener("click", () => {
         scdaw.sendCommand("panic");
       });
+
+    const barsInput = this.shadowRoot.getElementById("bars-input");
+    const barsDecBtn = this.shadowRoot.getElementById("bars-dec-btn");
+    const barsIncBtn = this.shadowRoot.getElementById("bars-inc-btn");
+    const sigSelect = this.shadowRoot.getElementById("signature-select");
+
+    if (barsDecBtn) {
+      barsDecBtn.addEventListener("click", (e) => {
+        const cur = scdaw.getProject().lengthBars || 1;
+        const lengthBars = calculateBarsAdjustment(cur, -1, e.shiftKey);
+        scdaw.sendCommand("set_transport", { lengthBars });
+      });
+    }
+    if (barsIncBtn) {
+      barsIncBtn.addEventListener("click", (e) => {
+        const cur = scdaw.getProject().lengthBars || 1;
+        const lengthBars = calculateBarsAdjustment(cur, 1, e.shiftKey);
+        scdaw.sendCommand("set_transport", { lengthBars });
+      });
+    }
+    if (barsInput) {
+      barsInput.addEventListener("change", (e) => {
+        const val = Number(e.target.value);
+        if (!Number.isNaN(val)) {
+          const lengthBars = Math.max(1, Math.min(512, Math.round(val)));
+          scdaw.sendCommand("set_transport", { lengthBars });
+        }
+      });
+      barsInput.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const cur = scdaw.getProject().lengthBars || 1;
+          const lengthBars = calculateBarsAdjustment(
+            cur,
+            e.deltaY < 0 ? 1 : -1,
+            e.shiftKey,
+          );
+          scdaw.sendCommand("set_transport", { lengthBars });
+        },
+        { passive: false },
+      );
+    }
+    if (sigSelect) {
+      sigSelect.addEventListener("change", (e) => {
+        const signature = parseSignatureString(e.target.value);
+        scdaw.sendCommand("set_transport", { signature });
+      });
+    }
   }
 }
 

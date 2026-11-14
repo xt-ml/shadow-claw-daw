@@ -9,10 +9,20 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { PPQN } from "../scdaw.js";
+import { PPQN, barPulses, beatsPerBar } from "../scdaw.js";
 import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+
+export function calculateProjectBarsFromDrag({
+  startBars = 1,
+  deltaX = 0,
+  pxPerBar = 60,
+}) {
+  const step = Math.max(8, Number(pxPerBar) || 60);
+  const bars = Math.round((Number(startBars) || 1) + deltaX / step);
+  return Math.max(1, Math.min(512, bars));
+}
 
 export function computeTimelineTicks(bars = 2, signature = [4, 4]) {
   const [numBeats] = signature;
@@ -871,7 +881,7 @@ export class DawTimelineElement extends BaseElement {
   _updatePlayhead(posPpqn) {
     if (!this.shadowRoot) return;
     const p = scdaw.project.get();
-    const total = (p.lengthBars || 1) * PPQN.Bar;
+    const total = (p.lengthBars || 1) * barPulses(p.signature);
     const pct = (posPpqn / total) * 100;
     const marker = this.shadowRoot.getElementById("playhead-marker");
     if (marker) {
@@ -887,8 +897,8 @@ export class DawTimelineElement extends BaseElement {
       scdaw.selectedTrackId?.get(),
     );
     const ticks = computeTimelineTicks(p.lengthBars, p.signature);
-    const totalPulses = (p.lengthBars || 1) * PPQN.Bar;
-    const totalBeats = (p.lengthBars || 1) * 4;
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature);
+    const totalBeats = (p.lengthBars || 1) * beatsPerBar(p.signature);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1411,12 +1421,44 @@ export class DawTimelineElement extends BaseElement {
           pointer-events: none;
           z-index: 10;
         }
+
+        .scdaw-timeline__end-handle {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          right: 0;
+          width: 10px;
+          background: var(--accent, #6366f1);
+          opacity: 0.75;
+          cursor: ew-resize;
+          touch-action: none;
+          z-index: 11;
+          border-radius: 2px 0 0 2px;
+          transition: opacity 0.12s ease, width 0.12s ease;
+        }
+
+        .scdaw-timeline__end-handle:hover,
+        .scdaw-timeline__end-handle:focus-visible,
+        .scdaw-timeline__end-handle--dragging {
+          opacity: 1;
+          width: 12px;
+          outline: 2px solid #ffffff;
+          outline-offset: -1px;
+        }
       </style>
       <div class="scdaw-timeline daw-panel" role="region" aria-label="Arrangement Timeline and Tracks">
         <div class="scdaw-timeline__header timeline-header">
           <div class="scdaw-timeline__title-group">
             <span style="font-weight:700; font-size:0.8rem;">⏱ Timeline</span>
-            <span class="badge">${p.lengthBars} Bars (${p.signature.join("/")})</span>
+            <span class="badge">${p.lengthBars} Bar${p.lengthBars > 1 ? "s" : ""} (${p.signature.join("/")})</span>
+            <button
+              id="timeline-add-bar-btn"
+              type="button"
+              class="btn btn-icon"
+              aria-label="Add 1 bar to project (Shift+Click to add 4 bars)"
+              title="Add 1 bar (Shift+Click for +4 bars)">
+              + Bar
+            </button>
             <button
               id="timeline-snap-btn"
               type="button"
@@ -1446,12 +1488,24 @@ export class DawTimelineElement extends BaseElement {
               )
               .join("")}
             <div id="playhead-marker" class="scdaw-timeline__playhead playhead" style="left:${(((scdaw.getState().positionPpqn || 0) / totalPulses) * 100).toFixed(4)}%;"></div>
+            <div
+              id="timeline-end-handle"
+              class="scdaw-timeline__end-handle"
+              role="slider"
+              tabindex="0"
+              aria-label="Project length in bars"
+              aria-valuemin="1"
+              aria-valuemax="512"
+              aria-valuenow="${p.lengthBars || 1}"
+              aria-valuetext="${p.lengthBars || 1} bar${(p.lengthBars || 1) > 1 ? "s" : ""}"
+              title="Drag horizontally or use Arrow keys to resize project length (${p.lengthBars || 1} bars)"
+            ></div>
           </div>
 
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
             ${(() => {
               const hasSolo = p.tracks.some((trk) => trk.solo);
-              const totalBeats = (p.lengthBars || 1) * 4;
+              const totalBeats = (p.lengthBars || 1) * beatsPerBar(p.signature);
 
               return p.tracks
                 .map((t, idx) => {
@@ -1920,7 +1974,8 @@ export class DawTimelineElement extends BaseElement {
         );
 
         const currentProj = scdaw.getProject();
-        const totalBeats = (currentProj.lengthBars || 1) * 4;
+        const totalBeats =
+          (currentProj.lengthBars || 1) * beatsPerBar(currentProj.signature);
         const time = Math.round(xNorm * totalBeats * 4) / 4;
         const param = lane.dataset.param;
 
@@ -2007,6 +2062,73 @@ export class DawTimelineElement extends BaseElement {
           });
         }
       });
+    // Add Bar button & Project End Handle (pointer drag + keyboard slider)
+    this.shadowRoot
+      .getElementById("timeline-add-bar-btn")
+      ?.addEventListener("click", (e) => {
+        const cur = scdaw.getProject().lengthBars || 1;
+        const delta = e.shiftKey ? 4 : 1;
+        const lengthBars = Math.max(1, Math.min(512, cur + delta));
+        scdaw.sendCommand("set_transport", { lengthBars });
+      });
+
+    const endHandle = this.shadowRoot.getElementById("timeline-end-handle");
+    if (endHandle) {
+      endHandle.addEventListener("pointerdown", (e) => {
+        e.stopPropagation?.();
+        e.preventDefault?.();
+        const startX = e.clientX;
+        const startBars = scdaw.getProject().lengthBars || 1;
+        const rulerEl = this.shadowRoot.querySelector(".scdaw-timeline__ruler");
+        const rulerWidth = rulerEl?.getBoundingClientRect?.().width || 300;
+        const pxPerBar = Math.max(24, rulerWidth / Math.max(1, startBars));
+        let previewBars = startBars;
+
+        endHandle.classList.add("scdaw-timeline__end-handle--dragging");
+        endHandle.setPointerCapture?.(e.pointerId);
+
+        const onMove = (ev) => {
+          previewBars = calculateProjectBarsFromDrag({
+            startBars,
+            deltaX: ev.clientX - startX,
+            pxPerBar,
+          });
+          endHandle.setAttribute("aria-valuenow", String(previewBars));
+          endHandle.setAttribute("aria-valuetext", `${previewBars} bars`);
+          endHandle.style.transform = `translateX(${ev.clientX - startX}px)`;
+        };
+
+        const onUp = () => {
+          endHandle.classList.remove("scdaw-timeline__end-handle--dragging");
+          endHandle.style.transform = "";
+          endHandle.removeEventListener("pointermove", onMove);
+          endHandle.removeEventListener("pointerup", onUp);
+          endHandle.removeEventListener("pointercancel", onUp);
+          if (previewBars !== startBars) {
+            scdaw.sendCommand("set_transport", { lengthBars: previewBars });
+          }
+        };
+
+        endHandle.addEventListener("pointermove", onMove);
+        endHandle.addEventListener("pointerup", onUp);
+        endHandle.addEventListener("pointercancel", onUp);
+      });
+
+      endHandle.addEventListener("keydown", (e) => {
+        const step = e.shiftKey ? 4 : 1;
+        let delta = 0;
+        if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = step;
+        else if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = -step;
+        else return;
+
+        e.preventDefault();
+        const cur = scdaw.getProject().lengthBars || 1;
+        const lengthBars = Math.max(1, Math.min(512, cur + delta));
+        if (lengthBars !== cur) {
+          scdaw.sendCommand("set_transport", { lengthBars });
+        }
+      });
+    }
   }
 }
 

@@ -155,7 +155,7 @@ export const TOOLS = [
   {
     name: "scdaw_set_transport",
     description:
-      "Update transport properties: BPM (40-240), signature ([4,4] or [3,4]), pattern length in bars (1-4), or swing factor (0-0.5).",
+      "Update transport properties: BPM (40-240), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
     input_schema: {
       type: "object",
       properties: {
@@ -167,7 +167,7 @@ export const TOOLS = [
         },
         lengthBars: {
           type: "number",
-          description: "Loop pattern length in bars (1-4)",
+          description: "Loop pattern length in bars (1-512)",
         },
         swing: {
           type: "number",

@@ -8,7 +8,13 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { pitchToName, PPQN, stepToPpqn, ppqnToStep } from "../scdaw.js";
+import {
+  pitchToName,
+  PPQN,
+  stepToPpqn,
+  ppqnToStep,
+  stepsPerBar,
+} from "../scdaw.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -166,7 +172,7 @@ export class DawEditorElement extends BaseElement {
     }
 
     const currentTrack = p.tracks.find((t) => t.id === this._selectedTrackId);
-    const numSteps = (p.lengthBars || 1) * 16;
+    const numSteps = (p.lengthBars || 1) * stepsPerBar(p.signature);
 
     const gridEl = this.shadowRoot.querySelector(".grid-area");
     const hasSkeleton = Boolean(gridEl);

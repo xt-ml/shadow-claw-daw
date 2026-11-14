@@ -1004,13 +1004,13 @@
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:bd16541afa0ee43fd01d31d38f25d066e7b03f3a036ca434d6f9febb1e67fb5a"
+      "digest": "sha256:bafd49b4d2b15a7d1c4f96c77f34553956b5400b705ada254b9a56a89b28eb68"
     },
     {
       "name": "scdaw-transport",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
       "url": "../../.agents/scripts/components/scdaw-transport.js",
-      "digest": "sha256:48161c959cf169645ce1c8571a996ef695e028be8ec46c158fcef251c96bb219"
+      "digest": "sha256:e50b2caaa1bc8a3017e0c4cbd2d261ff864f0af13b55962977437b679578008e"
     },
     {
       "name": "scdaw-workbench",
@@ -1058,7 +1058,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:2a25986722b4a612992d5921242057abe9f8b6e2402d15e15bf696dabc824acb"
+      "digest": "sha256:d1c8605ef40b2ce302a811d3d1e44a78830a80848d661a9aa3e513168e7c535f"
     },
     {
       "name": "scdaw-fs",

@@ -8,7 +8,7 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { pitchToName, ppqnToStep } from "../scdaw.js";
+import { pitchToName, ppqnToStep, stepsPerBar } from "../scdaw.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -75,7 +75,7 @@ export class DawSequencerElement extends BaseElement {
     const trackSigs = (p.tracks || [])
       .map((t) => `${t.id}|${t.kind}|${t.name}`)
       .join(";");
-    return `${p.lengthBars}|${trackSigs}`;
+    return `${p.lengthBars}|${(p.signature || []).join("/")}|${trackSigs}`;
   }
 
   _syncSteps(p) {
@@ -139,7 +139,7 @@ export class DawSequencerElement extends BaseElement {
     this._dirty = false;
     const p = scdaw.project.get();
     this._lastRenderSignature = this._computeRenderSignature(p);
-    const numSteps = (p.lengthBars || 1) * 16;
+    const numSteps = (p.lengthBars || 1) * stepsPerBar(p.signature);
 
     let rowsHtml = "";
     for (const track of p.tracks) {

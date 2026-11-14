@@ -24,6 +24,9 @@ import {
   applyZeitgeistGroove,
   applyHumanize,
   resolveTrackNotes,
+  beatsPerBar,
+  barPulses,
+  stepsPerBar,
 } from "../.agents/scripts/scdaw.js";
 
 test("PPQN: conforms to openDAW constants and conversions", () => {
@@ -770,4 +773,71 @@ test("Performance: computeEventsInRange retains cache when track object is shall
     elapsedMs < 20,
     `Expected 500 ticks with shallow-cloned track to hit cache in < 20ms, took ${elapsedMs.toFixed(2)}ms`,
   );
+});
+
+test("stepsPerBar & barPulses: compute signature-aware step and pulse counts", () => {
+  assert.equal(beatsPerBar([4, 4]), 4);
+  assert.equal(stepsPerBar([4, 4]), 16);
+  assert.equal(barPulses([4, 4]), 3840);
+
+  assert.equal(beatsPerBar([3, 4]), 3);
+  assert.equal(stepsPerBar([3, 4]), 12);
+  assert.equal(barPulses([3, 4]), 2880);
+
+  assert.equal(beatsPerBar([6, 8]), 3);
+  assert.equal(stepsPerBar([6, 8]), 12);
+  assert.equal(barPulses([6, 8]), 2880);
+
+  assert.equal(beatsPerBar([5, 4]), 5);
+  assert.equal(stepsPerBar([5, 4]), 20);
+});
+
+test("applyCommand(set_transport): clamps lengthBars (1-512) and normalizes signature", () => {
+  const base = createProject("starter");
+  const { project: p1 } = applyCommand(base, "set_transport", {
+    lengthBars: 16.4,
+    signature: [3, 4],
+  });
+  assert.equal(p1.lengthBars, 16);
+  assert.deepEqual(p1.signature, [3, 4]);
+
+  const { project: p2 } = applyCommand(p1, "set_transport", {
+    lengthBars: 999,
+    signature: [0, 7],
+  });
+  assert.equal(p2.lengthBars, 512);
+  assert.deepEqual(p2.signature, [1, 4]);
+});
+
+test("applyCommand(write_notes & add_audio_clip): auto-expands lengthBars when content exceeds project end", () => {
+  const base = createProject("empty");
+  base.lengthBars = 1;
+  base.signature = [4, 4];
+  const { project: withTrack, result: addRes } = applyCommand(
+    base,
+    "add_track",
+    { kind: "synth", name: "Lead" },
+  );
+
+  // Write a note starting in bar 3 (pulse 7680) with duration 960 -> ends at 8640 (bar 3)
+  const { project: expanded } = applyCommand(withTrack, "write_notes", {
+    trackId: addRes.trackId,
+    units: "ppqn",
+    notes: [{ pitch: 60, position: 7680, duration: 960, velocity: 0.8 }],
+  });
+  assert.equal(expanded.lengthBars, 3);
+
+  // Add an audio track + clip starting at beat 20 (5 bars in 4/4) with duration 4 beats (1 bar) -> bar 6
+  const { project: withAudio, result: audioRes } = applyCommand(
+    expanded,
+    "add_track",
+    { kind: "audio", name: "Vox" },
+  );
+  const { project: expandedAudio } = applyCommand(withAudio, "add_audio_clip", {
+    trackId: audioRes.trackId,
+    time: 20,
+    duration: 4,
+    audioUrl: "blob:test",
+  });
+  assert.equal(expandedAudio.lengthBars, 6);
 });
