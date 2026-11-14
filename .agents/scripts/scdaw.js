@@ -1941,9 +1941,10 @@ function lowerBoundNotePos(notes, targetPos) {
 function getCachedPlaybackNotes(project, track, totalPulses, isLooping) {
   const swing = project.swing || 0;
   const notesRef = track.notes;
+  const cacheKey = Array.isArray(notesRef) ? notesRef : track;
   const notesLen = notesRef ? notesRef.length : 0;
   const midiFxRef = track.midiFx;
-  const cached = RESOLVED_TRACK_CACHE.get(track);
+  const cached = RESOLVED_TRACK_CACHE.get(cacheKey);
   if (
     cached &&
     cached.notesRef === notesRef &&
@@ -1980,7 +1981,7 @@ function getCachedPlaybackNotes(project, track, totalPulses, isLooping) {
     resolved = wrapped;
   }
 
-  RESOLVED_TRACK_CACHE.set(track, {
+  RESOLVED_TRACK_CACHE.set(cacheKey, {
     notesRef,
     notesLen,
     midiFxRef,

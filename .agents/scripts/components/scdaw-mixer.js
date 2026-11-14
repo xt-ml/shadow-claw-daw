@@ -547,7 +547,7 @@ export class DawMixerElement extends BaseElement {
     // Selecting a channel strip updates global selectedTrackId
     this.shadowRoot.querySelectorAll(".strip[data-track]").forEach((strip) => {
       strip.addEventListener("click", (e) => {
-        if (e.target.closest?.("button")) return;
+        if (e.target.closest?.("button, input, scdaw-knob")) return;
         const id = strip.dataset.track;
         if (id && typeof scdaw.selectTrack === "function") {
           scdaw.selectTrack(id);
@@ -687,12 +687,24 @@ export class DawMixerElement extends BaseElement {
           if (curVal !== nextVal) {
             slider.value = String(nextVal);
             if (slider.id === "master-fader") {
-              scdaw.sendCommand("set_master", { volume: nextVal / 100 });
+              if (typeof scdaw.setLiveMasterParam === "function") {
+                scdaw.setLiveMasterParam({ volume: nextVal / 100 });
+                scdaw.commitLiveMasterParam?.();
+              } else {
+                scdaw.sendCommand("set_master", { volume: nextVal / 100 });
+              }
             } else if (slider.dataset.track) {
-              scdaw.sendCommand("set_track", {
-                trackId: slider.dataset.track,
-                volume: nextVal / 100,
-              });
+              if (typeof scdaw.setLiveTrackParam === "function") {
+                scdaw.setLiveTrackParam(slider.dataset.track, {
+                  volume: nextVal / 100,
+                });
+                scdaw.commitLiveTrackParam?.(slider.dataset.track);
+              } else {
+                scdaw.sendCommand("set_track", {
+                  trackId: slider.dataset.track,
+                  volume: nextVal / 100,
+                });
+              }
             }
           }
         },

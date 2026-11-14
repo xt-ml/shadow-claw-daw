@@ -3790,3 +3790,47 @@ test("Performance: scdaw-statusbar._sync() and scdaw-timeline._updatePlayhead() 
     scdaw.getProject = origGetProject;
   }
 });
+
+test("scdaw-mixer: clicking or releasing track slider/knob does not trigger scdaw.selectTrack", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawMixerElement } =
+    await import("../.agents/scripts/components/scdaw-mixer.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+  const tracks = scdaw.project.get().tracks;
+  scdaw.selectTrack(tracks[0].id);
+  const targetTrackId = tracks[1].id;
+
+  const mixer = new DawMixerElement();
+  const stripListeners = {};
+  const mockStrip = {
+    dataset: { track: targetTrackId },
+    addEventListener(evt, fn) {
+      stripListeners[evt] = fn;
+    },
+  };
+
+  mixer.shadowRoot = {
+    innerHTML: "",
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: (sel) =>
+      sel === ".strip[data-track]" ? [mockStrip] : [],
+  };
+
+  mixer.render();
+
+  // Simulate click bubbling up from .vol-slider or scdaw-knob inside the strip
+  stripListeners.click({
+    target: {
+      closest: (s) =>
+        s.includes("input") || s.includes("scdaw-knob") ? {} : null,
+    },
+  });
+
+  assert.equal(
+    scdaw.selectedTrackId.get(),
+    tracks[0].id,
+    "Releasing a track slider or knob must not switch selectedTrackId",
+  );
+});

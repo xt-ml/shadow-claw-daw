@@ -1906,21 +1906,17 @@ export class DawEngine extends EventTarget {
     }
 
     const track = p.tracks[idx];
-    const nextTrack = { ...track };
     if (patch.volume !== undefined) {
-      nextTrack.volume = Math.max(0, Math.min(1.5, Number(patch.volume)));
+      track.volume = Math.max(0, Math.min(1.5, Number(patch.volume)));
     }
     if (patch.pan !== undefined) {
-      nextTrack.pan = Math.max(-1, Math.min(1, Number(patch.pan)));
+      track.pan = Math.max(-1, Math.min(1, Number(patch.pan)));
     }
     if (patch.params && typeof patch.params === "object") {
-      nextTrack.params = { ...(track.params || {}), ...patch.params };
+      track.params = { ...(track.params || {}), ...patch.params };
     }
-    if (patch.mute !== undefined) nextTrack.mute = Boolean(patch.mute);
-    if (patch.solo !== undefined) nextTrack.solo = Boolean(patch.solo);
-
-    // Update live track reference in place without notifying project subscribers
-    p.tracks[idx] = nextTrack;
+    if (patch.mute !== undefined) track.mute = Boolean(patch.mute);
+    if (patch.solo !== undefined) track.solo = Boolean(patch.solo);
 
     if (this.ctx && this.graph) {
       const now = this.ctx.currentTime;
@@ -1928,11 +1924,9 @@ export class DawEngine extends EventTarget {
       if (nodes) {
         const hasSolo = p.tracks.some((t) => t.solo);
         const effectiveVol =
-          nextTrack.mute || (hasSolo && !nextTrack.solo)
-            ? 0
-            : (nextTrack.volume ?? 0.8);
+          track.mute || (hasSolo && !track.solo) ? 0 : (track.volume ?? 0.8);
         this._rampAudioParam(nodes.gain?.gain, effectiveVol, now, 0.012);
-        this._rampAudioParam(nodes.panner?.pan, nextTrack.pan ?? 0, now, 0.012);
+        this._rampAudioParam(nodes.panner?.pan, track.pan ?? 0, now, 0.012);
       }
 
       if (patch.params) {
@@ -1941,7 +1935,7 @@ export class DawEngine extends EventTarget {
             voice.trackId === trackId &&
             typeof voice.updateParams === "function"
           ) {
-            voice.updateParams(nextTrack.params, now);
+            voice.updateParams(track.params, now);
           }
         }
       }

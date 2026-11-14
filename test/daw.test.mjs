@@ -725,3 +725,49 @@ test("Performance: computeEventsInRange caches resolved notes per track and runs
     `Expected 1,000 computeEventsInRange ticks on 5,000 notes in < 30ms, took ${elapsedMs.toFixed(2)}ms`,
   );
 });
+
+test("Performance: computeEventsInRange retains cache when track object is shallow-cloned with same notes", () => {
+  const p = createProject("empty");
+  p.bpm = 215;
+  p.lengthBars = 108;
+  const totalPulses = p.lengthBars * PPQN.Bar;
+  const notes = [];
+  for (let i = 0; i < 2500; i++) {
+    notes.push({
+      position: Math.floor((i * totalPulses) / 2500),
+      duration: 240,
+      pitch: 60,
+      velocity: 0.8,
+    });
+  }
+  p.tracks.push({
+    id: "trk_0",
+    name: "Banjo",
+    kind: "synth",
+    volume: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: {},
+    notes,
+  });
+
+  // Prime cache
+  computeEventsInRange(p, 0, 240);
+
+  const startMs = performance.now();
+  for (let i = 0; i < 500; i++) {
+    // Shallow clone track (simulates setLiveTrackParam / slider drag)
+    p.tracks[0] = { ...p.tracks[0], volume: (i % 100) / 100 };
+    computeEventsInRange(
+      p,
+      (i * 240) % totalPulses,
+      ((i + 1) * 240) % totalPulses,
+    );
+  }
+  const elapsedMs = performance.now() - startMs;
+  assert.ok(
+    elapsedMs < 20,
+    `Expected 500 ticks with shallow-cloned track to hit cache in < 20ms, took ${elapsedMs.toFixed(2)}ms`,
+  );
+});
