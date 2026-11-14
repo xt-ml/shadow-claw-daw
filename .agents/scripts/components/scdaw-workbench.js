@@ -9,6 +9,13 @@
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
+import { serializeProject } from "../scdaw.js";
+import {
+  getBaseHref,
+  createCompressedUrl,
+  getCompressedParam,
+  clearUrlParam,
+} from "../scdaw-url-param.js";
 import { effect } from "../scdaw-signals.js";
 import {
   DEFAULT_GROUP_ID,
@@ -462,6 +469,14 @@ export class DawWorkbenchElement extends BaseElement {
     this._renderSkeleton();
     this._initFullscreen();
     this._updatePanels();
+    queueMicrotask(() => this._checkFileUrlParam());
+    if (
+      typeof window !== "undefined" &&
+      typeof window.addEventListener === "function"
+    ) {
+      this._onHashChange = () => this._checkFileUrlParam();
+      window.addEventListener("hashchange", this._onHashChange);
+    }
     this._dispose = effect(() => {
       const p = scdaw.project.get();
       this._syncProject(p);
@@ -497,6 +512,14 @@ export class DawWorkbenchElement extends BaseElement {
   }
 
   disconnectedCallback() {
+    if (
+      this._onHashChange &&
+      typeof window !== "undefined" &&
+      typeof window.removeEventListener === "function"
+    ) {
+      window.removeEventListener("hashchange", this._onHashChange);
+      this._onHashChange = null;
+    }
     if (this._dispose) this._dispose();
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
@@ -1320,9 +1343,38 @@ export class DawWorkbenchElement extends BaseElement {
               </div>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem; flex-wrap:wrap;">
               <button type="button" id="export-modal-cancel" class="btn">Cancel</button>
+              <button type="button" id="export-modal-press-url" class="btn" title="Compress .scdaw.json project into a shareable URL">🔗 Press a URL</button>
               <button type="button" id="export-modal-submit" class="btn btn-primary">Save & Export</button>
+            </div>
+          </form>
+        </dialog>
+
+        <!-- Shareable Compressed Song URL Modal Dialog -->
+        <dialog id="press-url-modal" class="scdaw-dialog" aria-labelledby="press-url-modal-title">
+          <form method="dialog" id="press-url-form" class="scdaw-dialog__form">
+            <div class="scdaw-dialog__header">
+              <h3 id="press-url-modal-title">🔗 Compressed Song URL</h3>
+              <button type="button" id="press-url-modal-close" class="btn btn-icon" aria-label="Close compressed URL dialog" style="padding:2px 8px; font-size:1rem;">✕</button>
+            </div>
+
+            <p id="press-url-stats" class="scdaw-dialog__message" style="margin:0; font-size:0.85rem; opacity:0.85;">
+              Your project has been compressed into a shareable URL:
+            </p>
+
+            <div class="scdaw-dialog__field">
+              <label for="press-url-input">Shareable Link</label>
+              <input type="text" id="press-url-input" readonly />
+            </div>
+
+            <div style="max-height:120px; overflow-y:auto; padding:0.5rem; border-radius:var(--radius-sm, 6px); border:1px solid var(--border, rgba(255,255,255,0.12)); background:var(--surface-1, rgba(0,0,0,0.2));">
+              <a id="press-url-link" href="#" target="_blank" rel="noopener noreferrer" style="word-break:break-all; font-size:0.82rem; color:var(--accent, inherit);"></a>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem;">
+              <button type="button" id="press-url-copy" class="btn">Copy URL</button>
+              <button type="button" id="press-url-modal-done" class="btn btn-primary">Close</button>
             </div>
           </form>
         </dialog>
@@ -1720,6 +1772,80 @@ export class DawWorkbenchElement extends BaseElement {
         exportModal?.close();
       });
 
+    const pressUrlModal = this.shadowRoot.getElementById("press-url-modal");
+    const pressUrlInput = this.shadowRoot.getElementById("press-url-input");
+    const pressUrlLink = this.shadowRoot.getElementById("press-url-link");
+    const pressUrlStats = this.shadowRoot.getElementById("press-url-stats");
+    const pressUrlCopyBtn = this.shadowRoot.getElementById("press-url-copy");
+
+    this.shadowRoot
+      .getElementById("export-modal-press-url")
+      ?.addEventListener("click", async () => {
+        const pressBtn = this.shadowRoot.getElementById(
+          "export-modal-press-url",
+        );
+        if (pressBtn) pressBtn.textContent = "Compressing...";
+
+        try {
+          const prettyJson = serializeProject(scdaw.getProject());
+          const jsonStr = JSON.stringify(JSON.parse(prettyJson));
+          const compressedUrl = await createCompressedUrl(
+            getBaseHref(),
+            jsonStr,
+            { paramName: "file", useHash: true },
+          );
+
+          if (pressUrlInput) pressUrlInput.value = compressedUrl;
+          if (pressUrlLink) {
+            pressUrlLink.href = compressedUrl;
+            pressUrlLink.textContent = compressedUrl;
+          }
+          if (pressUrlStats) {
+            const rawBytes = new TextEncoder().encode(jsonStr).byteLength;
+            pressUrlStats.textContent = `Compressed .scdaw.json (${formatFileSize(rawBytes)} → ${compressedUrl.length} chars):`;
+          }
+          if (pressUrlCopyBtn) pressUrlCopyBtn.textContent = "Copy URL";
+
+          exportModal?.close();
+          pressUrlModal?.showModal();
+        } catch (err) {
+          console.error("Press URL error:", err);
+        } finally {
+          if (pressBtn) pressBtn.textContent = "🔗 Press a URL";
+        }
+      });
+
+    this.shadowRoot
+      .getElementById("press-url-modal-close")
+      ?.addEventListener("click", () => {
+        pressUrlModal?.close();
+      });
+
+    this.shadowRoot
+      .getElementById("press-url-modal-done")
+      ?.addEventListener("click", () => {
+        pressUrlModal?.close();
+      });
+
+    pressUrlModal?.addEventListener("click", (e) => {
+      if (e.target === pressUrlModal) {
+        pressUrlModal.close();
+      }
+    });
+
+    pressUrlCopyBtn?.addEventListener("click", async () => {
+      if (!pressUrlInput?.value) return;
+      try {
+        await navigator.clipboard.writeText(pressUrlInput.value);
+        pressUrlCopyBtn.textContent = "Copied!";
+        setTimeout(() => {
+          if (pressUrlCopyBtn) pressUrlCopyBtn.textContent = "Copy URL";
+        }, 2000);
+      } catch (_) {
+        pressUrlInput.select();
+      }
+    });
+
     this.shadowRoot
       .getElementById("export-modal-submit")
       ?.addEventListener("click", async () => {
@@ -1968,6 +2094,47 @@ export class DawWorkbenchElement extends BaseElement {
           console.error("Context-sensitive drop handling failed:", err);
         }
       });
+    }
+  }
+
+  /**
+   * Checks the URL for a compressed `file` query parameter on startup.
+   * Prompts the user to load the shared song and clears the param once loaded.
+   */
+  async _checkFileUrlParam() {
+    if (typeof window === "undefined" || !window.location) return;
+
+    const jsonStr = await getCompressedParam("file", window.location);
+    if (!jsonStr) return;
+
+    let songName = "shared song";
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed?.name) songName = parsed.name;
+    } catch (_) {
+      // Invalid JSON; let importProjectFile handle or abort
+    }
+
+    if (
+      typeof customElements !== "undefined" &&
+      !customElements.get("shadow-claw-dialog")
+    ) {
+      await Promise.race([
+        customElements.whenDefined("shadow-claw-dialog"),
+        new Promise((r) => setTimeout(r, 1500)),
+      ]);
+    }
+
+    const confirmed = await this.confirmDialog({
+      title: "Load Song from URL",
+      message: `Would you like to load "${songName}" as a song? This will replace your current project.`,
+      confirmText: "Load Song",
+      cancelText: "Cancel",
+    });
+
+    if (confirmed) {
+      await scdaw.importProjectFile(jsonStr);
+      clearUrlParam("file");
     }
   }
 

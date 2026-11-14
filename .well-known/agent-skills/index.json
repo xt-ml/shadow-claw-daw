@@ -1016,7 +1016,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:d3d12e86685dc576537f6b2965f598232eb661afe85d066e63424177c230432e"
+      "digest": "sha256:4398130f7f3a76c80b90a4d208bece4e20f32447750a92ef47e8bda29736c240"
     },
     {
       "name": "scdaw-adapter",
@@ -1029,6 +1029,12 @@
       "description": "Portable ESM engine logic and tool execution handler for scdaw-compose.",
       "url": "../../.agents/scripts/scdaw-compose.js",
       "digest": "sha256:cb61d55bf40065150f6c213470ffd3192dd3c5e5c2864fce20de38d3d118e0b2"
+    },
+    {
+      "name": "scdaw-compress",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-compress.",
+      "url": "../../.agents/scripts/scdaw-compress.js",
+      "digest": "sha256:173a8c3d852135a709263d67753da0d6e22b28cb7566307aba348c29611e7cfa"
     },
     {
       "name": "scdaw-dawproject",
@@ -1107,6 +1113,12 @@
       "description": "Portable ESM engine logic and tool execution handler for scdaw-tools-metadata.",
       "url": "../../.agents/scripts/scdaw-tools-metadata.js",
       "digest": "sha256:f811902bea393d5b61529af82bc913da3b6da3eec32bd1a4dd7be48776f8055e"
+    },
+    {
+      "name": "scdaw-url-param",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-url-param.",
+      "url": "../../.agents/scripts/scdaw-url-param.js",
+      "digest": "sha256:00cf13ca72b3c93c27acbbeba6031b8c832fa136b15d0a8722c57516bf76699b"
     },
     {
       "name": "scdaw-zip",
@@ -1192,6 +1204,7 @@
       "../../.agents/scripts/components/scdaw-workbench.js",
       "../../.agents/scripts/scdaw-adapter.js",
       "../../.agents/scripts/scdaw-compose.js",
+      "../../.agents/scripts/scdaw-compress.js",
       "../../.agents/scripts/scdaw-dawproject.js",
       "../../.agents/scripts/scdaw-dsp.js",
       "../../.agents/scripts/scdaw-element.js",
@@ -1205,6 +1218,7 @@
       "../../.agents/scripts/scdaw-signals.js",
       "../../.agents/scripts/scdaw-soundfont.js",
       "../../.agents/scripts/scdaw-tools-metadata.js",
+      "../../.agents/scripts/scdaw-url-param.js",
       "../../.agents/scripts/scdaw-zip.js",
       "../../.agents/scripts/scdaw.js",
       "../../.agents/scripts/starter-tools.js",
