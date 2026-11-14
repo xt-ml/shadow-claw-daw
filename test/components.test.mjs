@@ -3987,3 +3987,41 @@ test("Performance: scdaw-editor._syncNotes() pre-indexes step velocities in O(N)
     `Expected _syncNotes on 108 bars / 2,000 notes to run in < 25ms, took ${elapsedMs.toFixed(2)}ms`,
   );
 });
+
+test("scdaw-timeline: calculateTimelineSeekPpqn maps ruler click/touch X coordinate to snapped PPQN", async () => {
+  const { calculateTimelineSeekPpqn } =
+    await import("../.agents/scripts/components/scdaw-timeline.js");
+
+  const rect = { left: 100, width: 400 }; // 4 bars -> 100px per bar
+  // Click at 50% (clientX = 300) on 4-bar 4/4 timeline -> Bar 3 (2 * 3840 = 7680 PPQN)
+  const barSnap = calculateTimelineSeekPpqn({
+    clientX: 300,
+    rect,
+    lengthBars: 4,
+    snapMode: "bar",
+    signature: [4, 4],
+  });
+  assert.equal(barSnap, 7680);
+
+  // Click at 31.25% (clientX = 225 -> 1.25 bars = 5 beats) with beat snap -> 5 * 960 = 4800 PPQN
+  const beatSnap = calculateTimelineSeekPpqn({
+    clientX: 225,
+    rect,
+    lengthBars: 4,
+    snapMode: "beat",
+    signature: [4, 4],
+  });
+  assert.equal(beatSnap, 4800);
+
+  // Clamped at left/right edges
+  assert.equal(
+    calculateTimelineSeekPpqn({
+      clientX: 50,
+      rect,
+      lengthBars: 4,
+      snapMode: "beat",
+      signature: [4, 4],
+    }),
+    0,
+  );
+});

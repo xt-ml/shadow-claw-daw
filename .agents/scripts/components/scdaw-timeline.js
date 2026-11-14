@@ -29,6 +29,32 @@ export function computeTimelineTicks(bars = 2, signature = [4, 4]) {
   return ticks;
 }
 
+export function calculateTimelineSeekPpqn({
+  clientX,
+  rect,
+  lengthBars = 1,
+  snapMode = "beat",
+  signature = [4, 4],
+}) {
+  const beatsPerBar = (signature && signature[0]) || 4;
+  const pulsesPerBar = beatsPerBar * PPQN.Quarter;
+  const totalPulses = Math.max(1, (lengthBars || 1) * pulsesPerBar);
+  if (!rect || !rect.width) return 0;
+
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  let target = ratio * totalPulses;
+
+  if (snapMode === "bar") {
+    target = Math.round(target / pulsesPerBar) * pulsesPerBar;
+  } else if (snapMode === "beat") {
+    target = Math.round(target / PPQN.Quarter) * PPQN.Quarter;
+  } else {
+    target = Math.round(target);
+  }
+
+  return Math.max(0, Math.min(totalPulses - 1, target));
+}
+
 /**
  * Computes non-overlapping lane rows for clips on a timeline track.
  * Used to arrange multiple takes or overlapping clips without visual masking.
@@ -946,6 +972,9 @@ export class DawTimelineElement extends BaseElement {
           margin-left: calc(var(--track-header-w) + var(--timeline-gutter-l, 16px));
           margin-right: var(--timeline-gutter-r, 16px);
           min-width: 280px;
+          cursor: pointer;
+          touch-action: none;
+          user-select: none;
         }
 
         .scdaw-timeline__tick,
@@ -1416,7 +1445,7 @@ export class DawTimelineElement extends BaseElement {
             `,
               )
               .join("")}
-            <div id="playhead-marker" class="scdaw-timeline__playhead playhead" style="left:0%;"></div>
+            <div id="playhead-marker" class="scdaw-timeline__playhead playhead" style="left:${(((scdaw.getState().positionPpqn || 0) / totalPulses) * 100).toFixed(4)}%;"></div>
           </div>
 
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
@@ -1743,6 +1772,46 @@ export class DawTimelineElement extends BaseElement {
         }
       });
     });
+
+    // Ruler click/drag to seek playhead position
+    const rulerEl = this.shadowRoot.querySelector?.(".ruler-container");
+    if (rulerEl) {
+      let isScrubbing = false;
+      const seekFromEvent = (e) => {
+        const rect = rulerEl.getBoundingClientRect?.();
+        if (!rect || !rect.width) return;
+        const proj = scdaw.project.get();
+        const targetPpqn = calculateTimelineSeekPpqn({
+          clientX: e.clientX,
+          rect,
+          lengthBars: proj.lengthBars,
+          snapMode: this._snapMode || "beat",
+          signature: proj.signature,
+        });
+        scdaw.seek?.(targetPpqn);
+      };
+      rulerEl.addEventListener("pointerdown", (e) => {
+        isScrubbing = true;
+        try {
+          rulerEl.setPointerCapture?.(e.pointerId);
+        } catch {}
+        seekFromEvent(e);
+        e.preventDefault?.();
+      });
+      rulerEl.addEventListener("pointermove", (e) => {
+        if (!isScrubbing) return;
+        seekFromEvent(e);
+      });
+      const endScrub = (e) => {
+        if (!isScrubbing) return;
+        isScrubbing = false;
+        try {
+          rulerEl.releasePointerCapture?.(e.pointerId);
+        } catch {}
+      };
+      rulerEl.addEventListener("pointerup", endScrub);
+      rulerEl.addEventListener("pointercancel", endScrub);
+    }
 
     // Mute & Solo
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((btn) => {

@@ -383,10 +383,11 @@ export class DawEngine extends EventTarget {
     this._updateAudioState();
 
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+    const startPpqn = this.state.get().positionPpqn || 0;
     this._lastScheduleAudioTime = nowAudio;
-    this._lastSchedulePpqn = 0;
+    this._lastSchedulePpqn = startPpqn;
     this._anchorAudioTime = nowAudio;
-    this._anchorPpqn = 0;
+    this._anchorPpqn = startPpqn;
     this._scheduledUntilPpqn = null;
     this._scheduledUntilUnwrapped = null;
     this._updateState({ playing: true });
@@ -396,6 +397,66 @@ export class DawEngine extends EventTarget {
     } else if (!this._intervalId) {
       this._intervalId = setInterval(() => this._onClockTick(), 25);
     }
+  }
+
+  async pause() {
+    this._updateState({ playing: false });
+
+    for (const voice of this._activeVoices) {
+      try {
+        if (typeof voice.stop === "function") voice.stop(0);
+        if (typeof voice.disconnect === "function") voice.disconnect();
+      } catch (_) {}
+    }
+    this._activeVoices.clear();
+    this._scheduledUntilPpqn = null;
+    this._scheduledUntilUnwrapped = null;
+
+    if (this._worker) {
+      this._worker.postMessage("stop");
+    }
+    if (this._intervalId) {
+      clearInterval(this._intervalId);
+      this._intervalId = null;
+    }
+  }
+
+  seek(ppqn) {
+    const p = this.project.get();
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const targetPpqn = Math.max(
+      0,
+      Math.min(totalPulses - 1, Math.round(Number(ppqn) || 0)),
+    );
+    const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+
+    this._lastScheduleAudioTime = nowAudio;
+    this._lastSchedulePpqn = targetPpqn;
+    this._anchorAudioTime = nowAudio;
+    this._anchorPpqn = targetPpqn;
+    this._scheduledUntilPpqn = null;
+    this._scheduledUntilUnwrapped = null;
+
+    if (this.state.get().playing) {
+      for (const voice of this._activeVoices) {
+        try {
+          if (typeof voice.stop === "function") voice.stop(0);
+          if (typeof voice.disconnect === "function") voice.disconnect();
+        } catch (_) {}
+      }
+      this._activeVoices.clear();
+    }
+
+    const bar = Math.floor(targetPpqn / PPQN.Bar) + 1;
+    const beat = Math.floor((targetPpqn % PPQN.Bar) / PPQN.Quarter) + 1;
+    const step = Math.floor(targetPpqn / PPQN.SemiQuaver);
+    this._updateState({
+      positionPpqn: targetPpqn,
+      bar,
+      beat,
+      step,
+    });
+    return { ok: true, positionPpqn: targetPpqn, bar, beat, step };
   }
 
   async stop() {

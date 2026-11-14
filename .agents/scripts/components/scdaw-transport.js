@@ -256,11 +256,11 @@ export class DawTransportElement extends BaseElement {
     const audioBtn = this.shadowRoot.getElementById("audio-btn");
 
     if (playBtn) {
-      playBtn.textContent = s.playing ? "⏸ Stop" : "▶ Play";
+      playBtn.textContent = s.playing ? "⏸ Pause" : "▶ Play";
       playBtn.classList.toggle("btn-primary", s.playing);
       playBtn.setAttribute(
         "aria-label",
-        s.playing ? "Stop playback" : "Start playback",
+        s.playing ? "Pause playback" : "Start playback",
       );
     }
     if (recBtn) {
@@ -704,8 +704,11 @@ export class DawTransportElement extends BaseElement {
       </style>
       <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
-          <button id="play-btn" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Stop playback" : "Start playback"}">
-            ${s.playing ? "⏸ Stop" : "▶ Play"}
+          <button id="play-btn" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Pause playback" : "Start playback"}">
+            ${s.playing ? "⏸ Pause" : "▶ Play"}
+          </button>
+          <button id="stop-btn" class="scdaw-transport__btn scdaw-transport__btn--stop btn" aria-label="Stop playback and return to start">
+            ⏹ Stop
           </button>
           <button id="rec-btn" class="scdaw-transport__btn scdaw-transport__btn--rec btn ${s.recording ? "btn-danger" : ""}" aria-label="${s.recording ? "Stop recording" : "Record audio"}" aria-pressed="${Boolean(s.recording)}">
             ${s.recording ? "⏹ Stop REC" : "● REC"}
@@ -873,8 +876,14 @@ export class DawTransportElement extends BaseElement {
       .getElementById("play-btn")
       ?.addEventListener("click", () => {
         const state = scdaw.getState();
-        if (state.playing) scdaw.stop();
+        if (state.playing) scdaw.pause();
         else scdaw.play();
+      });
+
+    this.shadowRoot
+      .getElementById("stop-btn")
+      ?.addEventListener("click", () => {
+        scdaw.stop();
       });
 
     this.shadowRoot

@@ -1026,3 +1026,64 @@ test("DawEngine: sendCommand debounces localStorage persistence instead of block
     await engine.stop();
   }
 });
+
+test("DawEngine: pause() preserves position, seek() updates start position, and play() resumes from seeked position", async () => {
+  const project = createProject("empty");
+  project.bpm = 120; // 1920 PPQN/sec
+  project.lengthBars = 4;
+  project.tracks.push({
+    id: "trk_synth",
+    name: "Synth",
+    kind: "synth",
+    volume: 0.8,
+    pan: 0,
+    mute: false,
+    solo: false,
+    params: { waveform: "sawtooth", cutoff: 1200 },
+    notes: [
+      { position: 0, duration: 240, pitch: 60, velocity: 0.8 },
+      { position: 3840, duration: 240, pitch: 64, velocity: 0.8 }, // Bar 2 beat 1
+    ],
+  });
+
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.play();
+    ctx.currentTime = 0.5;
+    engine._onClockTick();
+    assert.ok(engine.getState().positionPpqn > 900);
+
+    // Pause keeps positionPpqn intact
+    await engine.pause();
+    assert.equal(engine.getState().playing, false);
+    assert.ok(
+      engine.getState().positionPpqn > 900,
+      "pause() must preserve positionPpqn instead of resetting to 0",
+    );
+
+    // Seek to Bar 2 (3840 PPQN) while paused
+    engine.seek(3840);
+    assert.equal(engine.getState().positionPpqn, 3840);
+    assert.equal(engine.getState().bar, 2);
+    assert.equal(engine.getState().beat, 1);
+
+    // Unpause / play() resumes from Bar 2 (3840 PPQN) and triggers note at 3840
+    const oscBeforeResume = ctx.oscillators.length;
+    await engine.play();
+    engine._onClockTick();
+    assert.equal(engine.getState().playing, true);
+    assert.equal(
+      ctx.oscillators.length,
+      oscBeforeResume + 1,
+      "Resuming play() after seek(3840) should schedule note at 3840",
+    );
+  } finally {
+    await engine.stop();
+  }
+});
