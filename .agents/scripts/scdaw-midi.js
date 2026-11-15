@@ -708,3 +708,341 @@ export function midiToProject(input, options = {}) {
     tracks: newTracks,
   });
 }
+
+// ============================================================================
+// Live Web MIDI Wire Protocol, Real-Time MIDI FX & Retroactive Capture Math
+// Ported concepts from openDAW MidiData.ts & CaptureMidi.ts
+// ============================================================================
+
+export const MIN_CAPTURED_NOTE_DURATION = Math.round(
+  (PPQN.Quarter || 960) / 32,
+); // 1/128 note = 30 ticks
+
+/**
+ * Parses a raw Web MIDI MIDIMessageEvent.data Uint8Array into a structured event.
+ * Safely handles NoteOn vel=0 -> NoteOff, PitchBend 14-bit centering, CC, and Real-Time.
+ * @param {Uint8Array|number[]|null} data
+ * @returns {object}
+ */
+export function parseMidiMessage(data) {
+  if (!data || typeof data.length !== "number" || data.length === 0) {
+    return { type: "ignore" };
+  }
+
+  const status = data[0] & 0xff;
+
+  // System Real-Time (1-byte messages)
+  if (status === 0xf8) return { type: "clock" };
+  if (status === 0xfa) return { type: "start" };
+  if (status === 0xfb) return { type: "continue" };
+  if (status === 0xfc) return { type: "stop" };
+
+  // Song Position Pointer (3-byte: 0xF2, LSB, MSB)
+  if (status === 0xf2) {
+    if (data.length < 3) return { type: "ignore" };
+    const lsb = data[1] & 0x7f;
+    const msb = data[2] & 0x7f;
+    return { type: "song-position", midiBeats: lsb | (msb << 7) };
+  }
+
+  // SysEx and other system common messages are ignored
+  if (status >= 0xf0) {
+    return { type: "ignore" };
+  }
+
+  const command = status & 0xf0;
+  const channel = status & 0x0f;
+
+  if (command === CONTROL_TYPE.NOTE_ON) {
+    if (data.length < 3) return { type: "ignore" };
+    const pitch = data[1] & 0x7f;
+    const velByte = data[2] & 0x7f;
+    if (velByte === 0) {
+      return { type: "note-off", channel, pitch, velocity: 0 };
+    }
+    return {
+      type: "note-on",
+      channel,
+      pitch,
+      velocity: velByte / 127,
+    };
+  }
+
+  if (command === CONTROL_TYPE.NOTE_OFF) {
+    if (data.length < 3) return { type: "ignore" };
+    const pitch = data[1] & 0x7f;
+    const velByte = data[2] & 0x7f;
+    return {
+      type: "note-off",
+      channel,
+      pitch,
+      velocity: velByte / 127,
+    };
+  }
+
+  if (command === CONTROL_TYPE.CONTROLLER) {
+    if (data.length < 3) return { type: "ignore" };
+    const controller = data[1] & 0x7f;
+    const value = data[2] & 0x7f;
+    return {
+      type: "cc",
+      channel,
+      controller,
+      value,
+      normalized: value / 127,
+    };
+  }
+
+  if (command === CONTROL_TYPE.PITCH_BEND) {
+    if (data.length < 3) return { type: "ignore" };
+    const lsb = data[1] & 0x7f;
+    const msb = data[2] & 0x7f;
+    const raw14 = lsb | (msb << 7);
+    const value = raw14 <= 8192 ? raw14 / 8192 - 1 : (raw14 - 8192) / 8191;
+    return {
+      type: "pitch-bend",
+      channel,
+      value: Math.max(-1, Math.min(1, value)),
+    };
+  }
+
+  if (command === CONTROL_TYPE.PROGRAM_CHANGE) {
+    if (data.length < 2) return { type: "ignore" };
+    return {
+      type: "program-change",
+      channel,
+      program: data[1] & 0x7f,
+    };
+  }
+
+  if (command === CONTROL_TYPE.CHANNEL_AFTERTOUCH) {
+    if (data.length < 2) return { type: "ignore" };
+    const value = data[1] & 0x7f;
+    return {
+      type: "channel-aftertouch",
+      channel,
+      value,
+      normalized: value / 127,
+    };
+  }
+
+  if (command === CONTROL_TYPE.AFTERTOUCH) {
+    if (data.length < 3) return { type: "ignore" };
+    const pitch = data[1] & 0x7f;
+    const value = data[2] & 0x7f;
+    return {
+      type: "poly-aftertouch",
+      channel,
+      pitch,
+      value,
+      normalized: value / 127,
+    };
+  }
+
+  return { type: "ignore" };
+}
+
+/**
+ * Encodes a structured MIDI event into a Uint8Array suitable for MIDIOutput.send().
+ * @param {object} msg
+ * @returns {Uint8Array}
+ */
+export function encodeMidiMessage(msg) {
+  if (!msg || typeof msg !== "object") return new Uint8Array(0);
+  const ch = Math.max(0, Math.min(15, Math.floor(msg.channel ?? 0)));
+
+  switch (msg.type) {
+    case "note-on": {
+      const pitch = Math.max(0, Math.min(127, Math.round(msg.pitch ?? 60)));
+      const rawVel = msg.velocity ?? 0.8;
+      const velByte =
+        rawVel <= 1
+          ? Math.max(1, Math.min(127, Math.round(rawVel * 127)))
+          : Math.max(1, Math.min(127, Math.round(rawVel)));
+      return new Uint8Array([CONTROL_TYPE.NOTE_ON | ch, pitch, velByte]);
+    }
+    case "note-off": {
+      const pitch = Math.max(0, Math.min(127, Math.round(msg.pitch ?? 60)));
+      return new Uint8Array([CONTROL_TYPE.NOTE_OFF | ch, pitch, 0]);
+    }
+    case "cc": {
+      const controller = Math.max(
+        0,
+        Math.min(127, Math.round(msg.controller ?? 0)),
+      );
+      const val =
+        msg.value !== undefined
+          ? Math.max(0, Math.min(127, Math.round(msg.value)))
+          : Math.max(0, Math.min(127, Math.round((msg.normalized ?? 0) * 127)));
+      return new Uint8Array([CONTROL_TYPE.CONTROLLER | ch, controller, val]);
+    }
+    case "pitch-bend": {
+      const norm = Math.max(-1, Math.min(1, Number(msg.value ?? 0)));
+      const raw14 =
+        norm <= 0
+          ? Math.round((norm + 1) * 8192)
+          : Math.round(8192 + norm * 8191);
+      const clamped = Math.max(0, Math.min(16383, raw14));
+      return new Uint8Array([
+        CONTROL_TYPE.PITCH_BEND | ch,
+        clamped & 0x7f,
+        (clamped >> 7) & 0x7f,
+      ]);
+    }
+    case "clock":
+      return new Uint8Array([0xf8]);
+    case "start":
+      return new Uint8Array([0xfa]);
+    case "continue":
+      return new Uint8Array([0xfb]);
+    case "stop":
+      return new Uint8Array([0xfc]);
+    default:
+      return new Uint8Array(0);
+  }
+}
+
+/**
+ * Applies instantaneous track midiFx (notefilter, pitch transpose, velocity drive)
+ * to a live incoming MIDI note.
+ * @param {object} track
+ * @param {{ pitch: number, velocity: number }} noteEvent
+ * @returns {Array<{ pitch: number, velocity: number }>}
+ */
+export function transformLiveMidiNote(track, noteEvent) {
+  if (!noteEvent) return [];
+  let pitch = Math.max(0, Math.min(127, Math.round(noteEvent.pitch ?? 60)));
+  let velocity = Math.max(
+    0.01,
+    Math.min(1.0, Number(noteEvent.velocity ?? 0.8)),
+  );
+
+  const midiFx = Array.isArray(track?.midiFx) ? track.midiFx : [];
+
+  for (const fx of midiFx) {
+    if (!fx) continue;
+    if (fx.type === "notefilter" || fx.type === "filter") {
+      const minP = fx.minPitch ?? 0;
+      const maxP = fx.maxPitch ?? 127;
+      if (pitch < minP || pitch > maxP) {
+        return [];
+      }
+    } else if (fx.type === "pitch") {
+      const offset = (fx.semitones || 0) + (fx.octaves || 0) * 12;
+      pitch = Math.max(0, Math.min(127, pitch + offset));
+    } else if (fx.type === "velocity") {
+      velocity = velocity * (1 + (fx.drive || 0));
+      velocity = Math.max(0.01, Math.min(1.0, velocity));
+    }
+  }
+
+  return [{ pitch, velocity }];
+}
+
+/**
+ * Resolves raw buffered MIDI note-on/note-off events into ShadowClaw DAW note objects.
+ * Supports Scenario 1 (stopped: millisecond deltas converted to PPQN) and
+ * Scenario 2 (playing/recording: direct PPQN timestamps).
+ *
+ * @param {Array<{ type: "on"|"off", pitch: number, velocity?: number, timeMs?: number, ppqn?: number }>} events
+ * @param {object} [options]
+ * @returns {Array<{ position: number, duration: number, pitch: number, velocity: number }>}
+ */
+export function resolveCapturedMidiNotes(events = [], options = {}) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  const mode = options.mode === "playing" ? "playing" : "stopped";
+  const bpm = Math.max(20, Number(options.bpm || 120));
+  const anchorPpqn = Math.max(0, Math.round(Number(options.anchorPpqn || 0)));
+  const ppqnQuarter = PPQN.Quarter || 960;
+
+  let segmentAnchorPpqn = anchorPpqn;
+  let segmentOriginTimeMs = 0;
+  let lastEventPpqn = null;
+
+  if (mode === "stopped") {
+    const firstOn = events.find((e) => e.type === "on");
+    if (!firstOn) return [];
+    segmentOriginTimeMs = Number(firstOn.timeMs ?? firstOn.timestampMs ?? 0);
+    if (firstOn.ppqn !== undefined) {
+      lastEventPpqn = Math.round(firstOn.ppqn);
+      segmentAnchorPpqn = lastEventPpqn;
+    }
+  }
+
+  const msToPpqn = (
+    timeMs,
+    segAnchor = segmentAnchorPpqn,
+    segOrigin = segmentOriginTimeMs,
+  ) =>
+    segAnchor +
+    Math.round(
+      ((((Number(timeMs) - segOrigin) / 1000) * bpm) / 60) * ppqnQuarter,
+    );
+
+  const openNotes = new Map();
+  const resolved = [];
+
+  for (const ev of events) {
+    if (!ev) continue;
+    const evTimeMs = Number(ev.timeMs ?? ev.timestampMs ?? 0);
+    if (ev.type === "on") {
+      if (mode === "stopped" && ev.ppqn !== undefined) {
+        const evPpqn = Math.round(ev.ppqn);
+        if (lastEventPpqn === null || evPpqn !== lastEventPpqn) {
+          lastEventPpqn = evPpqn;
+          segmentAnchorPpqn = evPpqn;
+          segmentOriginTimeMs = evTimeMs;
+        }
+      }
+      const pos =
+        mode === "playing"
+          ? Math.round(ev.ppqn ?? 0)
+          : msToPpqn(evTimeMs, segmentAnchorPpqn, segmentOriginTimeMs);
+      openNotes.set(ev.pitch, {
+        position: Math.max(0, pos),
+        velocity: Math.max(0.01, Math.min(1.0, Number(ev.velocity ?? 0.8))),
+        segAnchor: segmentAnchorPpqn,
+        segOrigin: segmentOriginTimeMs,
+      });
+    } else if (ev.type === "off") {
+      const open = openNotes.get(ev.pitch);
+      if (!open) continue;
+      openNotes.delete(ev.pitch);
+      const endPos =
+        mode === "playing"
+          ? Math.round(ev.ppqn ?? open.position)
+          : msToPpqn(evTimeMs, open.segAnchor, open.segOrigin);
+      const duration = Math.max(
+        MIN_CAPTURED_NOTE_DURATION,
+        endPos - open.position,
+      );
+      resolved.push({
+        position: open.position,
+        duration,
+        pitch: ev.pitch,
+        velocity: open.velocity,
+      });
+    }
+  }
+
+  // Truncate any still-held notes at commit time
+  const commitEndFallback =
+    mode === "playing"
+      ? Math.round(options.commitPpqn ?? anchorPpqn)
+      : msToPpqn(options.commitTimeMs ?? segmentOriginTimeMs);
+
+  for (const [pitch, open] of openNotes.entries()) {
+    const duration = Math.max(
+      MIN_CAPTURED_NOTE_DURATION,
+      commitEndFallback - open.position,
+    );
+    resolved.push({
+      position: open.position,
+      duration,
+      pitch,
+      velocity: open.velocity,
+    });
+  }
+
+  return resolved.sort((a, b) => a.position - b.position);
+}

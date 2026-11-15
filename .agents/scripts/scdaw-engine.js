@@ -28,7 +28,12 @@ import {
   automationValueAt,
 } from "./scdaw.js";
 import { encodeZip } from "./scdaw-zip.js";
-import { encodeMidiFile, midiToProject } from "./scdaw-midi.js";
+import {
+  encodeMidiFile,
+  midiToProject,
+  resolveCapturedMidiNotes,
+  transformLiveMidiNote,
+} from "./scdaw-midi.js";
 import { encodeDawProject, decodeDawProject } from "./scdaw-dawproject.js";
 import { triggerInstrumentVoice } from "./scdaw-instruments.js";
 import {
@@ -45,6 +50,7 @@ import {
 } from "./scdaw-fs.js";
 import { AudioRecorder } from "./scdaw-recorder.js";
 import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
+import { createMidiIo } from "./scdaw-midi-io.js";
 
 export class DawEngine extends EventTarget {
   constructor(options = {}) {
@@ -90,6 +96,15 @@ export class DawEngine extends EventTarget {
     this._anchorAudioTime = 0;
     this._scheduledUntilUnwrapped = null;
     this._activeVoices = new Set();
+    this._liveVoices = new Map();
+    this._sustainedNotes = new Map();
+    this._sustainPedal = new Map();
+    this._pitchBendByTrack = new Map();
+    this._captureBuffer = [];
+    this._midiRecordingEvents = [];
+    this._recordingKind = null;
+    this.midiCaptureCount = new State(0);
+    this.activeLivePitches = new State([]);
     this._sampleCache = new Map();
     this._recorder = null;
     this._recording = false;
@@ -97,6 +112,7 @@ export class DawEngine extends EventTarget {
     this._initAudioContext();
     this._initSchedulerClock();
     this._updateGraph();
+    this.midi = createMidiIo(this);
   }
 
   _restoreSavedProject() {
@@ -146,7 +162,7 @@ export class DawEngine extends EventTarget {
 
     if (AudioCtx) {
       try {
-        this.ctx = new AudioCtx();
+        this.ctx = new AudioCtx({ latencyHint: "interactive" });
         this._updateAudioState();
         this.ctx.addEventListener?.("statechange", () =>
           this._updateAudioState(),
@@ -499,8 +515,262 @@ export class DawEngine extends EventTarget {
       } catch (_) {}
     }
     this._activeVoices.clear();
+    this._liveVoices.clear();
+    this._sustainedNotes.clear();
+    this._sustainPedal.clear();
+    this._pitchBendByTrack.clear();
+    this._syncActiveLivePitches();
     this._scheduledUntilPpqn = null;
     this._scheduledUntilUnwrapped = null;
+  }
+
+  _syncActiveLivePitches() {
+    const pitches = new Set();
+    for (const key of this._liveVoices.keys()) {
+      const sep = key.lastIndexOf(":");
+      const pitch = Number(key.slice(sep + 1));
+      if (Number.isFinite(pitch)) pitches.add(pitch);
+    }
+    this.activeLivePitches.set([...pitches]);
+  }
+
+  _recordCaptureEvent(evt) {
+    this._captureBuffer.push(evt);
+    if (this._captureBuffer.length > 500) {
+      this._captureBuffer.splice(0, this._captureBuffer.length - 500);
+    }
+    this.midiCaptureCount.set(
+      this._captureBuffer.filter((e) => e.type === "on").length,
+    );
+    if (this._recording && this._recordingKind === "midi") {
+      this._midiRecordingEvents.push(evt);
+    }
+  }
+
+  getExactPlayheadPpqn({ compensateOutputLatency = false } = {}) {
+    const s = this.state.get();
+    if (!s.playing) {
+      return Math.max(0, Math.round(s.positionPpqn || 0));
+    }
+    const p = this.project.get();
+    const bpm = p.bpm || 120;
+    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
+    const latencySec = compensateOutputLatency
+      ? Number(this.ctx?.outputLatency || 0) +
+        Number(this.ctx?.baseLatency || 0)
+      : 0;
+    const elapsedSec = Math.max(
+      0,
+      nowAudio - this._anchorAudioTime - latencySec,
+    );
+    const unwrapped = this._anchorPpqn + secondsToPulses(elapsedSec, bpm);
+    return Math.max(0, Math.round(unwrapped % totalPulses));
+  }
+
+  liveNoteOn(
+    trackId,
+    pitch,
+    velocity = 0.8,
+    { nowAudio = null, fromMidi = true } = {},
+  ) {
+    const p = this.project.get();
+    const targetId = trackId || this.selectedTrackId.get();
+    const track = p.tracks.find((t) => t.id === targetId);
+    if (!track) return null;
+
+    if (
+      this.ctx?.state === "suspended" &&
+      typeof this.ctx.resume === "function"
+    ) {
+      this.ctx.resume().catch(() => {});
+    }
+
+    const transformed = transformLiveMidiNote(track, { pitch, velocity });
+    if (!transformed) return null;
+
+    const notes = Array.isArray(transformed) ? transformed : [transformed];
+    const now = nowAudio ?? (this.ctx ? this.ctx.currentTime : 0);
+    const bpm = p.bpm || 120;
+    const ppqn = this.getExactPlayheadPpqn({ compensateOutputLatency: true });
+    const timestampMs = Date.now();
+    const dest =
+      this.graph?.tracks?.get(track.id)?.input || this.ctx?.destination;
+
+    let lastHandle = null;
+    for (const n of notes) {
+      const key = `${track.id}:${n.pitch}`;
+      const existing = this._liveVoices.get(key);
+      if (existing) {
+        try {
+          if (typeof existing.release === "function") existing.release(now);
+          else if (typeof existing.stop === "function") existing.stop(now);
+        } catch (_) {}
+        this._liveVoices.delete(key);
+        this._activeVoices.delete(existing);
+      }
+
+      this._recordCaptureEvent({
+        type: "on",
+        trackId: track.id,
+        pitch: n.pitch,
+        velocity: n.velocity,
+        ppqn,
+        timeMs: timestampMs,
+      });
+
+      if (this.ctx && dest) {
+        const instrument =
+          track.kind === "drums"
+            ? "drums"
+            : track.params?.instrument || "synth";
+        const voice = triggerInstrumentVoice(
+          this.ctx,
+          dest,
+          {
+            instrument,
+            trackKind: track.kind,
+            note: { pitch: n.pitch, velocity: n.velocity, duration: 480 },
+            params: track.params || {},
+            trackVolume: track.volume ?? 0.8,
+            trackPan: track.pan ?? 0,
+            gate: true,
+          },
+          now,
+          bpm,
+        );
+        if (voice) {
+          voice.trackId = track.id;
+          const bend = this._pitchBendByTrack.get(track.id);
+          if (bend && typeof voice.setPitchBend === "function") {
+            voice.setPitchBend(bend, now);
+          }
+          this._activeVoices.add(voice);
+          this._liveVoices.set(key, voice);
+          voice.onended = () => {
+            this._activeVoices.delete(voice);
+            if (this._liveVoices.get(key) === voice) {
+              this._liveVoices.delete(key);
+              this._syncActiveLivePitches();
+            }
+          };
+          lastHandle = voice;
+        }
+      }
+
+      if (fromMidi && this.midi?.sendNoteOn && track.midiOutput?.enabled) {
+        this.midi.sendNoteOn(track.id, n.pitch, n.velocity);
+      }
+    }
+
+    this._syncActiveLivePitches();
+    return lastHandle;
+  }
+
+  liveNoteOff(trackId, pitch, { nowAudio = null, fromMidi = true } = {}) {
+    const p = this.project.get();
+    const targetId = trackId || this.selectedTrackId.get();
+    const track = p.tracks.find((t) => t.id === targetId);
+    if (!track) return;
+
+    const now = nowAudio ?? (this.ctx ? this.ctx.currentTime : 0);
+    const ppqn = this.getExactPlayheadPpqn({ compensateOutputLatency: true });
+    const timestampMs = Date.now();
+
+    this._recordCaptureEvent({
+      type: "off",
+      trackId: track.id,
+      pitch,
+      velocity: 0,
+      ppqn,
+      timeMs: timestampMs,
+    });
+
+    if (this._sustainPedal.get(track.id)) {
+      let set = this._sustainedNotes.get(track.id);
+      if (!set) {
+        set = new Set();
+        this._sustainedNotes.set(track.id, set);
+      }
+      set.add(pitch);
+      return;
+    }
+
+    const key = `${track.id}:${pitch}`;
+    const voice = this._liveVoices.get(key);
+    if (voice) {
+      this._liveVoices.delete(key);
+      this._syncActiveLivePitches();
+      try {
+        if (typeof voice.release === "function") {
+          voice.release(now);
+        } else if (typeof voice.stop === "function") {
+          voice.stop(now);
+        }
+      } catch (_) {}
+    }
+
+    if (fromMidi && this.midi?.sendNoteOff && track.midiOutput?.enabled) {
+      this.midi.sendNoteOff(track.id, pitch);
+    }
+  }
+
+  setSustainPedal(trackId, down) {
+    const targetId = trackId || this.selectedTrackId.get();
+    if (!targetId) return;
+    const isDown = Boolean(down);
+    this._sustainPedal.set(targetId, isDown);
+    if (!isDown) {
+      const held = this._sustainedNotes.get(targetId);
+      if (held && held.size > 0) {
+        const pitches = [...held];
+        held.clear();
+        for (const p of pitches) {
+          this.liveNoteOff(targetId, p);
+        }
+      }
+    }
+  }
+
+  setPitchBend(trackId, normalized, rangeSemitones = 2) {
+    const targetId = trackId || this.selectedTrackId.get();
+    if (!targetId) return;
+    const clamped = Math.max(-1, Math.min(1, Number(normalized) || 0));
+    const semitones = clamped * rangeSemitones;
+    this._pitchBendByTrack.set(targetId, semitones);
+    const now = this.ctx ? this.ctx.currentTime : 0;
+    for (const [key, voice] of this._liveVoices.entries()) {
+      if (
+        key.startsWith(`${targetId}:`) &&
+        typeof voice.setPitchBend === "function"
+      ) {
+        voice.setPitchBend(semitones, now);
+      }
+    }
+  }
+
+  async commitCapturedMidi(trackId = null) {
+    const targetId = trackId || this.selectedTrackId.get();
+    if (!targetId) return { addedCount: 0, notes: [] };
+    const p = this.project.get();
+    const events = this._captureBuffer.filter((e) => e.trackId === targetId);
+    const notes = resolveCapturedMidiNotes(events, {
+      bpm: p.bpm || 120,
+      mode: this.state.get().playing ? "playing" : "stopped",
+      commitPpqn: this.getExactPlayheadPpqn({ compensateOutputLatency: true }),
+    });
+    if (notes.length === 0) return { addedCount: 0, notes: [] };
+    const res = await this.sendCommand("commit_captured_midi", {
+      trackId: targetId,
+      notes,
+    });
+    this._captureBuffer = this._captureBuffer.filter(
+      (e) => e.trackId !== targetId,
+    );
+    this.midiCaptureCount.set(
+      this._captureBuffer.filter((e) => e.type === "on").length,
+    );
+    return res;
   }
 
   _reanchorPlaybackClock(nowAudio, oldBpm) {
@@ -2206,16 +2476,14 @@ export class DawEngine extends EventTarget {
     if (trackId) {
       targetTrack = p.tracks.find((t) => t.id === trackId);
     } else {
-      // 1. Prefer currently selected track if it is an audio track
+      // 1. Prefer currently selected track (audio or MIDI/synth/drums)
       const selId = this.selectedTrackId.get();
       if (selId) {
-        targetTrack = p.tracks.find(
-          (t) => t.id === selId && t.kind === "audio",
-        );
+        targetTrack = p.tracks.find((t) => t.id === selId);
       }
-      // 2. Otherwise check for an armed audio track
+      // 2. Otherwise check for an armed track
       if (!targetTrack) {
-        targetTrack = p.tracks.find((t) => t.recordArm && t.kind === "audio");
+        targetTrack = p.tracks.find((t) => t.recordArm);
       }
       // 3. Otherwise find first audio track
       if (!targetTrack) {
@@ -2223,7 +2491,7 @@ export class DawEngine extends EventTarget {
       }
     }
 
-    // If mode is 'new_track' or if no audio track exists, create a new track
+    // If mode is 'new_track' or if no track exists, create a new audio track
     if (mode === "new_track" || !targetTrack) {
       const audioTracks = p.tracks.filter((t) => t.kind === "audio");
       const baseName = targetTrack
@@ -2240,6 +2508,33 @@ export class DawEngine extends EventTarget {
     }
 
     this.selectTrack(targetTrack.id);
+
+    if (targetTrack.kind !== "audio") {
+      // MIDI recording path for synth / drums / midi tracks
+      await this.sendCommand("set_track_record_arm", {
+        trackId: targetTrack.id,
+        armed: true,
+      });
+      const effectiveStartBeat =
+        startBeat ??
+        Math.floor((this.state.get().positionPpqn || 0) / PPQN.Quarter);
+      this._recording = true;
+      this._recordingKind = "midi";
+      this._recordingTrackId = targetTrack.id;
+      this._recordingStartBeat = effectiveStartBeat;
+      this._midiRecordingEvents = [];
+
+      if (!this.state.get().playing) {
+        await this.play();
+      }
+      this._updateState({ recording: true });
+      return {
+        ok: true,
+        trackId: targetTrack.id,
+        kind: "midi",
+        startBeat: effectiveStartBeat,
+      };
+    }
 
     // Disarm other audio tracks to keep single-track arm clarity
     for (const t of this.project.get().tracks) {
@@ -2298,6 +2593,7 @@ export class DawEngine extends EventTarget {
     this._recorder = new AudioRecorder({ audioContext: this.ctx });
     await this._recorder.start(stream);
     this._recording = true;
+    this._recordingKind = "audio";
     this._recordingTrackId = targetTrack.id;
     this._recordingStartBeat = effectiveStartBeat;
 
@@ -2310,13 +2606,51 @@ export class DawEngine extends EventTarget {
   }
 
   async stopRecording() {
-    if (!this._recording || !this._recorder) {
+    if (!this._recording) {
+      return { ok: false, message: "Not recording" };
+    }
+
+    const recKind = this._recordingKind;
+    const trackId = this._recordingTrackId;
+    const startBeat = this._recordingStartBeat || 0;
+
+    if (recKind === "midi") {
+      this._recording = false;
+      this._recordingKind = null;
+      this._updateState({ recording: false });
+      const commitPpqn = this.state.get().positionPpqn || 0;
+      if (this.state.get().playing) {
+        await this.stop();
+      }
+      const p = this.project.get();
+      const events = this._midiRecordingEvents.slice();
+      this._midiRecordingEvents = [];
+      const notes = resolveCapturedMidiNotes(events, {
+        bpm: p.bpm || 120,
+        mode: "playing",
+        commitPpqn,
+      });
+      let commitRes = { addedCount: 0, notes: [] };
+      if (trackId && notes.length > 0) {
+        commitRes = await this.sendCommand("commit_captured_midi", {
+          trackId,
+          notes,
+        });
+      }
+      return {
+        ok: true,
+        trackId,
+        kind: "midi",
+        ...commitRes,
+      };
+    }
+
+    if (!this._recorder) {
       return { ok: false, message: "Not recording" };
     }
 
     this._recording = false;
-    const trackId = this._recordingTrackId;
-    const startBeat = this._recordingStartBeat || 0;
+    this._recordingKind = null;
     const recResult = await this._recorder.stop();
     this._recorder = null;
     this._updateState({ recording: false });

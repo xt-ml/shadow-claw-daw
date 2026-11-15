@@ -4050,10 +4050,22 @@ test("scdaw-transport: calculateBarsAdjustment and parseSignatureString handle c
   };
   transport.render();
 
-  assert.match(transport.shadowRoot.innerHTML, /id="bars-dec-btn"[^>]*aria-label=/);
-  assert.match(transport.shadowRoot.innerHTML, /id="bars-input"[^>]*min="1"[^>]*max="512"/);
-  assert.match(transport.shadowRoot.innerHTML, /id="bars-inc-btn"[^>]*aria-label=/);
-  assert.match(transport.shadowRoot.innerHTML, /id="signature-select"[^>]*aria-label="Time signature"/);
+  assert.match(
+    transport.shadowRoot.innerHTML,
+    /id="bars-dec-btn"[^>]*aria-label=/,
+  );
+  assert.match(
+    transport.shadowRoot.innerHTML,
+    /id="bars-input"[^>]*min="1"[^>]*max="512"/,
+  );
+  assert.match(
+    transport.shadowRoot.innerHTML,
+    /id="bars-inc-btn"[^>]*aria-label=/,
+  );
+  assert.match(
+    transport.shadowRoot.innerHTML,
+    /id="signature-select"[^>]*aria-label="Time signature"/,
+  );
 });
 
 test("scdaw-timeline: renders ARIA end-bar slider, + Bar button, and computes drag bars accurately", async () => {
@@ -4102,7 +4114,10 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
     await import("../.agents/scripts/components/scdaw-sequencer.js");
 
   await scdaw.resetProject({ template: "starter" });
-  await scdaw.sendCommand("set_transport", { lengthBars: 2, signature: [3, 4] });
+  await scdaw.sendCommand("set_transport", {
+    lengthBars: 2,
+    signature: [3, 4],
+  });
 
   const editor = new DawEditorElement();
   editor.shadowRoot = {
@@ -4122,7 +4137,8 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
     querySelectorAll: () => [],
   };
   seq.render();
-  const stepMatches = seq.shadowRoot.innerHTML.match(/data-step="(\d+)"/g) || [];
+  const stepMatches =
+    seq.shadowRoot.innerHTML.match(/data-step="(\d+)"/g) || [];
   const maxStep = Math.max(
     ...stepMatches.map((m) => Number(m.match(/data-step="(\d+)"/)[1])),
   );

@@ -12,7 +12,11 @@ import { effect } from "../scdaw-signals.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
-export function formatTelemetryStatus(state = {}, project = {}) {
+export function formatTelemetryStatus(
+  state = {},
+  project = {},
+  midiState = null,
+) {
   const audio = state.audio || "suspended";
   const name = project.name || "Untitled";
   const bpm = project.bpm || 120;
@@ -20,11 +24,22 @@ export function formatTelemetryStatus(state = {}, project = {}) {
   const bounceInfo = state.lastBounce
     ? `Bounce: ${state.lastBounce.durationSec.toFixed(1)}s (${state.lastBounce.peakDb.toFixed(1)} dB)`
     : "No Bounces";
+  const mStatus = midiState?.midiStatus || midiState?.status || "idle";
+  const mCount =
+    midiState?.midiInputCount ??
+    (Array.isArray(midiState?.inputs) ? midiState.inputs.length : 0);
+  const midiSummary =
+    mStatus === "ready"
+      ? `MIDI: ${mCount} in`
+      : mStatus === "unsupported" || mStatus === "denied"
+        ? "MIDI: Keys"
+        : "MIDI: --";
   return {
     audioText: `Audio: ${audio}`,
     audioStatus: audio,
     projectSummary: `${name} · ${bpm} BPM · ${tracksCount} Tracks`,
     bounceSummary: bounceInfo,
+    midiSummary,
   };
 }
 
@@ -42,6 +57,7 @@ export class DawStatusBarElement extends BaseElement {
     this._dispose = effect(() => {
       scdaw.state.get();
       scdaw.project.get();
+      scdaw.midi?.state?.get?.();
       this._sync();
     });
   }
@@ -55,10 +71,13 @@ export class DawStatusBarElement extends BaseElement {
     if (!this.shadowRoot) return;
     const s = scdaw.getState();
     const p = scdaw.project.get();
+    const m = scdaw.midi?.state?.get?.();
+    const formatted = formatTelemetryStatus(s, p, m);
 
     const audioIndicator = this.shadowRoot.getElementById("audio-stat");
     const projIndicator = this.shadowRoot.getElementById("proj-stat");
     const bounceIndicator = this.shadowRoot.getElementById("bounce-stat");
+    const midiIndicator = this.shadowRoot.getElementById("midi-stat");
 
     if (audioIndicator) {
       audioIndicator.textContent = `Audio: ${s.audio}`;
@@ -70,6 +89,9 @@ export class DawStatusBarElement extends BaseElement {
     }
     if (bounceIndicator && s.lastBounce) {
       bounceIndicator.textContent = `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s (${s.lastBounce.peakDb.toFixed(1)} dB peak)`;
+    }
+    if (midiIndicator) {
+      midiIndicator.textContent = formatted.midiSummary;
     }
   }
 
@@ -171,6 +193,8 @@ export class DawStatusBarElement extends BaseElement {
         </div>
         <div class="scdaw-statusbar__group stat-item">
           <span id="bounce-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--bounce">${s.lastBounce ? `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s` : "No Bounces"}</span>
+          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+          <span id="midi-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--midi">MIDI: --</span>
           <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
           <span class="scdaw-statusbar__stat scdaw-statusbar__stat--lock" style="color:var(--accent);">Leader Lock OK</span>
         </div>

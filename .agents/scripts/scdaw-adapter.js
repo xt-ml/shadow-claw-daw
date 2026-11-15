@@ -208,6 +208,70 @@ export async function handleToolDispatch(name, params) {
       return scdaw.exportMidi(params);
     }
 
+    case "scdaw_get_midi_status": {
+      const m = scdaw.midi?.state?.get?.() || {
+        supported: false,
+        status: "unsupported",
+        inputs: [],
+        outputs: [],
+      };
+      const proj = scdaw.getProject();
+      return {
+        ...m,
+        captureCount: scdaw.midiCaptureCount?.get?.() || 0,
+        midiMappings: proj.midiMappings || [],
+      };
+    }
+
+    case "scdaw_configure_midi": {
+      const action = params.action;
+      if (action === "init") {
+        const status = await scdaw.midi?.init?.({
+          sysex: Boolean(params.sysex),
+        });
+        return { status, ...(scdaw.midi?.state?.get?.() || {}) };
+      }
+      if (action === "set_routing") {
+        return await scdaw.sendCommand("set_track_midi_routing", params);
+      }
+      if (action === "set_learn") {
+        return await scdaw.sendCommand("set_midi_learn_mapping", params);
+      }
+      if (action === "remove_learn") {
+        return await scdaw.sendCommand("remove_midi_learn_mapping", params);
+      }
+      if (action === "commit_captured") {
+        return await scdaw.commitCapturedMidi(params.trackId);
+      }
+      throw new Error(`Unknown scdaw_configure_midi action: ${action}`);
+    }
+
+    case "scdaw_trigger_midi": {
+      const action = params.action;
+      const trackId = params.trackId || scdaw.selectedTrackId?.get?.();
+      if (action === "note_on") {
+        scdaw.liveNoteOn(trackId, params.pitch ?? 60, params.velocity ?? 0.8);
+        return { ok: true, action, trackId, pitch: params.pitch ?? 60 };
+      }
+      if (action === "note_off") {
+        scdaw.liveNoteOff(trackId, params.pitch ?? 60);
+        return { ok: true, action, trackId, pitch: params.pitch ?? 60 };
+      }
+      if (action === "sustain") {
+        scdaw.setSustainPedal(trackId, Boolean(params.down));
+        return { ok: true, action, trackId, down: Boolean(params.down) };
+      }
+      if (action === "pitch_bend") {
+        scdaw.setPitchBend(trackId, Number(params.value ?? 0));
+        return { ok: true, action, trackId, value: Number(params.value ?? 0) };
+      }
+      if (action === "panic") {
+        scdaw.panic();
+        return { ok: true, action };
+      }
+      throw new Error(`Unknown scdaw_trigger_midi action: ${action}`);
+    }
+
     case "scdaw_import_midi": {
       let buf;
       if (typeof params.data === "string") {

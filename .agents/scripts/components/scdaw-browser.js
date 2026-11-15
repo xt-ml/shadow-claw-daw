@@ -485,31 +485,7 @@ export class DawBrowserElement extends BaseElement {
 
         <input type="text" class="search-box" placeholder="${this._activeTab === "files" ? "Search conversation files..." : "Search presets & devices..."}" value="${this._searchQuery}" />
         <div class="item-list">
-          ${
-            this._activeTab === "files" && filtered.length === 0
-              ? `
-            <div style="padding:1.5rem 0.5rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.75rem;">
-              No files found in this conversation.<br/>
-              <span style="font-size:0.68rem; opacity:0.8;">Save a project or bounce to this conversation.</span>
-            </div>
-          `
-              : filtered
-                  .map(
-                    (item) => `
-            <div class="browser-item" draggable="true" role="button" tabindex="0" aria-label="${item.name} (${item.category}). Drag to track or press Enter to apply." data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}" data-category="${item.category || ""}" data-format="${item.format || ""}" data-fx-type="${item.fxType || ""}">
-              <span style="display:flex; align-items:center; gap:6px;">
-                ${item.type === "files" ? `<span aria-hidden="true">${getFileIcon(item.name)}</span>` : ""}
-                <span>${item.name}</span>
-              </span>
-              <span style="display:flex; align-items:center; gap:6px;">
-                <span class="badge" style="font-size:0.65rem;">${item.category}</span>
-                ${item.size ? `<span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${formatFileSize(item.size)}</span>` : ""}
-              </span>
-            </div>
-          `,
-                  )
-                  .join("")
-          }
+          ${this._renderItemListHtml(filtered)}
         </div>
       </div>
     `;
@@ -542,15 +518,64 @@ export class DawBrowserElement extends BaseElement {
       this.loadFilesForConversation(this._activeConversationId);
     });
 
-    // Search input
+    // Search input (updates only .item-list in place to preserve input focus & cursor)
     const searchInput = this.shadowRoot.querySelector(".search-box");
     if (searchInput) {
       searchInput.addEventListener("input", (e) => {
         this._searchQuery = e.target.value;
-        this.render();
+        this._updateList();
       });
     }
 
+    this._bindItemListeners();
+  }
+
+  _renderItemListHtml(filtered) {
+    if (this._activeTab === "files" && filtered.length === 0) {
+      return `
+        <div style="padding:1.5rem 0.5rem; text-align:center; color:var(--shadow-claw-text-secondary, #94a3b8); font-size:0.75rem;">
+          No files found in this conversation.<br/>
+          <span style="font-size:0.68rem; opacity:0.8;">Save a project or bounce to this conversation.</span>
+        </div>
+      `;
+    }
+    return filtered
+      .map(
+        (item) => `
+        <div class="browser-item" draggable="true" role="button" tabindex="0" aria-label="${item.name} (${item.category}). Drag to track or press Enter to apply." data-id="${item.id}" data-type="${item.type}" data-name="${item.rawName || item.name}" data-kind="${item.kind || ""}" data-category="${item.category || ""}" data-format="${item.format || ""}" data-fx-type="${item.fxType || ""}">
+          <span style="display:flex; align-items:center; gap:6px;">
+            ${item.type === "files" ? `<span aria-hidden="true">${getFileIcon(item.name)}</span>` : ""}
+            <span>${item.name}</span>
+          </span>
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span class="badge" style="font-size:0.65rem;">${item.category}</span>
+            ${item.size ? `<span style="font-size:0.65rem; color:var(--shadow-claw-text-secondary, #94a3b8);">${formatFileSize(item.size)}</span>` : ""}
+          </span>
+        </div>
+      `,
+      )
+      .join("");
+  }
+
+  _updateList() {
+    if (!this.shadowRoot) return;
+    const itemListEl = this.shadowRoot.querySelector(".item-list");
+    if (!itemListEl) {
+      this.render();
+      return;
+    }
+    const allItems = this._getItems();
+    const filtered = filterBrowserItems(
+      allItems,
+      this._searchQuery,
+      this._activeTab,
+    );
+    itemListEl.innerHTML = this._renderItemListHtml(filtered);
+    this._bindItemListeners();
+  }
+
+  _bindItemListeners() {
+    if (!this.shadowRoot) return;
     // Item click and drag handlers
     this.shadowRoot.querySelectorAll(".browser-item").forEach((el) => {
       // Drag source

@@ -13,6 +13,61 @@ import { PPQN } from "../scdaw.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
+export function formatMidiStatusBadge(midiState = {}) {
+  const status = midiState?.status || "idle";
+  const inputs = Array.isArray(midiState?.inputs) ? midiState.inputs : [];
+  if (status === "ready") {
+    return {
+      label: `MIDI (${inputs.length})`,
+      title: `Web MIDI ready (${inputs.length} input${inputs.length === 1 ? "" : "s"})`,
+    };
+  }
+  if (status === "unsupported" || status === "denied") {
+    return {
+      label: "MIDI (Keys)",
+      title:
+        status === "denied"
+          ? "MIDI permission denied — using Software MIDI Keyboard"
+          : "Web MIDI unavailable — using Software MIDI Keyboard",
+    };
+  }
+  return {
+    label: "MIDI (--)",
+    title: "Click to connect Web MIDI devices",
+  };
+}
+
+export function formatCaptureButtonState(
+  captureCount = 0,
+  recentlyCaptured = 0,
+) {
+  const rec = Math.max(0, Math.round(Number(recentlyCaptured) || 0));
+  if (rec > 0) {
+    return {
+      label: `✓ Captured ${rec}`,
+      active: true,
+      hasNotes: false,
+      title: `Captured ${rec} MIDI note${rec === 1 ? "" : "s"} onto the selected track`,
+    };
+  }
+  const count = Math.max(0, Math.round(Number(captureCount) || 0));
+  if (count > 0) {
+    return {
+      label: `⏺ Capture (${count})`,
+      active: true,
+      hasNotes: true,
+      title: `Capture ${count} recently played MIDI note${count === 1 ? "" : "s"} onto the selected track`,
+    };
+  }
+  return {
+    label: "⏺ Capture",
+    active: false,
+    hasNotes: false,
+    title:
+      "Retroactive MIDI Capture — play notes first (MIDI or ⌨ Keys), then click to keep them",
+  };
+}
+
 /**
  * Checks whether starting recording on a track at a specific beat position
  * would collide with existing audio clips and therefore warrant prompting the user.
@@ -245,6 +300,8 @@ export class DawTransportElement extends BaseElement {
       this.attachShadow({ mode: "open" });
     }
     this._rafId = null;
+    this._captureFeedbackCount = 0;
+    this._captureFeedbackUntil = 0;
   }
 
   connectedCallback() {
@@ -300,6 +357,32 @@ export class DawTransportElement extends BaseElement {
     }
     if (audioBtn) {
       audioBtn.style.display = s.audio === "running" ? "none" : "inline-flex";
+    }
+
+    const midiBtn = this.shadowRoot.getElementById("midi-btn");
+    if (midiBtn) {
+      const m = scdaw.midi?.state?.get?.();
+      const badge = formatMidiStatusBadge(m);
+      if (midiBtn.textContent !== `🎹 ${badge.label}`) {
+        midiBtn.textContent = `🎹 ${badge.label}`;
+      }
+      midiBtn.title = badge.title;
+    }
+
+    const captureBtn = this.shadowRoot.getElementById("capture-midi-btn");
+    if (captureBtn) {
+      const count = scdaw.midiCaptureCount?.get?.() || 0;
+      const recent =
+        Date.now() < this._captureFeedbackUntil
+          ? this._captureFeedbackCount
+          : 0;
+      const cap = formatCaptureButtonState(count, recent);
+      if (captureBtn.textContent !== cap.label) {
+        captureBtn.textContent = cap.label;
+      }
+      captureBtn.classList.toggle("btn-primary", cap.active);
+      captureBtn.title = cap.title;
+      captureBtn.setAttribute("aria-label", cap.title);
     }
   }
 
@@ -789,6 +872,11 @@ export class DawTransportElement extends BaseElement {
           background: var(--border, #3f4849);
           color: #ffffff;
         }
+
+        dialog:modal,
+        dialog::backdrop {
+          overscroll-behavior: contain;
+        }
       </style>
       <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
@@ -803,6 +891,15 @@ export class DawTransportElement extends BaseElement {
           </button>
           <button id="metro-btn" class="scdaw-transport__btn scdaw-transport__btn--metro btn ${p.metronome?.enabled ? "btn-primary" : ""}" aria-label="Toggle Metronome" aria-pressed="${Boolean(p.metronome?.enabled)}" title="Metronome click track">
             🔔 Metro
+          </button>
+          <button id="midi-btn" class="scdaw-transport__btn btn" aria-haspopup="dialog" aria-label="MIDI Devices and Routing" title="Configure Web MIDI Devices & Routing">
+            🎹 MIDI
+          </button>
+          <button id="capture-midi-btn" class="scdaw-transport__btn btn" aria-label="Capture recent MIDI notes" title="Capture recent live MIDI notes to selected track">
+            ⏺ Capture
+          </button>
+          <button id="keys-btn" class="scdaw-transport__btn btn" aria-pressed="false" aria-label="Toggle Software MIDI Keyboard" title="Toggle on-screen / QWERTY MIDI Keyboard">
+            ⌨ Keys
           </button>
           <button id="audio-btn" class="scdaw-transport__btn scdaw-transport__btn--audio btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}" aria-label="Start Audio Processing Engine">
             🔊 Start Audio
@@ -913,6 +1010,39 @@ export class DawTransportElement extends BaseElement {
           </div>
         </form>
       </dialog>
+
+      <dialog id="scdaw-midi-dialog" class="scdaw-dialog" aria-labelledby="midi-dialog-title">
+        <form method="dialog" class="scdaw-dialog__form">
+          <div class="scdaw-dialog__header">
+            <h3 id="midi-dialog-title" class="scdaw-dialog__title">MIDI Devices &amp; Routing</h3>
+            <button type="button" id="midi-dialog-close" class="btn btn-icon" aria-label="Close MIDI dialog">✕</button>
+          </div>
+          <div id="midi-dialog-body" class="scdaw-dialog__body"></div>
+          <div class="scdaw-dialog__footer">
+            <button type="button" id="midi-dialog-done" class="btn btn-primary">Done</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="scdaw-capture-dialog" class="scdaw-dialog" aria-labelledby="capture-dialog-title">
+        <form method="dialog" class="scdaw-dialog__form">
+          <div class="scdaw-dialog__header">
+            <h3 id="capture-dialog-title" class="scdaw-dialog__title">Capture MIDI (Retroactive Recording)</h3>
+            <button type="button" id="capture-dialog-close" class="btn btn-icon" aria-label="Close Capture MIDI dialog">✕</button>
+          </div>
+          <div id="capture-dialog-body" class="scdaw-dialog__body">
+            <p>No recent MIDI notes are in the capture buffer yet.</p>
+            <p>Play notes anytime using a connected MIDI controller or the on-screen <strong>⌨ Keys</strong> keyboard—even without pressing Record. When notes are played, the button updates to <strong>⏺ Capture (N)</strong>; click it to drop what you just played onto the selected track.</p>
+            <p id="capture-dialog-target"></p>
+          </div>
+          <div class="scdaw-dialog__footer" style="display:flex;justify-content:flex-end;gap:8px;">
+            <button type="button" id="capture-open-keys" class="btn">Open ⌨ Keys</button>
+            <button type="button" id="capture-dialog-ok" class="btn btn-primary">Got it</button>
+          </div>
+        </form>
+      </dialog>
+
+      <span id="transport-live-msg" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></span>
     `;
 
     const dialog = this.shadowRoot.getElementById("scdaw-rec-dialog");
@@ -961,6 +1091,156 @@ export class DawTransportElement extends BaseElement {
     this.shadowRoot
       .getElementById("rec-dialog-cancel")
       ?.addEventListener("click", () => dialog?.close());
+
+    const midiDialog = this.shadowRoot.getElementById("scdaw-midi-dialog");
+    const midiDialogBody = this.shadowRoot.getElementById("midi-dialog-body");
+    const renderMidiDialogBody = () => {
+      if (!midiDialogBody) return;
+      const m = scdaw.midi?.state?.get?.() || {
+        status: "unsupported",
+        inputs: [],
+        outputs: [],
+      };
+      const proj = scdaw.getProject();
+      const selId = scdaw.selectedTrackId?.get?.();
+      const track = proj.tracks?.find((t) => t.id === selId);
+      const mappings = proj.midiMappings || [];
+
+      const statusMsg =
+        m.status === "ready"
+          ? `Web MIDI Connected (${m.inputs.length} in, ${m.outputs.length} out)`
+          : m.status === "denied"
+            ? "Web MIDI permission denied. Use the Software MIDI Keyboard (⌨ Keys) as fallback."
+            : "Web MIDI API is unavailable in this browser. Use the Software MIDI Keyboard (⌨ Keys) as fallback.";
+
+      const inputsHtml =
+        m.inputs.length > 0
+          ? m.inputs
+              .map((p) => `<li>${p.name} (${p.manufacturer || "MIDI"})</li>`)
+              .join("")
+          : "<li>No MIDI inputs detected</li>";
+      const outputsHtml =
+        m.outputs.length > 0
+          ? m.outputs
+              .map((p) => `<li>${p.name} (${p.manufacturer || "MIDI"})</li>`)
+              .join("")
+          : "<li>No MIDI outputs detected</li>";
+
+      const mappingsHtml =
+        mappings.length > 0
+          ? mappings
+              .map(
+                (map) =>
+                  `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;">
+                    <span>CC ${map.cc} → ${map.param}</span>
+                    <button type="button" class="btn btn-icon midi-del-map" data-id="${map.id}" aria-label="Remove mapping CC ${map.cc}">✕</button>
+                  </div>`,
+              )
+              .join("")
+          : "<p>No MIDI Learn mappings yet.</p>";
+
+      midiDialogBody.innerHTML = `
+        <p>${statusMsg}</p>
+        <h4>Inputs</h4>
+        <ul>${inputsHtml}</ul>
+        <h4>Outputs</h4>
+        <ul>${outputsHtml}</ul>
+        ${track ? `<h4>Selected Track: ${track.name}</h4><p>Input: ${track.midiInput?.deviceId || "All / Selected"} (Ch: ${track.midiInput?.channel ?? "omni"})</p>` : ""}
+        <h4>MIDI Learn Mappings</h4>
+        <div>${mappingsHtml}</div>
+      `;
+    };
+
+    this.shadowRoot
+      .getElementById("midi-btn")
+      ?.addEventListener("click", async () => {
+        if (scdaw.midi?.state?.get?.().status === "idle") {
+          await scdaw.midi.init();
+        }
+        renderMidiDialogBody();
+        midiDialog?.showModal?.();
+      });
+    this.shadowRoot
+      .getElementById("midi-dialog-close")
+      ?.addEventListener("click", () => midiDialog?.close());
+    this.shadowRoot
+      .getElementById("midi-dialog-done")
+      ?.addEventListener("click", () => midiDialog?.close());
+    midiDialogBody?.addEventListener("click", async (e) => {
+      const del = e.target.closest(".midi-del-map");
+      if (!del) return;
+      await scdaw.sendCommand("remove_midi_learn_mapping", {
+        id: del.dataset.id,
+      });
+      renderMidiDialogBody();
+    });
+
+    const captureDialog = this.shadowRoot.getElementById(
+      "scdaw-capture-dialog",
+    );
+    const captureTargetEl = this.shadowRoot.getElementById(
+      "capture-dialog-target",
+    );
+    const liveMsgEl = this.shadowRoot.getElementById("transport-live-msg");
+
+    this.shadowRoot
+      .getElementById("capture-midi-btn")
+      ?.addEventListener("click", async () => {
+        const res = await scdaw.commitCapturedMidi?.();
+        if (res && res.addedCount > 0) {
+          this._captureFeedbackCount = res.addedCount;
+          this._captureFeedbackUntil = Date.now() + 1800;
+          if (liveMsgEl) {
+            liveMsgEl.textContent = `Captured ${res.addedCount} MIDI note${res.addedCount === 1 ? "" : "s"} onto the selected track.`;
+          }
+          this._sync();
+          return;
+        }
+        if (captureTargetEl) {
+          const selId = scdaw.selectedTrackId?.get?.();
+          const trk = scdaw.getProject().tracks?.find((t) => t.id === selId);
+          captureTargetEl.textContent = trk
+            ? `Target track: ${trk.name} (${trk.kind})`
+            : "Tip: Add or select a Synth or Drums track first.";
+        }
+        captureDialog?.showModal?.();
+      });
+
+    this.shadowRoot
+      .getElementById("capture-dialog-close")
+      ?.addEventListener("click", () => captureDialog?.close());
+    this.shadowRoot
+      .getElementById("capture-dialog-ok")
+      ?.addEventListener("click", () => captureDialog?.close());
+    this.shadowRoot
+      .getElementById("capture-open-keys")
+      ?.addEventListener("click", () => {
+        captureDialog?.close();
+        const keysBtn = this.shadowRoot?.getElementById("keys-btn");
+        if (keysBtn) keysBtn.setAttribute("aria-pressed", "true");
+        this.dispatchEvent(
+          new CustomEvent("toggle-midi-keyboard", {
+            detail: { visible: true },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      });
+
+    this.shadowRoot
+      .getElementById("keys-btn")
+      ?.addEventListener("click", (e) => {
+        const btn = e.currentTarget;
+        const next = btn.getAttribute("aria-pressed") !== "true";
+        btn.setAttribute("aria-pressed", String(next));
+        this.dispatchEvent(
+          new CustomEvent("toggle-midi-keyboard", {
+            detail: { visible: next },
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      });
 
     this.shadowRoot
       .getElementById("rec-opt-new")

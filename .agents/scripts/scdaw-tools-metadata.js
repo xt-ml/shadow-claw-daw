@@ -108,7 +108,7 @@ export const TOOLS_METADATA = [
   {
     name: "scdaw_set_transport",
     description:
-      "Update transport properties: BPM (40-240), signature ([4,4] or [3,4]), pattern length in bars (1-4), or swing factor (0-0.5).",
+      "Update transport properties: BPM (40-240), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
     inputSchema: {
       type: "object",
       properties: {
@@ -125,7 +125,7 @@ export const TOOLS_METADATA = [
         },
         lengthBars: {
           type: "number",
-          description: "Loop pattern length in bars (1-4)",
+          description: "Loop pattern length in bars (1-512)",
         },
         swing: {
           type: "number",
@@ -537,6 +537,133 @@ export const TOOLS_METADATA = [
           description: "Whether to trigger browser download of .mid file",
         },
       },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_get_midi_status",
+    description:
+      "Returns Web MIDI API support status, connected input/output ports, track MIDI routing, and active MIDI Learn mappings.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_configure_midi",
+    description:
+      "Configures Web MIDI initialization, track MIDI input/output routing, MIDI Learn mappings, or commits captured live MIDI notes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "init",
+            "set_routing",
+            "set_learn",
+            "remove_learn",
+            "commit_captured",
+          ],
+          description: "MIDI configuration action to perform",
+        },
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        midiInput: {
+          type: "object",
+          description: "Track MIDI input config",
+        },
+        midiOutput: {
+          type: "object",
+          description: "Track MIDI output config",
+        },
+        id: {
+          type: "string",
+          description: "Mapping ID for set_learn/remove_learn",
+        },
+        deviceId: {
+          type: "string",
+        },
+        channel: {
+          type: ["integer", "string"],
+        },
+        cc: {
+          type: "integer",
+        },
+        param: {
+          type: "string",
+        },
+        min: {
+          type: "number",
+        },
+        max: {
+          type: "number",
+        },
+        scaling: {
+          type: "string",
+          enum: ["linear", "exponential"],
+        },
+        sysex: {
+          type: "boolean",
+        },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_trigger_midi",
+    description:
+      "Triggers live MIDI events (note_on, note_off, sustain, pitch_bend, or panic) on a track or selected track.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["note_on", "note_off", "sustain", "pitch_bend", "panic"],
+          description: "Live MIDI action",
+        },
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        pitch: {
+          type: "integer",
+          minimum: 0,
+          maximum: 127,
+        },
+        velocity: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+        },
+        down: {
+          type: "boolean",
+          description: "Sustain pedal state",
+        },
+        value: {
+          type: "number",
+          minimum: -1,
+          maximum: 1,
+          description: "Normalized pitch bend",
+        },
+      },
+      required: ["action"],
       additionalProperties: false,
     },
     annotations: {

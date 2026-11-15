@@ -297,6 +297,9 @@ export function createProject(template = "basic-beat") {
       master: template.master
         ? { ...base.master, ...template.master }
         : base.master,
+      midiMappings: Array.isArray(template.midiMappings)
+        ? template.midiMappings
+        : base.midiMappings,
       tracks: Array.isArray(template.tracks) ? template.tracks : base.tracks,
     };
   }
@@ -311,6 +314,7 @@ export function createProject(template = "basic-beat") {
       swing: 0,
       metronome: { enabled: false, volume: 0.8 },
       master: { volume: 0.8 },
+      midiMappings: [],
       tracks: [],
     };
   }
@@ -860,6 +864,9 @@ export function applyCommand(project, name, params = {}) {
         pan: 0,
         mute: false,
         solo: false,
+        recordArm: false,
+        midiInput: { deviceId: null, channel: "omni", enabled: true },
+        midiOutput: { deviceId: null, channel: 1, enabled: false },
         params: initParams,
         notes: [],
         audioClips: kind === "audio" ? [] : undefined,
@@ -1653,6 +1660,119 @@ export function applyCommand(project, name, params = {}) {
           ...analysis,
           project: next.name || "Untitled",
           durationSeconds: durSec,
+        },
+      };
+    }
+
+    case "set_track_midi_routing": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) {
+        throw new Error(`Track not found: ${params.trackId}`);
+      }
+      if (params.midiInput && typeof params.midiInput === "object") {
+        track.midiInput = {
+          ...(track.midiInput || {
+            deviceId: null,
+            channel: "omni",
+            enabled: true,
+          }),
+          ...params.midiInput,
+        };
+      }
+      if (params.midiOutput && typeof params.midiOutput === "object") {
+        track.midiOutput = {
+          ...(track.midiOutput || {
+            deviceId: null,
+            channel: 1,
+            enabled: false,
+          }),
+          ...params.midiOutput,
+        };
+      }
+      return {
+        project: next,
+        result: {
+          trackId: track.id,
+          midiInput: track.midiInput,
+          midiOutput: track.midiOutput,
+        },
+      };
+    }
+
+    case "set_midi_learn_mapping": {
+      if (!Array.isArray(next.midiMappings)) next.midiMappings = [];
+      const id =
+        params.id ||
+        `map_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const mapping = {
+        id,
+        deviceId: params.deviceId ?? null,
+        channel: params.channel ?? 0,
+        cc: Number(params.cc ?? 0),
+        trackId: params.trackId,
+        param: params.param,
+        min: params.min ?? 0,
+        max: params.max ?? 1,
+        scaling: params.scaling || "linear",
+      };
+      const existingIdx = next.midiMappings.findIndex((m) => m.id === id);
+      if (existingIdx >= 0) {
+        next.midiMappings[existingIdx] = mapping;
+      } else {
+        next.midiMappings.push(mapping);
+      }
+      return {
+        project: next,
+        result: { mapping },
+      };
+    }
+
+    case "remove_midi_learn_mapping": {
+      if (!Array.isArray(next.midiMappings)) next.midiMappings = [];
+      const before = next.midiMappings.length;
+      next.midiMappings = next.midiMappings.filter((m) => m.id !== params.id);
+      return {
+        project: next,
+        result: {
+          removed: before - next.midiMappings.length,
+          id: params.id,
+        },
+      };
+    }
+
+    case "commit_captured_midi": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) {
+        throw new Error(`Track not found: ${params.trackId}`);
+      }
+      if (!Array.isArray(track.notes)) track.notes = [];
+      const incoming = Array.isArray(params.notes) ? params.notes : [];
+      const added = [];
+      for (const n of incoming) {
+        const note = {
+          position: Math.max(0, Math.round(Number(n.position ?? 0))),
+          duration: Math.max(1, Math.round(Number(n.duration ?? 240))),
+          pitch: Math.max(0, Math.min(127, Math.round(Number(n.pitch ?? 60)))),
+          velocity: Math.max(0, Math.min(1, Number(n.velocity ?? 0.8))),
+        };
+        const dupIdx = track.notes.findIndex(
+          (existing) =>
+            existing.pitch === note.pitch &&
+            Math.abs(existing.position - note.position) < 30,
+        );
+        if (dupIdx >= 0) {
+          track.notes[dupIdx] = note;
+        } else {
+          track.notes.push(note);
+        }
+        added.push(note);
+      }
+      return {
+        project: next,
+        result: {
+          trackId: track.id,
+          addedCount: added.length,
+          notes: added,
         },
       };
     }

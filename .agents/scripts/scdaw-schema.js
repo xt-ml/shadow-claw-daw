@@ -516,6 +516,7 @@ export function migrateProject(project) {
     next.metronome = { enabled: false, volume: 0.8 };
   }
   if (!next.master) next.master = { volume: 0.8 };
+  if (!Array.isArray(next.midiMappings)) next.midiMappings = [];
   if (!Array.isArray(next.tracks)) next.tracks = [];
 
   for (const track of next.tracks) {
@@ -549,6 +550,12 @@ export function migrateProject(project) {
     if (track.pan === undefined) track.pan = 0.0;
     if (track.mute === undefined) track.mute = false;
     if (track.solo === undefined) track.solo = false;
+    if (!track.midiInput || typeof track.midiInput !== "object") {
+      track.midiInput = { deviceId: null, channel: "omni", enabled: true };
+    }
+    if (!track.midiOutput || typeof track.midiOutput !== "object") {
+      track.midiOutput = { deviceId: null, channel: 1, enabled: false };
+    }
 
     // Normalize legacy velocities > 1.0
     for (const note of track.notes) {

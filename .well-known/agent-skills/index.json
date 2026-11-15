@@ -58,7 +58,7 @@
         {
           "name": "scdaw_set_transport",
           "url": "../../.agents/tools/scdaw_set_transport.json",
-          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+          "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
         },
         {
           "name": "scdaw_write_notes",
@@ -122,7 +122,7 @@
         {
           "name": "scdaw_set_transport",
           "url": "../../.agents/tools/scdaw_set_transport.json",
-          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+          "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
         },
         {
           "name": "scdaw_write_notes",
@@ -264,7 +264,7 @@
         {
           "name": "scdaw_set_transport",
           "url": "../../.agents/tools/scdaw_set_transport.json",
-          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+          "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
         },
         {
           "name": "scdaw_write_notes",
@@ -344,7 +344,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
         }
       ]
     },
@@ -380,7 +380,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
         }
       ]
     },
@@ -406,7 +406,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
         }
       ]
     },
@@ -457,7 +457,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
         }
       ]
     },
@@ -483,12 +483,12 @@
         {
           "name": "scdaw-statusbar",
           "url": "../../.agents/scripts/components/scdaw-statusbar.js",
-          "digest": "sha256:bf2fab707fd006fb7db631e1a572b77137d0c5469f5e74a04ad7d1780312f773"
+          "digest": "sha256:09392cb7d9205dfdb9069bd4b253963648b5e0231231875c44ab052db4c3e1b8"
         },
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
         }
       ]
     },
@@ -604,7 +604,7 @@
         {
           "name": "scdaw_set_transport",
           "url": "../../.agents/tools/scdaw_set_transport.json",
-          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+          "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
         },
         {
           "name": "scdaw_write_notes",
@@ -687,7 +687,7 @@
         {
           "name": "scdaw_set_transport",
           "url": "../../.agents/tools/scdaw_set_transport.json",
-          "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+          "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
         },
         {
           "name": "scdaw_write_notes",
@@ -771,6 +771,12 @@
       "digest": "sha256:454095a2cdfab8a6f9c9c1ca734d8bdc1f4456cf5d844b83e53c06abe6a69a3c"
     },
     {
+      "name": "scdaw_configure_midi",
+      "description": "Configures Web MIDI initialization, track MIDI input/output routing, MIDI Learn mappings, or commits captured live MIDI notes.",
+      "url": "../../.agents/tools/scdaw_configure_midi.json",
+      "digest": "sha256:69b7ce6b8c638aaed0fa05de3535c51ed43039187dd44c6efa406173595656fd"
+    },
+    {
       "name": "scdaw_describe_arrangement",
       "description": "Inspect and return a human-readable summary of the active project arrangement (tempo, signature, total bars, track roles, note counts, and looping state) to verify structure.",
       "url": "../../.agents/tools/scdaw_describe_arrangement.json",
@@ -799,6 +805,12 @@
       "description": "Read real-time peak and RMS audio decibel meter levels for master bus and all active tracks.",
       "url": "../../.agents/tools/scdaw_get_levels.json",
       "digest": "sha256:f47a9d496b48f1e3054c5bbc8f307b5273f33d252f8b78ffee09d1ae341780cd"
+    },
+    {
+      "name": "scdaw_get_midi_status",
+      "description": "Returns Web MIDI API support status, connected input/output ports, track MIDI routing, and active MIDI Learn mappings.",
+      "url": "../../.agents/tools/scdaw_get_midi_status.json",
+      "digest": "sha256:00958306c769818c06ee0a1cb546d7be3b07540dbb94de2b7a5b678d9be2e241"
     },
     {
       "name": "scdaw_get_project",
@@ -922,15 +934,21 @@
     },
     {
       "name": "scdaw_set_transport",
-      "description": "Update transport properties: BPM (40-240), signature ([4,4] or [3,4]), pattern length in bars (1-4), or swing factor (0-0.5).",
+      "description": "Update transport properties: BPM (40-240), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
       "url": "../../.agents/tools/scdaw_set_transport.json",
-      "digest": "sha256:3a8733942d120e50c78ee929b737cdc081800e29a6c4f86ba3657a3507903940"
+      "digest": "sha256:9bc97ed6af5f26df2adaf6fe3efabe36e5e5fa8d69ccef4f82c2fe86a152b9ed"
     },
     {
       "name": "scdaw_stop",
       "description": "Stop playback and rewind the transport playhead to the start of the loop.",
       "url": "../../.agents/tools/scdaw_stop.json",
       "digest": "sha256:382a85abab961ab9ce9cc7e5b6b764dce35c429d5f52c604699d539801ef4196"
+    },
+    {
+      "name": "scdaw_trigger_midi",
+      "description": "Triggers live MIDI events (note_on, note_off, sustain, pitch_bend, or panic) on a track or selected track.",
+      "url": "../../.agents/tools/scdaw_trigger_midi.json",
+      "digest": "sha256:bdbb83b0bd4c69e80c3151ab3bf9b978cfccd5fe03e310bee22093a8529d82a8"
     },
     {
       "name": "scdaw_undo",
@@ -950,7 +968,7 @@
       "name": "scdaw-browser",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-browser.",
       "url": "../../.agents/scripts/components/scdaw-browser.js",
-      "digest": "sha256:db240f67be40a01c60378d0a7ea515b9b374b742e7af4ab7acf4d50655ab5e7c"
+      "digest": "sha256:c6a061b8c2557601f5a7af40a3a0a7bc868ff8497d01a8a4cbc443f3e451c32d"
     },
     {
       "name": "scdaw-devices",
@@ -962,13 +980,19 @@
       "name": "scdaw-editor",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-editor.",
       "url": "../../.agents/scripts/components/scdaw-editor.js",
-      "digest": "sha256:0178b1692207f7d9188ae36e6a6a265b3dcf3a344f7b9a40001890a151130181"
+      "digest": "sha256:0c4abaca4fa1269fb587a6b8f8320bfc0ef5e4ed62a2bef8abe540627c2bf463"
     },
     {
       "name": "scdaw-knob",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-knob.",
       "url": "../../.agents/scripts/components/scdaw-knob.js",
       "digest": "sha256:7cb700fc2ea54482cf56ff3d5736e149165628c35e2b42e789ccd6e24c1748ab"
+    },
+    {
+      "name": "scdaw-midi-keyboard",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-midi-keyboard.",
+      "url": "../../.agents/scripts/components/scdaw-midi-keyboard.js",
+      "digest": "sha256:f6b013aff6233be9fe7a1f691cc1138453dcec477853d5f3615c3babd08ad193"
     },
     {
       "name": "scdaw-mixer",
@@ -986,13 +1010,13 @@
       "name": "scdaw-sequencer",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-sequencer.",
       "url": "../../.agents/scripts/components/scdaw-sequencer.js",
-      "digest": "sha256:6e0d7d19e2afa6a54c22ede16e359d3e9882c8c5c96d6ce41645ef31829f74ff"
+      "digest": "sha256:680e8c24d4351e91a0b57f82e3b04f95867c952c19cd14e6f0c9c5f6d7a88535"
     },
     {
       "name": "scdaw-statusbar",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-statusbar.",
       "url": "../../.agents/scripts/components/scdaw-statusbar.js",
-      "digest": "sha256:bf2fab707fd006fb7db631e1a572b77137d0c5469f5e74a04ad7d1780312f773"
+      "digest": "sha256:09392cb7d9205dfdb9069bd4b253963648b5e0231231875c44ab052db4c3e1b8"
     },
     {
       "name": "scdaw-styles",
@@ -1004,25 +1028,25 @@
       "name": "scdaw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-timeline.",
       "url": "../../.agents/scripts/components/scdaw-timeline.js",
-      "digest": "sha256:bafd49b4d2b15a7d1c4f96c77f34553956b5400b705ada254b9a56a89b28eb68"
+      "digest": "sha256:bc54c5fe3a3aea55fa6706152eefc34731db70ea957258270bdb6a14b2e0e828"
     },
     {
       "name": "scdaw-transport",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-transport.",
       "url": "../../.agents/scripts/components/scdaw-transport.js",
-      "digest": "sha256:e50b2caaa1bc8a3017e0c4cbd2d261ff864f0af13b55962977437b679578008e"
+      "digest": "sha256:f785d57431f43b74c1f6d978c6eee6a96864d0f4291c21e3007908e4c8c42f81"
     },
     {
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:f1a22938c9f320522e1831a354ca17b39a130421e38676cc3bb95348b932f56e"
+      "digest": "sha256:9f9c7286fedde81ca90a356d73dbd568162946a04bc886422b04cc53456d287c"
     },
     {
       "name": "scdaw-adapter",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
       "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:ca9392251f44f513c45c5dc29cf39deb14e4dbbc153f23467642a690493be21b"
+      "digest": "sha256:d813cbc02552f8be787d08e616aa943e7dc619e5fd273b1896ac0f4028565f97"
     },
     {
       "name": "scdaw-compose",
@@ -1058,7 +1082,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:d1c8605ef40b2ce302a811d3d1e44a78830a80848d661a9aa3e513168e7c535f"
+      "digest": "sha256:dbb2ccb26e38a714021b5b86a2bb0721de05a2aaeb4f0a887cc3f1ae99848b2c"
     },
     {
       "name": "scdaw-fs",
@@ -1070,13 +1094,19 @@
       "name": "scdaw-instruments",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
       "url": "../../.agents/scripts/scdaw-instruments.js",
-      "digest": "sha256:08c7848fcc828516179a2290e85c43b5e3abea3f134fd8432cd1a29f785d8209"
+      "digest": "sha256:7b98a65c03b29c31547719b8309c8a5079b2ed18cadeaf3a9a5d49bb605f8d89"
+    },
+    {
+      "name": "scdaw-midi-io",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-midi-io.",
+      "url": "../../.agents/scripts/scdaw-midi-io.js",
+      "digest": "sha256:71a6225541fe2c52a20dcabad7ba95b4fcf8dff3b01ef8196c5332704e17d4dd"
     },
     {
       "name": "scdaw-midi",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-midi.",
       "url": "../../.agents/scripts/scdaw-midi.js",
-      "digest": "sha256:9a22f029264a959a2ffcae46c3e7856b0a25fb1e10ebb9b2400fc6720be93504"
+      "digest": "sha256:d272dc4fe177ad3e007b87afc063132ccf8d5b89e86298e512604b8845fe2a74"
     },
     {
       "name": "scdaw-presets",
@@ -1094,7 +1124,7 @@
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:074be3a645cb27d273fa1910dda46250c008b7b8c0491249aedd3a0f82de5f71"
+      "digest": "sha256:8cf0a3707e387cb7457e7febcd446f8b3810d77a5abab84410a13d081a042719"
     },
     {
       "name": "scdaw-signals",
@@ -1112,7 +1142,7 @@
       "name": "scdaw-tools-metadata",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-tools-metadata.",
       "url": "../../.agents/scripts/scdaw-tools-metadata.js",
-      "digest": "sha256:f811902bea393d5b61529af82bc913da3b6da3eec32bd1a4dd7be48776f8055e"
+      "digest": "sha256:a4812f395bcf26495ccf81d633ef39721972634d0dc0df0f1e20c25c532535aa"
     },
     {
       "name": "scdaw-url-param",
@@ -1130,7 +1160,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:ded4072402e879cde1880d9b2bdc78b00a865aa87e7389bd3d5adc32f1a0ed42"
+      "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
     },
     {
       "name": "starter-tools",
@@ -1159,11 +1189,13 @@
       "../../.agents/tools/scdaw_clear_project_notes.json",
       "../../.agents/tools/scdaw_compose_song.json",
       "../../.agents/tools/scdaw_configure_fx.json",
+      "../../.agents/tools/scdaw_configure_midi.json",
       "../../.agents/tools/scdaw_describe_arrangement.json",
       "../../.agents/tools/scdaw_export_midi.json",
       "../../.agents/tools/scdaw_export_project.json",
       "../../.agents/tools/scdaw_export_stems.json",
       "../../.agents/tools/scdaw_get_levels.json",
+      "../../.agents/tools/scdaw_get_midi_status.json",
       "../../.agents/tools/scdaw_get_project.json",
       "../../.agents/tools/scdaw_get_status.json",
       "../../.agents/tools/scdaw_import_midi.json",
@@ -1186,6 +1218,7 @@
       "../../.agents/tools/scdaw_set_track_send.json",
       "../../.agents/tools/scdaw_set_transport.json",
       "../../.agents/tools/scdaw_stop.json",
+      "../../.agents/tools/scdaw_trigger_midi.json",
       "../../.agents/tools/scdaw_undo.json",
       "../../.agents/tools/scdaw_write_notes.json"
     ],
@@ -1194,6 +1227,7 @@
       "../../.agents/scripts/components/scdaw-devices.js",
       "../../.agents/scripts/components/scdaw-editor.js",
       "../../.agents/scripts/components/scdaw-knob.js",
+      "../../.agents/scripts/components/scdaw-midi-keyboard.js",
       "../../.agents/scripts/components/scdaw-mixer.js",
       "../../.agents/scripts/components/scdaw-resize-handle.js",
       "../../.agents/scripts/components/scdaw-sequencer.js",
@@ -1211,6 +1245,7 @@
       "../../.agents/scripts/scdaw-engine.js",
       "../../.agents/scripts/scdaw-fs.js",
       "../../.agents/scripts/scdaw-instruments.js",
+      "../../.agents/scripts/scdaw-midi-io.js",
       "../../.agents/scripts/scdaw-midi.js",
       "../../.agents/scripts/scdaw-presets.js",
       "../../.agents/scripts/scdaw-recorder.js",

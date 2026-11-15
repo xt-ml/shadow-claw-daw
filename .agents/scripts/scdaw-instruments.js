@@ -78,9 +78,15 @@ export function createVoiceHandle(
     50,
     Math.round((stopTime - (ctx?.currentTime || 0)) * 1000 + 100),
   );
-  const safetyTimeout = setTimeout(cleanup, delayMs);
+  let safetyTimeout = setTimeout(cleanup, delayMs);
+  if (typeof safetyTimeout?.unref === "function") safetyTimeout.unref();
 
   const voice = {
+    _rescheduleCleanup: (nextDelayMs) => {
+      clearTimeout(safetyTimeout);
+      safetyTimeout = setTimeout(cleanup, Math.max(20, nextDelayMs));
+      if (typeof safetyTimeout?.unref === "function") safetyTimeout.unref();
+    },
     stop: (t = 0) => {
       clearTimeout(safetyTimeout);
       for (const src of sourcesToStop) {
@@ -90,6 +96,10 @@ export function createVoiceHandle(
       }
       cleanup();
     },
+    release: (t = 0) => {
+      voice.stop(t);
+    },
+    setPitchBend: () => {},
     disconnect: () => {
       clearTimeout(safetyTimeout);
       cleanup();
@@ -466,7 +476,9 @@ export function triggerSynth(
   params = {},
   bpm = 120,
   trackVolume = 1,
+  options = {},
 ) {
+  const gate = Boolean(options?.gate);
   const pitch = note.pitch ?? 60;
   const velocity = Math.max(
     0.01,
@@ -539,10 +551,12 @@ export function triggerSynth(
   const sustainVal = Math.max(0.0001, peakVal * sustain);
   amp.gain.linearRampToValueAtTime(sustainVal, when + attack + decay);
 
-  // Release stage
+  // Release stage (scheduled immediately unless gate=true for live MIDI)
   const releaseStart = when + durationSec;
-  amp.gain.setValueAtTime(sustainVal, releaseStart);
-  amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
+  if (!gate) {
+    amp.gain.setValueAtTime(sustainVal, releaseStart);
+    amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
+  }
 
   osc1.connect(filter);
 
@@ -592,7 +606,7 @@ export function triggerSynth(
   amp.connect(dest);
 
   osc1.start(when);
-  const stopTime = releaseStart + release + 0.05;
+  const stopTime = gate ? when + 30 : releaseStart + release + 0.05;
   osc1.stop(stopTime);
   if (osc2) osc2.stop(stopTime);
   if (subOsc) subOsc.stop(stopTime);
@@ -603,6 +617,46 @@ export function triggerSynth(
     stopTime,
     ctx,
   );
+  let released = false;
+  let currentDetune = Number(params.detune || 0);
+  let currentOsc2Detune = Number(params.osc2Detune || 0);
+  handle.release = (releaseAt = ctx.currentTime) => {
+    if (released) return;
+    released = true;
+    const t = Math.max(when, releaseAt);
+    try {
+      if (typeof amp.gain.cancelAndHoldAtTime === "function") {
+        amp.gain.cancelAndHoldAtTime(t);
+      } else {
+        if (typeof amp.gain.cancelScheduledValues === "function") {
+          amp.gain.cancelScheduledValues(t);
+        }
+        const curVal = Math.max(0.0001, Number(amp.gain.value ?? sustainVal));
+        amp.gain.setValueAtTime(curVal, t);
+      }
+      amp.gain.exponentialRampToValueAtTime(0.0001, t + release);
+      if (typeof amp.gain.linearRampToValueAtTime === "function") {
+        amp.gain.linearRampToValueAtTime(0, t + release + 0.015);
+      }
+      const endT = t + release + 0.03;
+      if (typeof osc1.stop === "function") osc1.stop(endT);
+      if (osc2 && typeof osc2.stop === "function") osc2.stop(endT);
+      if (subOsc && typeof subOsc.stop === "function") subOsc.stop(endT);
+    } catch (_) {}
+  };
+  handle.setPitchBend = (semitones = 0, now = ctx.currentTime) => {
+    const bendCents = Number(semitones) * 100;
+    try {
+      if (osc1.detune)
+        osc1.detune.setValueAtTime(currentDetune + bendCents, now);
+      if (osc2 && osc2.detune) {
+        osc2.detune.setValueAtTime(currentOsc2Detune + bendCents, now);
+      }
+      if (subOsc && subOsc.detune) {
+        subOsc.detune.setValueAtTime(bendCents, now);
+      }
+    } catch (_) {}
+  };
   handle.updateParams = (nextParams = {}, now = ctx.currentTime) => {
     try {
       if (nextParams.cutoff !== undefined && filter.frequency) {
@@ -1483,6 +1537,8 @@ export function triggerInstrumentVoice(ctx, dest, event, when, bpm = 120) {
     case "vaporisateur":
     case "synth":
     default:
-      return triggerSynth(ctx, dest, event.note, when, params, bpm, trackVol);
+      return triggerSynth(ctx, dest, event.note, when, params, bpm, trackVol, {
+        gate: Boolean(event.gate),
+      });
   }
 }

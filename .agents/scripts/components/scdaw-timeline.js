@@ -1705,12 +1705,10 @@ export class DawTimelineElement extends BaseElement {
                       <button type="button" class="btn btn-icon btn-danger delete-track-btn scdaw-timeline__btn--delete" data-track="${t.id}" aria-label="Delete ${t.name}" title="Delete ${t.name}">✕</button>
                     </div>
                     <div class="scdaw-timeline__controls">
+                      <button type="button" class="btn btn-icon ${t.recordArm ? "btn-danger" : ""} record-arm-btn scdaw-timeline__btn scdaw-timeline__btn--arm" data-track="${t.id}" aria-label="${t.recordArm ? `Disarm recording for ${t.name}` : `Arm recording for ${t.name}`}" aria-pressed="${Boolean(t.recordArm)}" title="${t.recordArm ? "Disarm recording" : "Record arm"}">● R</button>
                       ${
                         t.kind === "audio"
-                          ? `
-                        <button type="button" class="btn btn-icon ${t.recordArm ? "btn-danger" : ""} record-arm-btn scdaw-timeline__btn scdaw-timeline__btn--arm" data-track="${t.id}" aria-label="${t.recordArm ? `Disarm recording for ${t.name}` : `Arm recording for ${t.name}`}" aria-pressed="${Boolean(t.recordArm)}" title="${t.recordArm ? "Disarm recording" : "Record arm"}">● R</button>
-                        <button type="button" class="btn btn-icon import-audio-btn scdaw-timeline__btn" data-track="${t.id}" aria-label="Import audio file into ${t.name}" title="Import WAV or Audio File">📂</button>
-                      `
+                          ? `<button type="button" class="btn btn-icon import-audio-btn scdaw-timeline__btn" data-track="${t.id}" aria-label="Import audio file into ${t.name}" title="Import WAV or Audio File">📂</button>`
                           : ""
                       }
                       <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} scdaw-timeline__btn mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}" title="${t.mute ? `Unmute ${t.name}` : `Mute ${t.name}`}">M</button>

@@ -18,8 +18,8 @@ import {
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
-const MIN_PITCH = 24; // C1
-const MAX_PITCH = 84; // C6
+const MIN_PITCH = 0; // C-1
+const MAX_PITCH = 127; // G9
 
 export function pitchToPianoRollRow(pitch) {
   const p = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.round(pitch)));
@@ -79,8 +79,8 @@ export function resolveEditorScrollPosition({
   notes = [],
   rowHeight = 22,
   viewportHeight = 340,
-  minPitch = 36,
-  maxPitch = 72,
+  minPitch = MIN_PITCH,
+  maxPitch = MAX_PITCH,
 } = {}) {
   if (
     currentScrollTop !== null &&
@@ -90,25 +90,20 @@ export function resolveEditorScrollPosition({
     return Math.max(0, currentScrollTop);
   }
 
-  // If there are notes, center the viewport around the median/lowest note pitch
-  if (notes && notes.length > 0) {
-    const pitches = notes
-      .map((n) => n.pitch)
-      .filter((p) => typeof p === "number");
-    if (pitches.length > 0) {
-      const avgPitch = Math.round(
-        pitches.reduce((a, b) => a + b, 0) / pitches.length,
-      );
-      const clampedPitch = Math.max(minPitch, Math.min(maxPitch, avgPitch));
-      const row = maxPitch - clampedPitch;
-      const targetY = row * rowHeight;
-      const centered =
-        targetY - Math.floor(viewportHeight / 2) + Math.floor(rowHeight / 2);
-      return Math.max(0, centered);
-    }
-  }
-
-  return 0;
+  // If there are notes, center the viewport around the average note pitch; otherwise C4 (60)
+  const pitches = Array.isArray(notes)
+    ? notes.map((n) => n.pitch).filter((p) => typeof p === "number")
+    : [];
+  const targetPitch =
+    pitches.length > 0
+      ? Math.round(pitches.reduce((a, b) => a + b, 0) / pitches.length)
+      : 60;
+  const clampedPitch = Math.max(minPitch, Math.min(maxPitch, targetPitch));
+  const row = maxPitch - clampedPitch;
+  const targetY = row * rowHeight;
+  const centered =
+    targetY - Math.floor(viewportHeight / 2) + Math.floor(rowHeight / 2);
+  return Math.max(0, centered);
 }
 
 function computeNotesSignature(notes) {
@@ -308,9 +303,9 @@ export class DawEditorElement extends BaseElement {
       }
     }
 
-    // Build octave pitch rows (C6 down to C1)
+    // Build all MIDI octave pitch rows (G9 down to C-1)
     const rows = [];
-    for (let pitch = 72; pitch >= 36; pitch--) {
+    for (let pitch = MAX_PITCH; pitch >= MIN_PITCH; pitch--) {
       rows.push({
         pitch,
         name: pitchToName(pitch),

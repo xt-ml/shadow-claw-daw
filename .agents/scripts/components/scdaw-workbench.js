@@ -32,6 +32,7 @@ import "./scdaw-sequencer.js";
 import "./scdaw-devices.js";
 import "./scdaw-mixer.js";
 import "./scdaw-statusbar.js";
+import "./scdaw-midi-keyboard.js";
 import "./scdaw-resize-handle.js";
 
 // Ensure <shadow-claw-dialog> custom element is available via CDN
@@ -476,6 +477,26 @@ export class DawWorkbenchElement extends BaseElement {
     ) {
       this._onHashChange = () => this._checkFileUrlParam();
       window.addEventListener("hashchange", this._onHashChange);
+      this._onMidiKeyDown = (e) => {
+        const kbd = this.shadowRoot?.getElementById("midi-keyboard");
+        if (!kbd || kbd.hidden) return;
+        const tag = e.composedPath?.()?.[0]?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        scdaw.midi?.software?.keyDown?.(e.key, { repeat: e.repeat });
+      };
+      this._onMidiKeyUp = (e) => {
+        const kbd = this.shadowRoot?.getElementById("midi-keyboard");
+        if (!kbd || kbd.hidden) return;
+        scdaw.midi?.software?.keyUp?.(e.key);
+      };
+      window.addEventListener("keydown", this._onMidiKeyDown);
+      window.addEventListener("keyup", this._onMidiKeyUp);
+    }
+    if (typeof this.shadowRoot?.addEventListener === "function") {
+      this.shadowRoot.addEventListener("toggle-midi-keyboard", (e) => {
+        const kbd = this.shadowRoot?.getElementById("midi-keyboard");
+        if (kbd) kbd.hidden = !e.detail?.visible;
+      });
     }
     this._dispose = effect(() => {
       const p = scdaw.project.get();
@@ -1181,7 +1202,7 @@ export class DawWorkbenchElement extends BaseElement {
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History, Output, and Display">
               <button id="undo-btn" class="scdaw-workbench__btn btn btn-icon" title="Undo last change">↩ Undo</button>
-              <button id="bounce-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Export 16-bit WAV audio">💿 Bounce WAV</button>
+              <button id="bounce-btn" class="scdaw-workbench__btn btn btn-icon btn-primary" title="Export 16-bit WAV audio" hidden="hidden">💿 Bounce WAV</button>
               <button
                 id="fullscreen-btn"
                 type="button"
@@ -1247,6 +1268,7 @@ export class DawWorkbenchElement extends BaseElement {
           </div>
         </main>
 
+        <scdaw-midi-keyboard id="midi-keyboard" hidden></scdaw-midi-keyboard>
         <footer class="scdaw-workbench__footer" style="margin-top:0.6rem;" role="contentinfo">
           <scdaw-statusbar></scdaw-statusbar>
         </footer>

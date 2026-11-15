@@ -612,6 +612,105 @@ export const TOOLS = [
     },
   },
   {
+    name: "scdaw_get_midi_status",
+    description:
+      "Returns Web MIDI API support status, connected input/output ports, track MIDI routing, and active MIDI Learn mappings.",
+    input_schema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_get_midi_status", 5000),
+    },
+  },
+  {
+    name: "scdaw_configure_midi",
+    description:
+      "Configures Web MIDI initialization, track MIDI input/output routing, MIDI Learn mappings, or commits captured live MIDI notes.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "init",
+            "set_routing",
+            "set_learn",
+            "remove_learn",
+            "commit_captured",
+          ],
+          description: "MIDI configuration action to perform",
+        },
+        trackId: { type: "string", description: "Target track ID" },
+        midiInput: { type: "object", description: "Track MIDI input config" },
+        midiOutput: { type: "object", description: "Track MIDI output config" },
+        id: {
+          type: "string",
+          description: "Mapping ID for set_learn/remove_learn",
+        },
+        deviceId: { type: "string" },
+        channel: { type: ["integer", "string"] },
+        cc: { type: "integer" },
+        param: { type: "string" },
+        min: { type: "number" },
+        max: { type: "number" },
+        scaling: { type: "string", enum: ["linear", "exponential"] },
+        sysex: { type: "boolean" },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_configure_midi", 5000),
+    },
+  },
+  {
+    name: "scdaw_trigger_midi",
+    description:
+      "Triggers live MIDI events (note_on, note_off, sustain, pitch_bend, or panic) on a track or selected track.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["note_on", "note_off", "sustain", "pitch_bend", "panic"],
+          description: "Live MIDI action",
+        },
+        trackId: { type: "string", description: "Target track ID" },
+        pitch: { type: "integer", minimum: 0, maximum: 127 },
+        velocity: { type: "number", minimum: 0, maximum: 1 },
+        down: { type: "boolean", description: "Sustain pedal state" },
+        value: {
+          type: "number",
+          minimum: -1,
+          maximum: 1,
+          description: "Normalized pitch bend",
+        },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_trigger_midi", 5000),
+    },
+  },
+  {
     name: "scdaw_import_midi",
     description:
       "Imports a Standard MIDI File (.mid) buffer or base64 data into the DAW project or a target track.",
