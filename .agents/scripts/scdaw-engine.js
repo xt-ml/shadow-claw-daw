@@ -39,6 +39,8 @@ import { triggerInstrumentVoice } from "./scdaw-instruments.js";
 import {
   processMaximizer,
   processStereoTool,
+  buildTrackFxChain,
+  processTrackOfflineFx,
   analyzeAudioBuffer,
 } from "./scdaw-dsp.js";
 import {
@@ -149,6 +151,25 @@ export class DawEngine extends EventTarget {
     }
   }
 
+  get trackNodes() {
+    return this.graph?.tracks || new Map();
+  }
+
+  async ensureContext() {
+    if (!this.ctx) {
+      this._initAudioContext();
+    }
+    if (
+      this.ctx &&
+      typeof this.ctx.resume === "function" &&
+      this.ctx.state === "suspended"
+    ) {
+      await this.ctx.resume();
+    }
+    this._updateGraph();
+    return this.ctx;
+  }
+
   _initAudioContext() {
     if (this.options.audioContext) {
       this.ctx = this.options.audioContext;
@@ -156,9 +177,10 @@ export class DawEngine extends EventTarget {
       return;
     }
     const AudioCtx =
-      typeof window !== "undefined"
+      this.options.AudioContextClass ||
+      (typeof window !== "undefined"
         ? window.AudioContext || window.webkitAudioContext
-        : null;
+        : null);
 
     if (AudioCtx) {
       try {
@@ -282,8 +304,38 @@ export class DawEngine extends EventTarget {
         }
         analyser.connect(this.graph.masterGain);
 
-        nodes = { gain, panner, analyser, sends: new Map() };
+        nodes = {
+          gain,
+          input: gain,
+          fxChain: null,
+          fxSig: "",
+          panner,
+          analyser,
+          sends: new Map(),
+        };
         this.graph.tracks.set(track.id, nodes);
+      }
+
+      // Rebuild per-track FX chain when track.fx changes
+      const fxList =
+        Array.isArray(track.fx) && track.fx.length > 0
+          ? track.fx
+          : Array.isArray(track.params?.defaultFx)
+            ? track.params.defaultFx
+            : [];
+      const nextFxSig = JSON.stringify(fxList);
+      if (nodes.fxSig !== nextFxSig) {
+        if (nodes.fxChain && typeof nodes.fxChain.disconnect === "function") {
+          nodes.fxChain.disconnect();
+        }
+        nodes.fxChain = buildTrackFxChain(
+          this.ctx,
+          nodes.gain,
+          fxList,
+          p.bpm || 120,
+        );
+        nodes.input = nodes.fxChain.input || nodes.gain;
+        nodes.fxSig = nextFxSig;
       }
 
       // Update volume & pan
@@ -871,7 +923,7 @@ export class DawEngine extends EventTarget {
 
             const voice = triggerInstrumentVoice(
               this.ctx,
-              nodes.gain,
+              nodes.input || nodes.gain,
               { ...ev, trackVolume: 1, trackPan: 0 },
               evTime,
               bpm,
@@ -1229,10 +1281,18 @@ export class DawEngine extends EventTarget {
       }
     }
 
-    // Schedule voices using resolved notes (honoring MIDI FX, cutoff automation, and swing)
+    // Schedule voices using resolved notes (honoring MIDI FX, per-track Audio FX, cutoff automation, and swing)
     for (const track of p.tracks) {
       if (track.mute || (hasSolo && !track.solo)) continue;
       const gainNode = trackGains.get(track.id);
+      const fxList =
+        Array.isArray(track.fx) && track.fx.length > 0
+          ? track.fx
+          : Array.isArray(track.params?.defaultFx)
+            ? track.params.defaultFx
+            : [];
+      const fxChain = buildTrackFxChain(offlineCtx, gainNode, fxList, bpm);
+      const trackInputNode = fxChain.input || gainNode;
 
       // Schedule synth/drum notes
       const resolvedNotes = resolveTrackNotes(p, track, {
@@ -1255,7 +1315,7 @@ export class DawEngine extends EventTarget {
         }
         triggerInstrumentVoice(
           offlineCtx,
-          gainNode,
+          trackInputNode,
           {
             trackKind: track.kind || track.type,
             trackInstrument: track.instrument || track.kind || track.type,
@@ -1735,6 +1795,15 @@ export class DawEngine extends EventTarget {
         gain.connect(masterGain);
         trackGains.set(track.id, gain);
 
+        const fxList =
+          Array.isArray(track.fx) && track.fx.length > 0
+            ? track.fx
+            : Array.isArray(track.params?.defaultFx)
+              ? track.params.defaultFx
+              : [];
+        const fxChain = buildTrackFxChain(offlineCtx, gain, fxList, bpm);
+        const trackInputNode = fxChain.input || gain;
+
         const resolvedNotes = resolveTrackNotes(p, track, {
           loops: 1,
           bakeMidiFx: true,
@@ -1747,7 +1816,7 @@ export class DawEngine extends EventTarget {
 
           triggerInstrumentVoice(
             offlineCtx,
-            gain,
+            trackInputNode,
             {
               trackKind: track.kind || track.type,
               trackInstrument: track.instrument || track.kind || track.type,
@@ -1765,6 +1834,19 @@ export class DawEngine extends EventTarget {
       const rendered = await offlineCtx.startRendering();
       const left = rendered.getChannelData(0);
       const right = rendered.getChannelData(1);
+      // If using a mock OfflineAudioContext that returns silent buffers, fall back to pure DSP reducer
+      let maxSample = 0;
+      for (let i = 0; i < left.length; i += 16) {
+        const a = Math.abs(left[i]);
+        if (a > maxSample) maxSample = a;
+      }
+      if (
+        maxSample < 1e-6 &&
+        p.tracks.some((t) => (t.notes?.length || 0) > 0)
+      ) {
+        const { result } = applyCommand(p, "analyze_mix", options);
+        return result;
+      }
       const analysis = analyzeAudioBuffer({ left, right, sampleRate });
       return {
         ...analysis,

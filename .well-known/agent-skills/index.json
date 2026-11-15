@@ -18,7 +18,7 @@
         {
           "name": "scdaw_apply_preset",
           "url": "../../.agents/tools/scdaw_apply_preset.json",
-          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+          "digest": "sha256:05afda19ccf6f95408832b1efdb686311620a113888aaed9833eb6abe7b2b2d3"
         },
         {
           "name": "scdaw_get_project",
@@ -28,7 +28,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_new_project",
@@ -82,7 +82,7 @@
         {
           "name": "scdaw_apply_preset",
           "url": "../../.agents/tools/scdaw_apply_preset.json",
-          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+          "digest": "sha256:05afda19ccf6f95408832b1efdb686311620a113888aaed9833eb6abe7b2b2d3"
         },
         {
           "name": "scdaw_clear_notes",
@@ -97,7 +97,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_new_project",
@@ -180,7 +180,7 @@
         {
           "name": "scdaw_apply_preset",
           "url": "../../.agents/tools/scdaw_apply_preset.json",
-          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+          "digest": "sha256:05afda19ccf6f95408832b1efdb686311620a113888aaed9833eb6abe7b2b2d3"
         },
         {
           "name": "scdaw_get_project",
@@ -234,7 +234,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_new_project",
@@ -293,7 +293,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_reset",
@@ -344,7 +344,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+          "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
         }
       ]
     },
@@ -380,7 +380,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+          "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
         }
       ]
     },
@@ -406,7 +406,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+          "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
         }
       ]
     },
@@ -457,7 +457,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+          "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
         }
       ]
     },
@@ -488,7 +488,7 @@
         {
           "name": "scdaw",
           "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+          "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
         }
       ]
     },
@@ -515,7 +515,7 @@
         {
           "name": "scdaw_apply_preset",
           "url": "../../.agents/tools/scdaw_apply_preset.json",
-          "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+          "digest": "sha256:05afda19ccf6f95408832b1efdb686311620a113888aaed9833eb6abe7b2b2d3"
         },
         {
           "name": "scdaw_compose_song",
@@ -574,7 +574,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_new_project",
@@ -652,7 +652,7 @@
         {
           "name": "scdaw_manage_fx",
           "url": "../../.agents/tools/scdaw_manage_fx.json",
-          "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+          "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
         },
         {
           "name": "scdaw_new_project",
@@ -718,9 +718,9 @@
     },
     {
       "name": "scdaw_analyze_mix",
-      "description": "Analyze the current mix levels, dynamic range, clipping, and 3-band energy distribution (low, mid, high) across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, and actionable mix suggestions.",
+      "description": "Analyze the current mix levels, dynamic range, clipping, spectral centroid, 5-band energy distribution (sub, low, mid, highMid, high), and pitch sag across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, spectralCentroidHz, bandEnergy, and actionable mix suggestions.",
       "url": "../../.agents/tools/scdaw_analyze_mix.json",
-      "digest": "sha256:0f33cd71e696b004139538152e0fa94a0046adfdc595aa619c1e65ff148da135"
+      "digest": "sha256:f635dc300e330a1e9e66c86233f43546d16bd86f2dc118fe2fef0e59856de09a"
     },
     {
       "name": "scdaw_apply_groove",
@@ -730,9 +730,9 @@
     },
     {
       "name": "scdaw_apply_preset",
-      "description": "Apply a curated synthesizer preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead') to a synth track.",
+      "description": "Apply a curated synthesizer or SFX preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
       "url": "../../.agents/tools/scdaw_apply_preset.json",
-      "digest": "sha256:dfefbff9e13c94630c26012a14c9da4561346ee0990e4fef1c94e8b3342b529e"
+      "digest": "sha256:05afda19ccf6f95408832b1efdb686311620a113888aaed9833eb6abe7b2b2d3"
     },
     {
       "name": "scdaw_bounce",
@@ -768,7 +768,7 @@
       "name": "scdaw_configure_fx",
       "description": "Add, update, or remove an audio effect (autotune, vocoder, maximizer, tidal, transient, sidechain, fold, crusher, delay, reverb, stereoTool) on a track.",
       "url": "../../.agents/tools/scdaw_configure_fx.json",
-      "digest": "sha256:454095a2cdfab8a6f9c9c1ca734d8bdc1f4456cf5d844b83e53c06abe6a69a3c"
+      "digest": "sha256:4706e1fa740877ebc76ded5ee1ce74bd0bd3e34e7e6a9e875f3ef4ad870041c1"
     },
     {
       "name": "scdaw_configure_midi",
@@ -781,6 +781,12 @@
       "description": "Inspect and return a human-readable summary of the active project arrangement (tempo, signature, total bars, track roles, note counts, and looping state) to verify structure.",
       "url": "../../.agents/tools/scdaw_describe_arrangement.json",
       "digest": "sha256:6a4ab858136820c9272f2c5662a8b6a1c43bb249e865b6ad90a189046a218577"
+    },
+    {
+      "name": "scdaw_design_sound",
+      "description": "Configure a track in one call from a studio sound recipe ('dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') with full synthesis parameters, per-track FX chain, and optional default musical pattern.",
+      "url": "../../.agents/tools/scdaw_design_sound.json",
+      "digest": "sha256:0771789ac514f6ad76dda463c5ff7d81b0ebe072056f81090fb7c8b604845720"
     },
     {
       "name": "scdaw_export_midi",
@@ -837,6 +843,12 @@
       "digest": "sha256:5727f2a4a984d1fce3d46124b48c4f1b2b080ad68bcf220777359dd01a803c57"
     },
     {
+      "name": "scdaw_list_schemas",
+      "description": "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, and sound presets.",
+      "url": "../../.agents/tools/scdaw_list_schemas.json",
+      "digest": "sha256:c1bb5766e215735505bce2724ff2759d0243f3a6b058b39f7676f8330ad8d03c"
+    },
+    {
       "name": "scdaw_load_project",
       "description": "Validate and load a complete DAW project schema into the active workbench session, or load an existing project file from OPFS conversation storage.",
       "url": "../../.agents/tools/scdaw_load_project.json",
@@ -846,7 +858,7 @@
       "name": "scdaw_manage_fx",
       "description": "Add, update, reset, or remove an audio effect ('fold', 'crusher', 'stereoTool', 'delay', 'reverb', 'compressor', 'revamp') or MIDI effect ('arpeggio', 'pitch', 'velocity') on a track.",
       "url": "../../.agents/tools/scdaw_manage_fx.json",
-      "digest": "sha256:155c60dbd8ffd158abaea058800bdeaff90ffa3570b9987c1fee6a5ffbd7799d"
+      "digest": "sha256:63d61f3d9f9cf6dc0d8adb43c2755856e448be717203a8038810bd76bfd19399"
     },
     {
       "name": "scdaw_new_project",
@@ -1046,7 +1058,7 @@
       "name": "scdaw-adapter",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
       "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:d813cbc02552f8be787d08e616aa943e7dc619e5fd273b1896ac0f4028565f97"
+      "digest": "sha256:7dc958e381beda7abd6d39bae24941a556280aea37335fca7b98d5c9f7238ddf"
     },
     {
       "name": "scdaw-compose",
@@ -1070,7 +1082,7 @@
       "name": "scdaw-dsp",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-dsp.",
       "url": "../../.agents/scripts/scdaw-dsp.js",
-      "digest": "sha256:4c8e168bf4d8566956a478fa0438ea454a63f4871c4b2f8acf6caf7da6ffb37c"
+      "digest": "sha256:ba1040b3ea7b4bebebc3bee848cad0e4d0182f6d2f079827fee5b2e6641696e4"
     },
     {
       "name": "scdaw-element",
@@ -1082,7 +1094,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:dbb2ccb26e38a714021b5b86a2bb0721de05a2aaeb4f0a887cc3f1ae99848b2c"
+      "digest": "sha256:d0d8ded402cf609e24a1aa7c666100b28249c10a7f65e08c771b9078a675111b"
     },
     {
       "name": "scdaw-fs",
@@ -1094,7 +1106,7 @@
       "name": "scdaw-instruments",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
       "url": "../../.agents/scripts/scdaw-instruments.js",
-      "digest": "sha256:e7f619df8e815caa529171a4b3d258bb1abc02d58f918ea4eb39248e120a4963"
+      "digest": "sha256:4ffe33d5590fdda66ee1dfbbeff49348776f7a7a9a528a36fa3c1701031b593d"
     },
     {
       "name": "scdaw-midi-io",
@@ -1112,7 +1124,7 @@
       "name": "scdaw-presets",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-presets.",
       "url": "../../.agents/scripts/scdaw-presets.js",
-      "digest": "sha256:a80b138ec8f6bed1060cc439ab12ccc05f3a3fd22e9b1859e4f1785439a07d46"
+      "digest": "sha256:7d947c9a1f39c729b082773ccb263c2b17ad32df04e0d2e3bce49ddef76d72ea"
     },
     {
       "name": "scdaw-recorder",
@@ -1124,7 +1136,7 @@
       "name": "scdaw-schema",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
       "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:8cf0a3707e387cb7457e7febcd446f8b3810d77a5abab84410a13d081a042719"
+      "digest": "sha256:57246495924ce65a3bf5ecb910eb1a8f33532981a1baa94f0629b4b17862bad2"
     },
     {
       "name": "scdaw-signals",
@@ -1142,7 +1154,7 @@
       "name": "scdaw-tools-metadata",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-tools-metadata.",
       "url": "../../.agents/scripts/scdaw-tools-metadata.js",
-      "digest": "sha256:a4812f395bcf26495ccf81d633ef39721972634d0dc0df0f1e20c25c532535aa"
+      "digest": "sha256:03c607067e9769558da8c25c161cf1c2fd1981bd30f8df943d57e95d89c694de"
     },
     {
       "name": "scdaw-url-param",
@@ -1160,7 +1172,7 @@
       "name": "scdaw",
       "description": "Portable ESM engine logic and tool execution handler for scdaw.",
       "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:d3bc47eb80d4e782100f27cb62cf8aa92da4d4ed11a184aadce921c5e7e4c4e4"
+      "digest": "sha256:b65abefc36dc1226384f5e021b2dd361ce7686ed88f57c07cd0ae495bcbbed2d"
     },
     {
       "name": "starter-tools",
@@ -1191,6 +1203,7 @@
       "../../.agents/tools/scdaw_configure_fx.json",
       "../../.agents/tools/scdaw_configure_midi.json",
       "../../.agents/tools/scdaw_describe_arrangement.json",
+      "../../.agents/tools/scdaw_design_sound.json",
       "../../.agents/tools/scdaw_export_midi.json",
       "../../.agents/tools/scdaw_export_project.json",
       "../../.agents/tools/scdaw_export_stems.json",
@@ -1200,6 +1213,7 @@
       "../../.agents/tools/scdaw_get_status.json",
       "../../.agents/tools/scdaw_import_midi.json",
       "../../.agents/tools/scdaw_import_project.json",
+      "../../.agents/tools/scdaw_list_schemas.json",
       "../../.agents/tools/scdaw_load_project.json",
       "../../.agents/tools/scdaw_manage_fx.json",
       "../../.agents/tools/scdaw_new_project.json",

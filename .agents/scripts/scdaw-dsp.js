@@ -749,6 +749,651 @@ export function createGuitarOverdriveCurve(
 }
 
 /**
+ * Generates an openDAW-style multi-equation waveshaper transfer curve.
+ * Equations: "hardclip" | "softclip" | "sigmoid" | "atan" | "sin" | "foldback"
+ *
+ * @param {string} equation - Transfer function type.
+ * @param {number} driveDb - Input drive in dB (0 to 30 dB).
+ * @param {number} numSamples - Curve resolution (default: 1024).
+ * @returns {Float32Array}
+ */
+export function createWaveshaperCurve(
+  equation = "softclip",
+  driveDb = 6,
+  numSamples = 1024,
+) {
+  const curve = new Float32Array(numSamples);
+  const gain = Math.pow(10, (driveDb || 0) / 20);
+  const eq = String(equation || "softclip").toLowerCase();
+
+  for (let i = 0; i < numSamples; i++) {
+    const x = (i * 2) / (numSamples - 1) - 1;
+    const d = x * gain;
+    let y = d;
+    if (eq === "hardclip") {
+      y = Math.max(-1, Math.min(1, d));
+    } else if (eq === "sigmoid") {
+      y = 2 / (1 + Math.exp(-2 * d)) - 1;
+    } else if (eq === "atan") {
+      y = (2 / Math.PI) * Math.atan(d);
+    } else if (eq === "sin") {
+      y = Math.sin(Math.max(-Math.PI, Math.min(Math.PI, d)));
+    } else if (eq === "foldback") {
+      y = Math.sin(d * (Math.PI / 2));
+    } else {
+      // softclip (tanh)
+      y = Math.tanh(d);
+    }
+    curve[i] = Math.max(-1, Math.min(1, y));
+  }
+  return curve;
+}
+
+/**
+ * Pure biquad filter processor for offline audio rendering.
+ */
+function makeOfflineBiquad(
+  type,
+  freq,
+  q = 0.707,
+  gainDb = 0,
+  sampleRate = 44100,
+) {
+  const clampedFreq = Math.max(20, Math.min(sampleRate * 0.48, freq || 1000));
+  const w0 = (2 * Math.PI * clampedFreq) / sampleRate;
+  const cosW0 = Math.cos(w0);
+  const sinW0 = Math.sin(w0);
+  const safeQ = Math.max(0.1, q || 0.707);
+  const alpha = sinW0 / (2 * safeQ);
+  const A = Math.pow(10, (gainDb || 0) / 40);
+
+  let b0 = 1,
+    b1 = 0,
+    b2 = 0,
+    a0 = 1,
+    a1 = 0,
+    a2 = 0;
+
+  if (type === "highpass") {
+    b0 = (1 + cosW0) / 2;
+    b1 = -(1 + cosW0);
+    b2 = (1 + cosW0) / 2;
+    a0 = 1 + alpha;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha;
+  } else if (type === "lowpass") {
+    b0 = (1 - cosW0) / 2;
+    b1 = 1 - cosW0;
+    b2 = (1 - cosW0) / 2;
+    a0 = 1 + alpha;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha;
+  } else if (type === "bandpass") {
+    b0 = alpha;
+    b1 = 0;
+    b2 = -alpha;
+    a0 = 1 + alpha;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha;
+  } else if (type === "peaking") {
+    b0 = 1 + alpha * A;
+    b1 = -2 * cosW0;
+    b2 = 1 - alpha * A;
+    a0 = 1 + alpha / A;
+    a1 = -2 * cosW0;
+    a2 = 1 - alpha / A;
+  } else if (type === "lowshelf") {
+    const twoSqrtAAlpha = 2 * Math.sqrt(A) * alpha;
+    b0 = A * (A + 1 - (A - 1) * cosW0 + twoSqrtAAlpha);
+    b1 = 2 * A * (A - 1 - (A + 1) * cosW0);
+    b2 = A * (A + 1 - (A - 1) * cosW0 - twoSqrtAAlpha);
+    a0 = A + 1 + (A - 1) * cosW0 + twoSqrtAAlpha;
+    a1 = -2 * (A - 1 + (A + 1) * cosW0);
+    a2 = A + 1 + (A - 1) * cosW0 - twoSqrtAAlpha;
+  } else if (type === "highshelf") {
+    const twoSqrtAAlpha = 2 * Math.sqrt(A) * alpha;
+    b0 = A * (A + 1 + (A - 1) * cosW0 + twoSqrtAAlpha);
+    b1 = -2 * A * (A - 1 + (A + 1) * cosW0);
+    b2 = A * (A + 1 + (A - 1) * cosW0 - twoSqrtAAlpha);
+    a0 = A + 1 - (A - 1) * cosW0 + twoSqrtAAlpha;
+    a1 = 2 * (A - 1 - (A + 1) * cosW0);
+    a2 = A + 1 - (A - 1) * cosW0 - twoSqrtAAlpha;
+  }
+
+  const nb0 = b0 / a0;
+  const nb1 = b1 / a0;
+  const nb2 = b2 / a0;
+  const na1 = a1 / a0;
+  const na2 = a2 / a0;
+
+  return {
+    processBuffer(buf) {
+      let x1 = 0,
+        x2 = 0,
+        y1 = 0,
+        y2 = 0;
+      const out = new Float32Array(buf.length);
+      for (let i = 0; i < buf.length; i++) {
+        const x = buf[i];
+        const y = nb0 * x + nb1 * x1 + nb2 * x2 - na1 * y1 - na2 * y2;
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+        out[i] = y;
+      }
+      return out;
+    },
+  };
+}
+
+/**
+ * Applies a transfer curve (Float32Array) to an audio buffer with dry/wet mix.
+ */
+function applyTransferCurve(input, curve, mix = 1.0) {
+  const len = input.length;
+  const out = new Float32Array(len);
+  const n = curve.length - 1;
+  const m = Math.max(0, Math.min(1, mix));
+  for (let i = 0; i < len; i++) {
+    const x = Math.max(-1, Math.min(1, input[i]));
+    const pos = (x + 1) * 0.5 * n;
+    const idx0 = Math.floor(pos);
+    const idx1 = Math.min(n, idx0 + 1);
+    const frac = pos - idx0;
+    const shaped = curve[idx0] * (1 - frac) + curve[idx1] * frac;
+    out[i] = input[i] * (1 - m) + shaped * m;
+  }
+  return out;
+}
+
+/**
+ * Pure sample-level offline FX chain processor for a track.
+ * Runs identically in Node.js and browser offline bounce / mix analysis.
+ *
+ * @param {Float32Array} left
+ * @param {Float32Array} right
+ * @param {Array<object>} trackFx
+ * @param {number} [bpm=120]
+ * @param {number} [sampleRate=44100]
+ * @returns {{ outLeft: Float32Array, outRight: Float32Array }}
+ */
+export function processTrackOfflineFx(
+  left,
+  right,
+  trackFx = [],
+  bpm = 120,
+  sampleRate = 44100,
+) {
+  let curL = new Float32Array(left);
+  let curR = new Float32Array(right || left);
+
+  if (!Array.isArray(trackFx) || trackFx.length === 0) {
+    return { outLeft: curL, outRight: curR };
+  }
+
+  const stepSec = 60 / Math.max(20, bpm || 120) / 4;
+
+  for (const rawFx of trackFx) {
+    if (!rawFx || rawFx.enabled === false) continue;
+    const fx = { ...(rawFx.params || {}), ...rawFx };
+    const type = String(fx.type || "").toLowerCase();
+
+    if (type === "fold") {
+      const driveDb = fx.driveDb ?? fx.drive ?? 6;
+      const mix = fx.mix ?? fx.wet ?? 1.0;
+      const curve = createWavefolderCurve(driveDb, 1024);
+      curL = applyTransferCurve(curL, curve, mix);
+      curR = applyTransferCurve(curR, curve, mix);
+    } else if (type === "waveshaper") {
+      const driveDb = fx.driveDb ?? fx.drive ?? 6;
+      const mix = fx.mix ?? fx.wet ?? 1.0;
+      const curve = createWaveshaperCurve(
+        fx.equation || "softclip",
+        driveDb,
+        1024,
+      );
+      curL = applyTransferCurve(curL, curve, mix);
+      curR = applyTransferCurve(curR, curve, mix);
+    } else if (type === "crusher") {
+      const bits = fx.bits ?? 8;
+      const downsample = fx.downsample ?? 1;
+      const mix = fx.mix ?? fx.wet ?? 1.0;
+      const crushedL = processCrusherBuffer(curL, bits, downsample);
+      const crushedR = processCrusherBuffer(curR, bits, downsample);
+      for (let i = 0; i < curL.length; i++) {
+        curL[i] = curL[i] * (1 - mix) + crushedL[i] * mix;
+        curR[i] = curR[i] * (1 - mix) + crushedR[i] * mix;
+      }
+    } else if (type === "stereotool") {
+      const res = processStereoTool(curL, curR, fx.width ?? 1.0, fx.pan ?? 0.0);
+      curL = res.outLeft;
+      curR = res.outRight;
+    } else if (type === "revamp" || type === "eq") {
+      const hpFreq = fx.hpFreq ?? 20;
+      const lpFreq = fx.lpFreq ?? 18000;
+      const lowGain = fx.lowGainDb ?? fx.lowGain ?? 0;
+      const midGain = fx.midGainDb ?? fx.midGain ?? 0;
+      const highGain = fx.highGainDb ?? fx.highGain ?? 0;
+      const midFreq = fx.midFreq ?? 1200;
+      const midQ = fx.midQ ?? 1.2;
+
+      if (hpFreq > 22) {
+        curL = makeOfflineBiquad(
+          "highpass",
+          hpFreq,
+          0.707,
+          0,
+          sampleRate,
+        ).processBuffer(curL);
+        curR = makeOfflineBiquad(
+          "highpass",
+          hpFreq,
+          0.707,
+          0,
+          sampleRate,
+        ).processBuffer(curR);
+      }
+      if (Math.abs(lowGain) > 0.05) {
+        curL = makeOfflineBiquad(
+          "lowshelf",
+          220,
+          0.707,
+          lowGain,
+          sampleRate,
+        ).processBuffer(curL);
+        curR = makeOfflineBiquad(
+          "lowshelf",
+          220,
+          0.707,
+          lowGain,
+          sampleRate,
+        ).processBuffer(curR);
+      }
+      if (Math.abs(midGain) > 0.05) {
+        curL = makeOfflineBiquad(
+          "peaking",
+          midFreq,
+          midQ,
+          midGain,
+          sampleRate,
+        ).processBuffer(curL);
+        curR = makeOfflineBiquad(
+          "peaking",
+          midFreq,
+          midQ,
+          midGain,
+          sampleRate,
+        ).processBuffer(curR);
+      }
+      if (Math.abs(highGain) > 0.05) {
+        curL = makeOfflineBiquad(
+          "highshelf",
+          3800,
+          0.707,
+          highGain,
+          sampleRate,
+        ).processBuffer(curL);
+        curR = makeOfflineBiquad(
+          "highshelf",
+          3800,
+          0.707,
+          highGain,
+          sampleRate,
+        ).processBuffer(curR);
+      }
+      if (lpFreq < 17900) {
+        curL = makeOfflineBiquad(
+          "lowpass",
+          lpFreq,
+          0.707,
+          0,
+          sampleRate,
+        ).processBuffer(curL);
+        curR = makeOfflineBiquad(
+          "lowpass",
+          lpFreq,
+          0.707,
+          0,
+          sampleRate,
+        ).processBuffer(curR);
+      }
+    } else if (type === "filter" || type === "biquad") {
+      const fType = fx.filterType || fx.params?.type || "highpass";
+      const freq = fx.frequency ?? fx.cutoff ?? 120;
+      const q = fx.Q ?? fx.resonance ?? 0.707;
+      curL = makeOfflineBiquad(fType, freq, q, 0, sampleRate).processBuffer(
+        curL,
+      );
+      curR = makeOfflineBiquad(fType, freq, q, 0, sampleRate).processBuffer(
+        curR,
+      );
+    } else if (type === "compressor") {
+      const threshDb = fx.threshold ?? -12;
+      const ratio = Math.max(1, fx.ratio ?? 4);
+      const wet = fx.wet ?? fx.mix ?? 1.0;
+      const atkCoeff = Math.exp(
+        -1 / (Math.max(0.001, fx.attack ?? 0.005) * sampleRate),
+      );
+      const relCoeff = Math.exp(
+        -1 / (Math.max(0.01, fx.release ?? 0.12) * sampleRate),
+      );
+      let env = 0;
+      for (let i = 0; i < curL.length; i++) {
+        const peak = Math.max(Math.abs(curL[i]), Math.abs(curR[i]));
+        env =
+          peak > env
+            ? peak + (env - peak) * atkCoeff
+            : peak + (env - peak) * relCoeff;
+        let g = 1.0;
+        const envDb = 20 * Math.log10(Math.max(1e-6, env));
+        if (envDb > threshDb) {
+          const reducedDb = threshDb + (envDb - threshDb) / ratio;
+          g = Math.pow(10, (reducedDb - envDb) / 20);
+        }
+        curL[i] = curL[i] * (1 - wet) + curL[i] * g * wet;
+        curR[i] = curR[i] * (1 - wet) + curR[i] * g * wet;
+      }
+    } else if (type === "delay") {
+      const stepsL = Math.max(1, fx.timeStepsL ?? fx.time ?? 3);
+      const stepsR = Math.max(1, fx.timeStepsR ?? fx.time ?? 4);
+      const fb = Math.max(0, Math.min(0.92, fx.feedback ?? 0.35));
+      const wet = Math.max(0, Math.min(1, fx.wet ?? fx.mix ?? 0.3));
+      const delayFramesL = Math.max(
+        1,
+        Math.round(stepsL * stepSec * sampleRate),
+      );
+      const delayFramesR = Math.max(
+        1,
+        Math.round(stepsR * stepSec * sampleRate),
+      );
+      const bufL = new Float32Array(curL.length);
+      const bufR = new Float32Array(curR.length);
+      for (let i = 0; i < curL.length; i++) {
+        const dL = i >= delayFramesL ? bufL[i - delayFramesL] : 0;
+        const dR = i >= delayFramesR ? bufR[i - delayFramesR] : 0;
+        bufL[i] = curL[i] + dL * fb;
+        bufR[i] = curR[i] + dR * fb;
+        curL[i] = Math.max(
+          -1,
+          Math.min(1, curL[i] * (1 - wet * 0.5) + dL * wet),
+        );
+        curR[i] = Math.max(
+          -1,
+          Math.min(1, curR[i] * (1 - wet * 0.5) + dR * wet),
+        );
+      }
+    } else if (type === "reverb") {
+      const decay = Math.max(0.1, Math.min(5.0, fx.decay ?? 1.5));
+      const damping = Math.max(0, Math.min(1.0, fx.damping ?? 0.5));
+      const preDelayFrames = Math.max(
+        0,
+        Math.round(((fx.preDelayMs ?? 10) / 1000) * sampleRate),
+      );
+      const wet = Math.max(0, Math.min(1, fx.wet ?? fx.mix ?? 0.25));
+      // Multi-tap Schroeder comb reflections for fast offline execution
+      const tapMs = [29.7, 37.1, 41.1, 43.7];
+      const tapFrames = tapMs.map((ms) =>
+        Math.max(1, Math.round((ms / 1000) * sampleRate)),
+      );
+      const tapGains = tapFrames.map((f) =>
+        Math.pow(10, (-3 * (f / sampleRate)) / decay),
+      );
+      const revL = new Float32Array(curL.length);
+      const revR = new Float32Array(curR.length);
+      let lpL = 0,
+        lpR = 0;
+      const damp = 0.2 + (1 - damping) * 0.6;
+      for (let i = 0; i < curL.length; i++) {
+        const srcIdx = i - preDelayFrames;
+        let accL = srcIdx >= 0 ? curL[srcIdx] * 0.35 : 0;
+        let accR = srcIdx >= 0 ? curR[srcIdx] * 0.35 : 0;
+        for (let t = 0; t < tapFrames.length; t++) {
+          const tf = tapFrames[t];
+          if (i >= tf) {
+            accL += revL[i - tf] * tapGains[t] * 0.24;
+            accR += revR[(i - tf) % revR.length] * tapGains[t] * 0.24;
+          }
+        }
+        lpL += damp * (accL - lpL);
+        lpR += damp * (accR - lpR);
+        revL[i] = lpL;
+        revR[i] = lpR;
+        curL[i] = Math.max(
+          -1,
+          Math.min(1, curL[i] * (1 - wet * 0.4) + lpL * wet),
+        );
+        curR[i] = Math.max(
+          -1,
+          Math.min(1, curR[i] * (1 - wet * 0.4) + lpR * wet),
+        );
+      }
+    } else if (type === "tidal") {
+      const res = processTidal(curL, curR, fx, bpm, sampleRate);
+      curL = res.outLeft;
+      curR = res.outRight;
+    } else if (type === "transient") {
+      const res = processTransientShaper(curL, curR, fx, sampleRate);
+      curL = res.outLeft;
+      curR = res.outRight;
+    } else if (type === "maximizer") {
+      const res = processMaximizer(curL, curR, fx, sampleRate);
+      curL = res.outLeft;
+      curR = res.outRight;
+    } else if (type === "autotune") {
+      const res = processAutotune(curL, curR, fx, sampleRate);
+      curL = res.outLeft;
+      curR = res.outRight;
+    } else if (type === "vocoder") {
+      const res = processVocoder(curL, curR, null, null, fx, sampleRate);
+      curL = res.outLeft;
+      curR = res.outRight;
+    }
+  }
+
+  return { outLeft: curL, outRight: curR };
+}
+
+/**
+ * Builds a live/offline Web Audio API FX node chain for a track and connects it to `dest`.
+ * Returns `{ input, nodes, disconnect }` so `DawEngine._updateGraph` and `bounce`
+ * route track signal through `track.fx`.
+ *
+ * @param {AudioContext|OfflineAudioContext} ctx
+ * @param {AudioNode} dest
+ * @param {Array<object>} trackFx
+ * @param {number} [bpm=120]
+ * @returns {{ input: AudioNode, nodes: AudioNode[], disconnect: () => void }}
+ */
+export function buildTrackFxChain(ctx, dest, trackFx = [], bpm = 120) {
+  const nodes = [];
+  if (!ctx || !Array.isArray(trackFx) || trackFx.length === 0) {
+    return {
+      input: dest,
+      nodes,
+      disconnect() {},
+    };
+  }
+
+  const entryGain = ctx.createGain();
+  nodes.push(entryGain);
+  let tail = entryGain;
+  const stepSec = 60 / Math.max(20, bpm || 120) / 4;
+
+  for (const rawFx of trackFx) {
+    if (!rawFx || rawFx.enabled === false) continue;
+    const fx = { ...(rawFx.params || {}), ...rawFx };
+    const type = String(fx.type || "").toLowerCase();
+
+    if (type === "fold" || type === "waveshaper" || type === "crusher") {
+      const shaper = ctx.createWaveShaper();
+      if (type === "fold") {
+        shaper.curve = createWavefolderCurve(fx.driveDb ?? fx.drive ?? 6, 1024);
+      } else if (type === "waveshaper") {
+        shaper.curve = createWaveshaperCurve(
+          fx.equation || "softclip",
+          fx.driveDb ?? fx.drive ?? 6,
+          1024,
+        );
+      } else {
+        // Quantized step transfer curve for live crusher node
+        const bits = fx.bits ?? 8;
+        const step = Math.pow(0.5, bits - 1);
+        const curve = new Float32Array(1024);
+        for (let i = 0; i < 1024; i++) {
+          const x = (i * 2) / 1023 - 1;
+          curve[i] = step * Math.round(x / step);
+        }
+        shaper.curve = curve;
+      }
+      shaper.oversample = "2x";
+      tail.connect(shaper);
+      tail = shaper;
+      nodes.push(shaper);
+    } else if (type === "revamp" || type === "eq") {
+      const hpFreq = fx.hpFreq ?? 20;
+      if (hpFreq > 22) {
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = hpFreq;
+        hp.Q.value = 0.707;
+        tail.connect(hp);
+        tail = hp;
+        nodes.push(hp);
+      }
+      const lowGain = fx.lowGainDb ?? fx.lowGain ?? 0;
+      if (Math.abs(lowGain) > 0.05) {
+        const ls = ctx.createBiquadFilter();
+        ls.type = "lowshelf";
+        ls.frequency.value = 220;
+        if (ls.gain) ls.gain.value = lowGain;
+        tail.connect(ls);
+        tail = ls;
+        nodes.push(ls);
+      }
+      const midGain = fx.midGainDb ?? fx.midGain ?? 0;
+      if (Math.abs(midGain) > 0.05) {
+        const pk = ctx.createBiquadFilter();
+        pk.type = "peaking";
+        pk.frequency.value = fx.midFreq ?? 1200;
+        pk.Q.value = fx.midQ ?? 1.2;
+        if (pk.gain) pk.gain.value = midGain;
+        tail.connect(pk);
+        tail = pk;
+        nodes.push(pk);
+      }
+      const highGain = fx.highGainDb ?? fx.highGain ?? 0;
+      if (Math.abs(highGain) > 0.05) {
+        const hs = ctx.createBiquadFilter();
+        hs.type = "highshelf";
+        hs.frequency.value = 3800;
+        if (hs.gain) hs.gain.value = highGain;
+        tail.connect(hs);
+        tail = hs;
+        nodes.push(hs);
+      }
+    } else if (type === "filter" || type === "biquad") {
+      const flt = ctx.createBiquadFilter();
+      flt.type = fx.filterType || fx.params?.type || "highpass";
+      flt.frequency.value = fx.frequency ?? fx.cutoff ?? 120;
+      flt.Q.value = fx.Q ?? fx.resonance ?? 0.707;
+      tail.connect(flt);
+      tail = flt;
+      nodes.push(flt);
+    } else if (type === "compressor" || type === "maximizer") {
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = fx.threshold ?? -12;
+      comp.ratio.value = fx.ratio ?? (type === "maximizer" ? 20 : 4);
+      comp.attack.value = fx.attack ?? 0.003;
+      comp.release.value = fx.release ?? 0.15;
+      tail.connect(comp);
+      tail = comp;
+      nodes.push(comp);
+    } else if (type === "delay") {
+      const dryGain = ctx.createGain();
+      const wetGain = ctx.createGain();
+      const outMix = ctx.createGain();
+      const dly = ctx.createDelay(5.0);
+      const fb = ctx.createGain();
+      const steps = Math.max(1, fx.timeStepsL ?? fx.time ?? 3);
+      const wet = Math.max(0, Math.min(1, fx.wet ?? fx.mix ?? 0.3));
+      dly.delayTime.value = Math.min(4.9, steps * stepSec);
+      fb.gain.value = Math.max(0, Math.min(0.9, fx.feedback ?? 0.35));
+      dryGain.gain.value = 1.0;
+      wetGain.gain.value = wet;
+
+      tail.connect(dryGain);
+      dryGain.connect(outMix);
+      tail.connect(dly);
+      dly.connect(fb);
+      fb.connect(dly);
+      dly.connect(wetGain);
+      wetGain.connect(outMix);
+      tail = outMix;
+      nodes.push(dryGain, wetGain, outMix, dly, fb);
+    } else if (type === "reverb") {
+      const dryGain = ctx.createGain();
+      const wetGain = ctx.createGain();
+      const outMix = ctx.createGain();
+      const wet = Math.max(0, Math.min(1, fx.wet ?? fx.mix ?? 0.25));
+      dryGain.gain.value = 1.0;
+      wetGain.gain.value = wet;
+      tail.connect(dryGain);
+      dryGain.connect(outMix);
+
+      if (typeof ctx.createConvolver === "function") {
+        const conv = ctx.createConvolver();
+        const sr = ctx.sampleRate || 44100;
+        const imp = generateReverbImpulse(
+          sr,
+          fx.decay ?? 1.2,
+          fx.damping ?? 0.5,
+          fx.preDelayMs ?? 10,
+        );
+        const buf = ctx.createBuffer(2, imp.left.length, sr);
+        buf.getChannelData(0).set(imp.left);
+        if (buf.numberOfChannels > 1) buf.getChannelData(1).set(imp.right);
+        conv.buffer = buf;
+        tail.connect(conv);
+        conv.connect(wetGain);
+        nodes.push(conv);
+      } else {
+        // Fallback diffuser delay when ConvolverNode is absent in mock
+        const revDelay = ctx.createDelay(1.0);
+        revDelay.delayTime.value = 0.035;
+        tail.connect(revDelay);
+        revDelay.connect(wetGain);
+        nodes.push(revDelay);
+      }
+      wetGain.connect(outMix);
+      tail = outMix;
+      nodes.push(dryGain, wetGain, outMix);
+    } else if (type === "stereotool") {
+      const panner = ctx.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, fx.pan ?? 0));
+      tail.connect(panner);
+      tail = panner;
+      nodes.push(panner);
+    }
+  }
+
+  tail.connect(dest);
+  return {
+    input: entryGain,
+    nodes,
+    disconnect() {
+      for (const n of nodes) {
+        try {
+          n.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+    },
+  };
+}
+
+/**
  * Analyzes an audio buffer (peak dBFS, RMS dBFS, crest factor, clipping, frequency balance, and suggestions).
  * Ported concepts from claw-daw audio/metering and openDAW rms/analyser.
  *
@@ -779,7 +1424,7 @@ export function analyzeAudioBuffer({ left, right, sampleRate = 44100 }) {
   let midEnergy = 0;
   let highEnergy = 0;
 
-  // Single-pole filters for rough 3-band energy partitioning:
+  // Single-pole filters for 3-band energy partitioning:
   // Low cutoff ~ 250 Hz, High cutoff ~ 4 kHz
   const dt = 1.0 / sampleRate;
   const rcLow = 1.0 / (2.0 * Math.PI * 250);
@@ -833,6 +1478,140 @@ export function analyzeAudioBuffer({ left, right, sampleRate = 44100 }) {
     high: Math.round((highEnergy / totalBand) * 100) / 100,
   };
 
+  // Multi-frame 512-point Hann-windowed DFT for accurate 5-band energy & spectral centroid
+  const fftSize = Math.min(512, numFrames);
+  const halfBins = Math.floor(fftSize / 2);
+  let eSub = 0,
+    eLow = 0,
+    eMid = 0,
+    eHighMid = 0,
+    eHigh = 0;
+  let weightedFreqSum = 0;
+  let magSum = 0;
+
+  if (fftSize >= 64 && peak > 1e-5) {
+    const numWindows = Math.min(
+      6,
+      Math.max(1, Math.floor(numFrames / fftSize)),
+    );
+    const step = Math.max(
+      1,
+      Math.floor((numFrames - fftSize) / Math.max(1, numWindows)),
+    );
+    for (let w = 0; w < numWindows; w++) {
+      const start = Math.min(numFrames - fftSize, w * step);
+      let winRms = 0;
+      for (let n = 0; n < fftSize; n++) {
+        const s = left[start + n];
+        winRms += s * s;
+      }
+      if (winRms / fftSize < 1e-7) continue;
+
+      for (let k = 1; k < halfBins; k++) {
+        let re = 0,
+          im = 0;
+        const omega = (-2 * Math.PI * k) / fftSize;
+        for (let n = 0; n < fftSize; n++) {
+          const hann = 0.5 * (1 - Math.cos((2 * Math.PI * n) / (fftSize - 1)));
+          const s = left[start + n] * hann;
+          const angle = omega * n;
+          re += s * Math.cos(angle);
+          im += s * Math.sin(angle);
+        }
+        const power = re * re + im * im;
+        const mag = Math.sqrt(power);
+        const freq = (k * sampleRate) / fftSize;
+        weightedFreqSum += freq * mag;
+        magSum += mag;
+
+        if (freq < 90) eSub += power;
+        else if (freq < 400) eLow += power;
+        else if (freq < 1200) eMid += power;
+        else if (freq < 4000) eHighMid += power;
+        else eHigh += power;
+      }
+    }
+  }
+
+  const total5 = Math.max(1e-9, eSub + eLow + eMid + eHighMid + eHigh);
+  const bandEnergy = {
+    sub: Math.round((eSub / total5) * 1000) / 1000,
+    low: Math.round((eLow / total5) * 1000) / 1000,
+    mid: Math.round((eMid / total5) * 1000) / 1000,
+    highMid: Math.round((eHighMid / total5) * 1000) / 1000,
+    high: Math.round((eHigh / total5) * 1000) / 1000,
+  };
+  const spectralCentroidHz =
+    magSum > 1e-6 ? Math.round((weightedFreqSum / magSum) * 10) / 10 : 0;
+
+  // Estimate pitch in early sustain window vs tail window to measure pitch sag
+  function detectWindowPitch(startFrame, endFrame) {
+    const span = endFrame - startFrame;
+    if (span < 256) return 0;
+    const minLag = Math.max(8, Math.floor(sampleRate / 2200));
+    const maxLag = Math.min(Math.floor(span / 2), Math.floor(sampleRate / 70));
+    let bestLag = 0;
+    let bestCorr = 0;
+    const winLen = Math.min(512, span - maxLag);
+    if (winLen < 64) return 0;
+
+    let e0 = 0;
+    for (let i = 0; i < winLen; i++) {
+      const s = left[startFrame + i];
+      e0 += s * s;
+    }
+    if (e0 < 1e-6) return 0;
+
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      let c = 0;
+      let eLag = 0;
+      for (let i = 0; i < winLen; i++) {
+        const a = left[startFrame + i];
+        const b = left[startFrame + i + lag];
+        c += a * b;
+        eLag += b * b;
+      }
+      const norm = Math.sqrt(e0 * Math.max(1e-9, eLag));
+      const r = norm > 1e-6 ? c / norm : 0;
+      if (r > bestCorr) {
+        bestCorr = r;
+        bestLag = lag;
+      }
+    }
+    return bestLag > 0 && bestCorr > 0.25 ? sampleRate / bestLag : 0;
+  }
+
+  // Find active bounds (above 5% of peak)
+  let firstActive = 0;
+  let lastActive = numFrames - 1;
+  const activeThresh = Math.max(1e-4, peak * 0.06);
+  for (let i = 0; i < numFrames; i++) {
+    if (Math.abs(left[i]) >= activeThresh) {
+      firstActive = i;
+      break;
+    }
+  }
+  for (let i = numFrames - 1; i >= firstActive; i--) {
+    if (Math.abs(left[i]) >= activeThresh) {
+      lastActive = i;
+      break;
+    }
+  }
+  const activeSpan = Math.max(1, lastActive - firstActive);
+  const startPitchHz = detectWindowPitch(
+    firstActive + Math.floor(activeSpan * 0.08),
+    firstActive + Math.floor(activeSpan * 0.45),
+  );
+  const endPitchHz = detectWindowPitch(
+    firstActive + Math.floor(activeSpan * 0.8),
+    lastActive,
+  );
+  const estimatedPitchHz = startPitchHz || endPitchHz || 0;
+  const pitchSagSemitones =
+    startPitchHz > 20 && endPitchHz > 20
+      ? Math.round(12 * Math.log2(endPitchHz / startPitchHz) * 100) / 100
+      : 0;
+
   const suggestions = [];
   const clipping = clippedCount > 0;
 
@@ -868,7 +1647,7 @@ export function analyzeAudioBuffer({ left, right, sampleRate = 44100 }) {
 
   const summary = [
     `Peak: ${peakDb.toFixed(2)} dBFS | RMS: ${rmsDb.toFixed(2)} dBFS | Dynamic Range: ${crestFactorDb.toFixed(2)} dB`,
-    `Bands: Low ${Math.round(bandBalance.low * 100)}% | Mid ${Math.round(bandBalance.mid * 100)}% | High ${Math.round(bandBalance.high * 100)}%`,
+    `Centroid: ${spectralCentroidHz.toFixed(0)} Hz | Bands: Low ${Math.round(bandBalance.low * 100)}% | Mid ${Math.round(bandBalance.mid * 100)}% | High ${Math.round(bandBalance.high * 100)}%`,
     clipping
       ? `WARNING: ${clippedCount} clipped samples`
       : `Status: Clean headroom`,
@@ -881,7 +1660,13 @@ export function analyzeAudioBuffer({ left, right, sampleRate = 44100 }) {
     crestFactorDb: Math.round(crestFactorDb * 100) / 100,
     clipping,
     clippedSampleCount: clippedCount,
+    spectralCentroidHz,
     bandBalance,
+    bandEnergy,
+    estimatedPitchHz: Math.round(estimatedPitchHz * 10) / 10,
+    startPitchHz: Math.round(startPitchHz * 10) / 10,
+    endPitchHz: Math.round(endPitchHz * 10) / 10,
+    pitchSagSemitones,
     summary,
     suggestions,
   };

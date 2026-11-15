@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_analyze_mix",
-  "description": "Analyze the current mix levels, dynamic range, clipping, and 3-band energy distribution (low, mid, high) across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, and actionable mix suggestions.",
+  "description": "Analyze the current mix levels, dynamic range, clipping, spectral centroid, 5-band energy distribution (sub, low, mid, highMid, high), and pitch sag across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, spectralCentroidHz, bandEnergy, and actionable mix suggestions.",
   "input_schema": {
     "type": "object",
     "properties": {

@@ -29,6 +29,112 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
     step: 0.01,
     unit: "ratio",
   },
+  osc2Waveform: {
+    default: "none",
+    type: "enum",
+    values: ["none", "sine", "triangle", "sawtooth", "square", "pulse"],
+  },
+  osc2Octave: {
+    default: 0,
+    min: -3,
+    max: 3,
+    step: 1,
+    unit: "oct",
+  },
+  osc2Detune: {
+    default: 7,
+    min: -1200,
+    max: 1200,
+    step: 1,
+    unit: "cents",
+  },
+  osc2Mix: {
+    default: 0.0,
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    unit: "ratio",
+  },
+  subMix: {
+    default: 0.0,
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    unit: "ratio",
+  },
+  noiseMix: {
+    default: 0.0,
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    unit: "ratio",
+  },
+  unisonCount: {
+    default: 1,
+    min: 1,
+    max: 7,
+    step: 1,
+    unit: "voices",
+  },
+  unisonDetune: {
+    default: 0,
+    min: 0,
+    max: 100,
+    step: 1,
+    unit: "cents",
+  },
+  unisonStereo: {
+    default: 0.5,
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    unit: "ratio",
+  },
+  monophonic: {
+    default: false,
+    type: "boolean",
+  },
+  pitchEnvAmount: {
+    default: 0,
+    min: -24,
+    max: 24,
+    step: 0.1,
+    unit: "st",
+  },
+  pitchAttack: {
+    default: 0.02,
+    min: 0.001,
+    max: 1.0,
+    step: 0.005,
+    unit: "s",
+  },
+  pitchReleaseDrop: {
+    default: 0,
+    min: -24,
+    max: 24,
+    step: 0.1,
+    unit: "st",
+  },
+  filterType: {
+    default: "lowpass",
+    type: "enum",
+    values: ["lowpass", "highpass", "bandpass", "peaking", "horn"],
+  },
+  highpassCutoff: {
+    default: 20,
+    min: 20,
+    max: 8000,
+    step: 1,
+    unit: "Hz",
+    scaling: "exponential",
+  },
+  formantFreq: {
+    default: 2100,
+    min: 300,
+    max: 6000,
+    step: 10,
+    unit: "Hz",
+  },
   cutoff: {
     default: 1200,
     min: 20,
@@ -44,9 +150,75 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
     step: 0.1,
     unit: "Q",
   },
+  filterEnvAmount: {
+    default: 0,
+    min: -10000,
+    max: 10000,
+    step: 10,
+    unit: "Hz",
+  },
+  filterDecay: {
+    default: 0.2,
+    min: 0.01,
+    max: 3.0,
+    step: 0.01,
+    unit: "s",
+  },
+  lfoWaveform: {
+    default: "sine",
+    type: "enum",
+    values: ["sine", "triangle", "sawtooth", "square"],
+  },
+  lfoRate: {
+    default: 4.0,
+    min: 0.1,
+    max: 30.0,
+    step: 0.1,
+    unit: "Hz",
+  },
+  lfoPitchDepth: {
+    default: 0,
+    min: 0,
+    max: 200,
+    step: 1,
+    unit: "cents",
+  },
+  lfoFilterDepth: {
+    default: 0,
+    min: 0,
+    max: 4000,
+    step: 10,
+    unit: "Hz",
+  },
+  drive: {
+    default: 0.0,
+    min: 0.0,
+    max: 1.5,
+    step: 0.01,
+    unit: "ratio",
+  },
+  glide: {
+    default: 0.0,
+    min: 0.0,
+    max: 1.0,
+    step: 0.005,
+    unit: "s",
+  },
+  samplePreset: {
+    default: "none",
+    type: "enum",
+    values: [
+      "none",
+      "dj-airhorn",
+      "reggae-siren",
+      "sub-drop",
+      "white-noise-riser",
+      "laser-zap",
+    ],
+  },
   attack: {
     default: 0.01,
-    min: 0.005,
+    min: 0.001,
     max: 2.0,
     step: 0.005,
     unit: "s",
@@ -67,7 +239,7 @@ export const SYNTH_PARAM_SCHEMA = Object.freeze({
   },
   release: {
     default: 0.15,
-    min: 0.02,
+    min: 0.01,
     max: 4.0,
     step: 0.01,
     unit: "s",
@@ -197,7 +369,42 @@ export const KORPUS_SCHEMA = Object.freeze({
 });
 
 export const NANO_SCHEMA = Object.freeze({
+  samplePreset: {
+    default: "none",
+    type: "enum",
+    values: [
+      "none",
+      "dj-airhorn",
+      "reggae-siren",
+      "sub-drop",
+      "white-noise-riser",
+      "laser-zap",
+    ],
+  },
   rootKey: { default: 60, min: 0, max: 127, step: 1, unit: "key" },
+  monophonic: { default: false, type: "boolean" },
+  pitchEnvAmount: { default: 0, min: -24, max: 24, step: 0.1, unit: "st" },
+  pitchAttack: { default: 0.025, min: 0.001, max: 1.0, step: 0.005, unit: "s" },
+  pitchReleaseDrop: { default: 0, min: -24, max: 24, step: 0.1, unit: "st" },
+  highpassCutoff: {
+    default: 20,
+    min: 20,
+    max: 8000,
+    step: 1,
+    unit: "Hz",
+    scaling: "exponential",
+  },
+  formantFreq: { default: 2100, min: 300, max: 6000, step: 10, unit: "Hz" },
+  cutoff: {
+    default: 18000,
+    min: 20,
+    max: 20000,
+    step: 1,
+    unit: "Hz",
+    scaling: "exponential",
+  },
+  resonance: { default: 1.0, min: 0.1, max: 25.0, step: 0.1, unit: "Q" },
+  drive: { default: 0.0, min: 0.0, max: 1.5, step: 0.01, unit: "ratio" },
   attack: { default: 0.005, min: 0.001, max: 2.0, step: 0.005, unit: "s" },
   release: { default: 0.2, min: 0.01, max: 5.0, step: 0.01, unit: "s" },
   loop: { default: false, type: "boolean" },
@@ -285,17 +492,42 @@ export const FX_SCHEMAS = Object.freeze({
   reverb: Object.freeze({
     decay: { default: 1.5, min: 0.1, max: 5.0, step: 0.1, unit: "s" },
     damping: { default: 0.5, min: 0, max: 1.0, step: 0.01, unit: "" },
+    preDelayMs: { default: 8, min: 0, max: 120, step: 1, unit: "ms" },
     wet: { default: 0.25, min: 0, max: 1.0, step: 0.01, unit: "" },
   }),
   compressor: Object.freeze({
     threshold: { default: -12, min: -60, max: 0, step: 1, unit: "dB" },
     ratio: { default: 4, min: 1, max: 20, step: 0.5, unit: "" },
+    attack: { default: 0.005, min: 0.001, max: 0.5, step: 0.001, unit: "s" },
+    release: { default: 0.15, min: 0.01, max: 1.0, step: 0.01, unit: "s" },
     wet: { default: 1.0, min: 0, max: 1.0, step: 0.01, unit: "" },
   }),
   revamp: Object.freeze({
+    hpFreq: { default: 20, min: 20, max: 4000, step: 10, unit: "Hz" },
     lowGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
+    midFreq: { default: 1200, min: 200, max: 8000, step: 10, unit: "Hz" },
+    midQ: { default: 1.2, min: 0.2, max: 12.0, step: 0.1, unit: "Q" },
     midGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
     highGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
+    lpFreq: { default: 18000, min: 1000, max: 20000, step: 50, unit: "Hz" },
+  }),
+  eq: Object.freeze({
+    hpFreq: { default: 20, min: 20, max: 4000, step: 10, unit: "Hz" },
+    lowGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
+    midFreq: { default: 1200, min: 200, max: 8000, step: 10, unit: "Hz" },
+    midQ: { default: 1.2, min: 0.2, max: 12.0, step: 0.1, unit: "Q" },
+    midGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
+    highGainDb: { default: 0, min: -18, max: 18, step: 0.5, unit: "dB" },
+    lpFreq: { default: 18000, min: 1000, max: 20000, step: 50, unit: "Hz" },
+  }),
+  waveshaper: Object.freeze({
+    equation: {
+      default: "softclip",
+      type: "enum",
+      values: ["hardclip", "softclip", "sigmoid", "atan", "sin", "foldback"],
+    },
+    driveDb: { default: 6, min: 0, max: 30, step: 0.5, unit: "dB" },
+    mix: { default: 1.0, min: 0, max: 1.0, step: 0.01, unit: "" },
   }),
   arpeggio: Object.freeze({
     mode: {
@@ -571,10 +803,12 @@ export function migrateProject(project) {
 }
 
 export function getDefaultParams(kind) {
-  const normKind = String(kind || "").toLowerCase();
+  const rawKind = String(kind || "");
+  const normKind = rawKind.toLowerCase();
   const schema =
     INSTRUMENT_SCHEMAS[normKind] ||
     (normKind === "synth" ? SYNTH_PARAM_SCHEMA : null) ||
+    FX_SCHEMAS[rawKind] ||
     FX_SCHEMAS[normKind];
   if (schema) {
     const defaults = {};
@@ -586,9 +820,66 @@ export function getDefaultParams(kind) {
   return {};
 }
 
-export function validateAndFilterParams(schema, inputParams = {}) {
+export function normalizeFxParams(fxType, inputParams = {}) {
+  if (!inputParams || typeof inputParams !== "object") return {};
+  const rawType = String(fxType || "");
+  const schema = FX_SCHEMAS[rawType] || FX_SCHEMAS[rawType.toLowerCase()];
+  const out = { ...inputParams };
+
+  // Normalize common cross-device parameter aliases
+  if (out.drive !== undefined && out.driveDb === undefined) {
+    if (!schema || schema.driveDb !== undefined) {
+      out.driveDb = Number(out.drive);
+      if (schema && schema.drive === undefined) delete out.drive;
+    }
+  }
+  if (out.wet !== undefined && out.mix === undefined) {
+    if (schema && schema.mix !== undefined && schema.wet === undefined) {
+      out.mix = Number(out.wet);
+      delete out.wet;
+    }
+  }
+  if (out.mix !== undefined && out.wet === undefined) {
+    if (schema && schema.wet !== undefined && schema.mix === undefined) {
+      out.wet = Number(out.mix);
+      delete out.mix;
+    }
+  }
+  if (out.time !== undefined) {
+    if (out.timeStepsL === undefined) out.timeStepsL = Number(out.time);
+    if (out.timeStepsR === undefined) out.timeStepsR = Number(out.time);
+    if (schema && schema.time === undefined) delete out.time;
+  }
+  if (out.lowGain !== undefined && out.lowGainDb === undefined) {
+    out.lowGainDb = Number(out.lowGain);
+  }
+  if (out.midGain !== undefined && out.midGainDb === undefined) {
+    out.midGainDb = Number(out.midGain);
+  }
+  if (out.highGain !== undefined && out.highGainDb === undefined) {
+    out.highGainDb = Number(out.highGain);
+  }
+  if (out.preDelay !== undefined && out.preDelayMs === undefined) {
+    out.preDelayMs = Number(out.preDelay);
+  }
+
+  return out;
+}
+
+export function validateAndFilterParams(schemaOrName, inputParams = {}) {
+  const schema =
+    typeof schemaOrName === "string"
+      ? INSTRUMENT_SCHEMAS[schemaOrName.toLowerCase()] ||
+        FX_SCHEMAS[schemaOrName] ||
+        FX_SCHEMAS[schemaOrName.toLowerCase()]
+      : schemaOrName;
+
   if (!schema || typeof inputParams !== "object" || inputParams === null) {
-    return { filtered: inputParams || {}, ignoredParams: [] };
+    return {
+      ...(inputParams || {}),
+      filtered: inputParams || {},
+      ignoredParams: [],
+    };
   }
 
   const filtered = {};
@@ -621,5 +912,5 @@ export function validateAndFilterParams(schema, inputParams = {}) {
     filtered[key] = val;
   }
 
-  return { filtered, ignoredParams };
+  return { ...filtered, filtered, ignoredParams };
 }

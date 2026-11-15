@@ -18,12 +18,14 @@
         "type": "string",
         "enum": [
           "fold",
+          "waveshaper",
           "crusher",
           "stereoTool",
           "delay",
           "reverb",
           "compressor",
           "revamp",
+          "eq",
           "arpeggio",
           "pitch",
           "velocity"

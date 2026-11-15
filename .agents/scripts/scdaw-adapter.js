@@ -142,7 +142,8 @@ export async function handleToolDispatch(name, params) {
       };
     }
 
-    case "scdaw_new_project": {
+    case "scdaw_new_project":
+    case "scdaw_create_project": {
       return await scdaw.sendCommand("new_project", params);
     }
 
@@ -180,7 +181,8 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("set_track", params);
     }
 
-    case "scdaw_write_notes": {
+    case "scdaw_write_notes":
+    case "scdaw_add_notes": {
       return await scdaw.sendCommand("write_notes", params);
     }
 
@@ -415,6 +417,14 @@ export async function handleToolDispatch(name, params) {
 
     case "scdaw_analyze_mix": {
       return await scdaw.sendCommand("analyze_mix", params);
+    }
+
+    case "scdaw_list_schemas": {
+      return await scdaw.sendCommand("list_schemas", params);
+    }
+
+    case "scdaw_design_sound": {
+      return await scdaw.sendCommand("design_sound", params);
     }
 
     case "scdaw_render_surface": {

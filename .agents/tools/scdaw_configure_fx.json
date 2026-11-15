@@ -24,9 +24,13 @@
           "transient",
           "sidechain",
           "fold",
+          "waveshaper",
           "crusher",
           "delay",
           "reverb",
+          "compressor",
+          "revamp",
+          "eq",
           "stereoTool"
         ],
         "description": "Audio effect type"

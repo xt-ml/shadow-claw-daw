@@ -68,6 +68,7 @@ class FakeBiquadFilterNode extends FakeAudioNode {
     super(ctx);
     this.frequency = new FakeAudioParam(1000);
     this.Q = new FakeAudioParam(1);
+    this.gain = new FakeAudioParam(0);
     this.type = "lowpass";
   }
 }
@@ -142,7 +143,9 @@ class FakeAudioBufferSourceNode extends FakeAudioNode {
   constructor(ctx) {
     super(ctx);
     this.playbackRate = new FakeAudioParam(1);
+    this.detune = new FakeAudioParam(0);
     this.buffer = null;
+    this.loop = false;
   }
   start(when = 0) {
     this.startTime = when;
@@ -152,6 +155,14 @@ class FakeAudioBufferSourceNode extends FakeAudioNode {
     setTimeout(() => {
       if (typeof this.onended === "function") this.onended();
     }, 10);
+  }
+}
+
+class FakeConvolverNode extends FakeAudioNode {
+  constructor(ctx) {
+    super(ctx);
+    this.buffer = null;
+    this.normalize = true;
   }
 }
 
@@ -195,6 +206,9 @@ export class FakeAudioContext extends EventTarget {
   createDelay(maxDelay = 1) {
     return new FakeDelayNode(this, maxDelay);
   }
+  createConvolver() {
+    return new FakeConvolverNode(this);
+  }
   createBufferSource() {
     const node = new FakeAudioBufferSourceNode(this);
     this.bufferSources.push(node);
@@ -226,11 +240,16 @@ export class FakeAudioContext extends EventTarget {
     return buf;
   }
   createBuffer(channels, length, sampleRate) {
+    const channelData = Array.from(
+      { length: Math.max(1, channels) },
+      () => new Float32Array(length),
+    );
     return {
       numberOfChannels: channels,
       length,
       sampleRate,
-      getChannelData: () => new Float32Array(length),
+      duration: length / (sampleRate || 44100),
+      getChannelData: (ch = 0) => channelData[ch] || channelData[0],
     };
   }
 

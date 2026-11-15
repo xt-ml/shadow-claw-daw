@@ -13,8 +13,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const TOOLS_DIR = resolve(ROOT, ".agents/tools");
 
-test("Tools: all 43 tools defined in manifest exist on disk and match schema", () => {
-  assert.equal(TOOLS.length, 43);
+test("Tools: all 45 tools defined in manifest exist on disk and match schema", () => {
+  assert.equal(TOOLS.length, 45);
 
   for (const tool of TOOLS) {
     const filePath = resolve(TOOLS_DIR, `${tool.name}.json`);
@@ -201,7 +201,7 @@ test("Adapter: handleToolDispatch dispatches status, project, transport, and sur
   assert.ok(resetRes.ok);
 });
 
-test("WebMCP adapter: registerNativeWebMcp registers all 43 tools into modelContext", async () => {
+test("WebMCP adapter: registerNativeWebMcp registers all 45 tools into modelContext", async () => {
   const registered = [];
   globalThis.document = {
     modelContext: {
@@ -215,8 +215,16 @@ test("WebMCP adapter: registerNativeWebMcp registers all 43 tools into modelCont
   await registerNativeWebMcp();
   assert.equal(
     registered.length,
-    43,
-    "All 43 tools must be registered with WebMCP",
+    45,
+    "All 45 tools must be registered with WebMCP",
+  );
+  assert.ok(
+    registered.some((t) => t.name === "scdaw_design_sound"),
+    "scdaw_design_sound must be registered",
+  );
+  assert.ok(
+    registered.some((t) => t.name === "scdaw_list_schemas"),
+    "scdaw_list_schemas must be registered",
   );
   assert.ok(
     registered.some((t) => t.name === "scdaw_compose_song"),

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_design_sound",
+  "description": "Configure a track in one call from a studio sound recipe ('dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') with full synthesis parameters, per-track FX chain, and optional default musical pattern.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "trackId": {
+        "type": "string",
+        "description": "Target track ID"
+      },
+      "recipe": {
+        "type": "string",
+        "enum": [
+          "dj-airhorn",
+          "reggae-siren",
+          "brass-stab",
+          "hoover-rave",
+          "init-saw",
+          "techno-bass",
+          "acid-303",
+          "supersaw-lead"
+        ],
+        "description": "Sound design recipe or preset name"
+      },
+      "instrument": {
+        "type": "string",
+        "enum": ["nano", "synth", "neon", "808", "cubed", "tubular", "korpus"],
+        "description": "Optional instrument engine override (defaults to recipe's optimal engine, e.g. 'nano' for dj-airhorn)"
+      },
+      "overrides": {
+        "type": "object",
+        "description": "Optional synthesis parameter overrides"
+      },
+      "fx": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        },
+        "description": "Optional custom FX chain array override"
+      },
+      "insertDefaultPattern": {
+        "type": "boolean",
+        "description": "If true, writes the recipe's signature note pattern onto the track (e.g. 'wha-wha-wha-whaaaaaa' for dj-airhorn)"
+      }
+    },
+    "required": ["trackId", "recipe"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": false
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_design_sound. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_design_sound\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

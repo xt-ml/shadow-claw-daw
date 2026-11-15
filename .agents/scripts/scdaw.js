@@ -18,6 +18,7 @@ import {
   getDefaultParams,
   migrateProject,
   validateAndFilterParams,
+  normalizeFxParams,
 } from "./scdaw-schema.js";
 import {
   INSTRUMENT_PRESETS,
@@ -25,7 +26,7 @@ import {
   generateGenrePattern,
 } from "./scdaw-presets.js";
 import { compileSong } from "./scdaw-compose.js";
-import { analyzeAudioBuffer } from "./scdaw-dsp.js";
+import { analyzeAudioBuffer, processTrackOfflineFx } from "./scdaw-dsp.js";
 
 export {
   MASTER_SCHEMA,
@@ -826,7 +827,11 @@ export function applyCommand(project, name, params = {}) {
           : params.kind === "audio"
             ? "audio"
             : "synth";
-      const id = `trk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const requestedId = params.id || params.trackId;
+      const id =
+        requestedId && !next.tracks.some((t) => t.id === requestedId)
+          ? String(requestedId)
+          : `trk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const name =
         params.name ||
         (kind === "drums"
@@ -998,6 +1003,7 @@ export function applyCommand(project, name, params = {}) {
       };
     }
 
+    case "add_notes":
     case "write_notes": {
       const track = next.tracks.find((t) => t.id === params.trackId);
       if (!track) throw new Error(`Track not found: ${params.trackId}`);
@@ -1132,6 +1138,15 @@ export function applyCommand(project, name, params = {}) {
       track.instrument = targetInstrument;
       const defaultParams = getDefaultParams(targetInstrument);
       track.params = { ...defaultParams, ...presetData };
+      if (
+        Array.isArray(presetData.defaultFx) &&
+        (!Array.isArray(track.fx) || track.fx.length === 0)
+      ) {
+        track.fx = structuredClone(presetData.defaultFx).map((fx, idx) => ({
+          id: fx.id || `fx_${presetName}_${idx}`,
+          ...fx,
+        }));
+      }
       return {
         project: next,
         result: {
@@ -1139,6 +1154,91 @@ export function applyCommand(project, name, params = {}) {
           trackId: track.id,
           preset: presetName,
           instrument: targetInstrument,
+        },
+      };
+    }
+
+    case "list_schemas": {
+      const category = String(params.category || "all").toLowerCase();
+      const name = params.name ? String(params.name).toLowerCase() : null;
+      const res = { ok: true };
+      if (category === "all" || category === "instruments") {
+        res.instruments = name
+          ? { [name]: INSTRUMENT_SCHEMAS[name] || null }
+          : INSTRUMENT_SCHEMAS;
+      }
+      if (category === "all" || category === "fx") {
+        res.fx = name ? { [name]: FX_SCHEMAS[name] || null } : FX_SCHEMAS;
+      }
+      if (category === "all" || category === "presets") {
+        res.presets = Object.keys(INSTRUMENT_PRESETS);
+      }
+      return { project: next, result: res };
+    }
+
+    case "design_sound": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const recipeName = String(
+        params.recipe || params.preset || "dj-airhorn",
+      ).toLowerCase();
+      const presetData =
+        INSTRUMENT_PRESETS[recipeName] || INSTRUMENT_PRESETS["dj-airhorn"];
+      const targetInstrument = String(
+        params.instrument || presetData.instrument || "nano",
+      ).toLowerCase();
+      track.instrument = targetInstrument;
+      const defaultParams = getDefaultParams(targetInstrument);
+      const overrides =
+        params.overrides && typeof params.overrides === "object"
+          ? params.overrides
+          : {};
+      track.params = { ...defaultParams, ...presetData, ...overrides };
+
+      if (Array.isArray(params.fx)) {
+        track.fx = params.fx.map((fx, idx) => ({
+          id: fx.id || `fx_${recipeName}_${idx}`,
+          ...normalizeFxParams(fx.type, fx),
+        }));
+      } else if (Array.isArray(presetData.defaultFx)) {
+        track.fx = structuredClone(presetData.defaultFx).map((fx, idx) => ({
+          id: fx.id || `fx_${recipeName}_${idx}`,
+          ...fx,
+        }));
+      }
+
+      if (params.insertDefaultPattern) {
+        if (recipeName === "dj-airhorn") {
+          const rootPitch = Number(track.params.rootKey || 66);
+          // Iconic dancehall / MLG DJ Airhorn: "wha - wha - wha - whaaaaaaaaaa↘"
+          track.notes = [
+            { position: 0, duration: 200, pitch: rootPitch, velocity: 0.92 },
+            { position: 240, duration: 200, pitch: rootPitch, velocity: 0.95 },
+            { position: 480, duration: 200, pitch: rootPitch, velocity: 0.98 },
+            { position: 720, duration: 1920, pitch: rootPitch, velocity: 1.0 },
+          ];
+        } else if (recipeName === "reggae-siren") {
+          track.notes = [
+            { position: 0, duration: 1920, pitch: 69, velocity: 0.95 },
+            { position: 1920, duration: 1920, pitch: 67, velocity: 0.9 },
+          ];
+        } else {
+          track.notes = [
+            { position: 0, duration: 480, pitch: 60, velocity: 0.9 },
+            { position: 480, duration: 480, pitch: 64, velocity: 0.9 },
+            { position: 960, duration: 960, pitch: 67, velocity: 0.95 },
+          ];
+        }
+      }
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          recipe: recipeName,
+          instrument: track.instrument,
+          track,
         },
       };
     }
@@ -1187,11 +1287,12 @@ export function applyCommand(project, name, params = {}) {
       if (action === "add") {
         if (!fxType) throw new Error("manage_fx add requires fxType");
         const defaults = getDefaultParams(fxType);
+        const normInput = normalizeFxParams(fxType, params.params || {});
         const newFx = {
           id: fxId,
           type: fxType,
           ...defaults,
-          ...(params.params || {}),
+          ...normInput,
         };
         track[fxListKey].push(newFx);
         return {
@@ -1207,7 +1308,11 @@ export function applyCommand(project, name, params = {}) {
         if (!item) {
           throw new Error(`FX not found: ${params.fxId || fxType}`);
         }
-        Object.assign(item, params.params || {});
+        const normInput = normalizeFxParams(
+          item.type || fxType,
+          params.params || {},
+        );
+        Object.assign(item, normInput);
         return {
           project: next,
           result: { ok: true, action: "update", trackId: track.id, fx: item },
@@ -1598,15 +1703,36 @@ export function applyCommand(project, name, params = {}) {
 
         const isDrums = track.kind === "drums";
         const notes = track.notes || [];
+        const tp = track.params || {};
+        const isAirhorn =
+          tp.samplePreset === "dj-airhorn" ||
+          tp.filterType === "horn" ||
+          (track.name && /airhorn/i.test(track.name));
 
-        for (const note of notes) {
+        const trkL = new Float32Array(totalFrames);
+        const trkR = new Float32Array(totalFrames);
+
+        for (let nIdx = 0; nIdx < notes.length; nIdx++) {
+          const note = notes[nIdx];
           const noteStartSec = pulsesToSeconds(note.position, bpm);
           if (noteStartSec >= durSec) continue;
 
-          const noteDurSec = Math.min(
-            durSec - noteStartSec,
-            pulsesToSeconds(note.duration || PPQN.SemiQuaver, bpm),
+          // Monophonic choke if next note overlaps
+          let maxNoteDurSec = pulsesToSeconds(
+            note.duration || PPQN.SemiQuaver,
+            bpm,
           );
+          if (tp.monophonic && nIdx + 1 < notes.length) {
+            const nextStartSec = pulsesToSeconds(notes[nIdx + 1].position, bpm);
+            if (nextStartSec > noteStartSec) {
+              maxNoteDurSec = Math.min(
+                maxNoteDurSec,
+                nextStartSec - noteStartSec,
+              );
+            }
+          }
+
+          const noteDurSec = Math.min(durSec - noteStartSec, maxNoteDurSec);
           const startFrame = Math.floor(noteStartSec * sampleRate);
           const noteFrames = Math.floor(noteDurSec * sampleRate);
           const vel =
@@ -1625,16 +1751,54 @@ export function applyCommand(project, name, params = {}) {
                 : 8000
             : 440 * Math.pow(2, (pitch - 69) / 12);
 
+          let phase = 0;
           for (let f = 0; f < noteFrames && startFrame + f < totalFrames; f++) {
             const t = f / sampleRate;
-            const env = Math.exp(-t * (isDrums ? 12 : 3));
-            let s = Math.sin(2 * Math.PI * freq * t) * env * vel;
-            if (isDrums && pitch === 38) {
-              s = (s * 0.5 + (Math.random() * 2 - 1) * 0.5) * env * vel;
+            if (isAirhorn) {
+              const u = f / Math.max(1, noteFrames);
+              let pitchSt = 0;
+              if (t < 0.03) pitchSt -= 2.0 * (1 - t / 0.03);
+              if (u > 0.65) pitchSt -= 3.5 * ((u - 0.65) / 0.35);
+              const fInst = freq * Math.pow(2, pitchSt / 12);
+              phase += (2 * Math.PI * fInst) / sampleRate;
+              const s =
+                (0.45 * Math.sin(phase * 2) +
+                  0.5 * Math.sin(phase * 3) +
+                  0.6 * Math.sin(phase * 4) +
+                  0.55 * Math.sin(phase * 5) +
+                  0.4 * Math.sin(phase * 6)) *
+                0.35 *
+                vel;
+              trkL[startFrame + f] += s * gainL;
+              trkR[startFrame + f] += s * gainR;
+            } else {
+              const env = Math.exp(-t * (isDrums ? 12 : 3));
+              let s = Math.sin(2 * Math.PI * freq * t) * env * vel;
+              if (isDrums && pitch === 38) {
+                s = (s * 0.5 + (Math.random() * 2 - 1) * 0.5) * env * vel;
+              }
+              trkL[startFrame + f] += s * gainL;
+              trkR[startFrame + f] += s * gainR;
             }
-            left[startFrame + f] += s * gainL;
-            right[startFrame + f] += s * gainR;
           }
+        }
+
+        const fxList =
+          Array.isArray(track.fx) && track.fx.length > 0
+            ? track.fx
+            : Array.isArray(tp.defaultFx)
+              ? tp.defaultFx
+              : [];
+        const { outLeft, outRight } = processTrackOfflineFx(
+          trkL,
+          trkR,
+          fxList,
+          bpm,
+          sampleRate,
+        );
+        for (let i = 0; i < totalFrames; i++) {
+          left[i] += outLeft[i];
+          right[i] += outRight[i];
         }
       }
 

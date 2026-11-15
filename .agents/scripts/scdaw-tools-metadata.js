@@ -853,7 +853,7 @@ export const TOOLS_METADATA = [
   {
     name: "scdaw_apply_preset",
     description:
-      "Apply a curated synthesizer preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead') to a synth track.",
+      "Apply a curated synthesizer or SFX preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
     inputSchema: {
       type: "object",
       properties: {
@@ -871,6 +871,10 @@ export const TOOLS_METADATA = [
             "warm-pad",
             "sub-808",
             "supersaw-lead",
+            "dj-airhorn",
+            "reggae-siren",
+            "brass-stab",
+            "hoover-rave",
           ],
           description: "Preset name",
         },
@@ -917,12 +921,14 @@ export const TOOLS_METADATA = [
           type: "string",
           enum: [
             "fold",
+            "waveshaper",
             "crusher",
             "stereoTool",
             "delay",
             "reverb",
             "compressor",
             "revamp",
+            "eq",
             "arpeggio",
             "pitch",
             "velocity",
@@ -1309,9 +1315,13 @@ export const TOOLS_METADATA = [
             "transient",
             "sidechain",
             "fold",
+            "waveshaper",
             "crusher",
             "delay",
             "reverb",
+            "compressor",
+            "revamp",
+            "eq",
             "stereoTool",
           ],
           description: "Audio effect type",
@@ -1534,7 +1544,7 @@ export const TOOLS_METADATA = [
   {
     name: "scdaw_analyze_mix",
     description:
-      "Analyze the current mix levels, dynamic range, clipping, and 3-band energy distribution (low, mid, high) across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, and actionable mix suggestions.",
+      "Analyze the current mix levels, dynamic range, clipping, spectral centroid, 5-band energy distribution (sub, low, mid, highMid, high), and pitch sag across a specified duration. Returns peak dBFS, RMS dBFS, crest factor, spectralCentroidHz, bandEnergy, and actionable mix suggestions.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1548,6 +1558,87 @@ export const TOOLS_METADATA = [
     },
     annotations: {
       readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_list_schemas",
+    description:
+      "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, and sound presets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: {
+          type: "string",
+          enum: ["all", "instruments", "fx", "presets"],
+          description: "Schema category to inspect (default 'all')",
+        },
+        name: {
+          type: "string",
+          description:
+            "Optional specific instrument or FX name (e.g. 'synth', 'nano', 'revamp')",
+        },
+      },
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_design_sound",
+    description:
+      "Configure a track in one call from a studio sound recipe ('dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') with full synthesis parameters, per-track FX chain, and optional default musical pattern.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target track ID",
+        },
+        recipe: {
+          type: "string",
+          enum: [
+            "dj-airhorn",
+            "reggae-siren",
+            "brass-stab",
+            "hoover-rave",
+            "init-saw",
+            "techno-bass",
+            "acid-303",
+            "supersaw-lead",
+          ],
+          description: "Sound design recipe or preset name",
+        },
+        instrument: {
+          type: "string",
+          enum: ["nano", "synth", "neon", "808", "cubed", "tubular", "korpus"],
+          description:
+            "Optional instrument engine override (defaults to recipe's optimal engine, e.g. 'nano' for dj-airhorn)",
+        },
+        overrides: {
+          type: "object",
+          description: "Optional synthesis parameter overrides",
+        },
+        fx: {
+          type: "array",
+          items: {
+            type: "object",
+          },
+          description: "Optional custom FX chain array override",
+        },
+        insertDefaultPattern: {
+          type: "boolean",
+          description:
+            "If true, writes the recipe's signature note pattern onto the track (e.g. 'wha-wha-wha-whaaaaaa' for dj-airhorn)",
+        },
+      },
+      required: ["trackId", "recipe"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
       consequentialHint: false,
     },
   },

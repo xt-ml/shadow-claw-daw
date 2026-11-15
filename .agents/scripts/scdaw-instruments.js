@@ -12,9 +12,272 @@ import {
   triggerDrumSoundfont,
   triggerSoundfontNote,
 } from "./scdaw-soundfont.js";
+import { createWavefolderCurve } from "./scdaw-dsp.js";
 
 // Global cache for preloaded sample audio buffers (decoded via ctx.decodeAudioData)
 const sampleCache = new Map();
+const sfxBufferCache = new Map();
+const activeMonoVoices = new WeakMap();
+
+function chokePreviousMonoVoice(dest, when = 0) {
+  if (!dest || typeof dest !== "object") return;
+  const prev = activeMonoVoices.get(dest);
+  if (prev && typeof prev.stop === "function") {
+    try {
+      prev.stop(when);
+    } catch (_) {}
+  }
+}
+
+function registerMonoVoice(dest, voiceHandle) {
+  if (!dest || typeof dest !== "object" || !voiceHandle) return;
+  activeMonoVoices.set(dest, voiceHandle);
+}
+
+/**
+ * Procedurally synthesizes studio one-shot SFX buffers for the Nano sampler.
+ * Supports: "dj-airhorn" (Jamaican dancehall / MLG compressed canister airhorn),
+ * "reggae-siren" (dub NJD pitch-modulated siren), "sub-drop", "white-noise-riser", "laser-zap".
+ *
+ * @param {AudioContext|OfflineAudioContext} ctx
+ * @param {string} [presetName="dj-airhorn"]
+ * @param {object} [options={}]
+ * @returns {AudioBuffer}
+ */
+export function synthesizeSfxBuffer(
+  ctx,
+  presetName = "dj-airhorn",
+  options = {},
+) {
+  const sampleRate = ctx?.sampleRate || 44100;
+  const preset = String(presetName || "dj-airhorn").toLowerCase();
+  const durationSec = Math.max(
+    0.2,
+    Number(
+      options.duration ??
+        (preset === "dj-airhorn"
+          ? 0.9
+          : preset === "reggae-siren"
+            ? 1.2
+            : preset === "white-noise-riser"
+              ? 1.5
+              : 0.8),
+    ),
+  );
+  const cacheKey = `${preset}:${sampleRate}:${durationSec.toFixed(2)}`;
+  if (!options.force && sfxBufferCache.has(cacheKey)) {
+    return sfxBufferCache.get(cacheKey);
+  }
+
+  const numFrames = Math.max(256, Math.round(sampleRate * durationSec));
+  const buffer = ctx.createBuffer(2, numFrames, sampleRate);
+  const left = buffer.getChannelData(0);
+  const right = buffer.getChannelData(1);
+
+  if (preset === "dj-airhorn") {
+    // Classic Dancehall / MLG Compressed Gas Airhorn (Root F#4 ~ 370 Hz, Horn Bell Cutoff > 580 Hz)
+    const baseFreq = Number(options.baseFreq || 370.0);
+    // Compressed plastic horn partials: fundamental is weak due to horn flare cutoff;
+    // 2nd..7th harmonics + slightly discordant dual-chamber reed ratios dominate 1.2kHz-3.5kHz
+    const partials = [
+      { ratio: 1.0, amp: 0.08, pan: 0.0 },
+      { ratio: 1.256, amp: 0.14, pan: -0.25 },
+      { ratio: 1.498, amp: 0.16, pan: 0.25 },
+      { ratio: 2.0, amp: 0.55, pan: -0.1 },
+      { ratio: 2.009, amp: 0.42, pan: 0.15 },
+      { ratio: 2.512, amp: 0.38, pan: -0.2 },
+      { ratio: 3.0, amp: 0.48, pan: 0.1 },
+      { ratio: 4.0, amp: 0.62, pan: -0.15 },
+      { ratio: 5.0, amp: 0.58, pan: 0.2 },
+      { ratio: 5.98, amp: 0.46, pan: -0.1 },
+      { ratio: 7.02, amp: 0.32, pan: 0.1 },
+      { ratio: 8.0, amp: 0.22, pan: 0.0 },
+    ];
+    const phases = new Float64Array(partials.length);
+
+    // Deterministic PRNG for consistent air turbulence across runs
+    let rng = 0x13579bdf;
+    const nextNoise = () => {
+      rng = (rng * 1664525 + 1013904223) >>> 0;
+      return (rng / 0xffffffff) * 2 - 1;
+    };
+
+    const scoopEndSec = 0.032; // 32ms valve pressure rise scoop
+    const sagStartSec = durationSec * 0.56; // Final 44% canister pressure drop sag
+
+    for (let i = 0; i < numFrames; i++) {
+      const t = i / sampleRate;
+
+      // Pitch contour in semitones:
+      // 1) Initial upward air-valve pressure scoop (-2.2 st -> 0 st)
+      // 2) High-pressure diaphragm flutter (+-0.12 st @ 29 Hz)
+      // 3) Classic end-of-blast downward pitch sag (0 st -> -3.8 st)
+      let pitchSt = 0;
+      if (t < scoopEndSec) {
+        const u = 1 - t / scoopEndSec;
+        pitchSt -= 2.2 * u * u;
+      }
+      if (t > sagStartSec) {
+        const u = (t - sagStartSec) / Math.max(0.01, durationSec - sagStartSec);
+        pitchSt -= 3.8 * Math.pow(u, 1.35);
+      }
+      pitchSt += 0.11 * Math.sin(2 * Math.PI * 29.0 * t);
+
+      const freqMult = Math.pow(2, pitchSt / 12);
+      const instFreq = baseFreq * freqMult;
+
+      // Amplitude contour: instant blast attack, hard plateau, natural pressure decay on sag
+      let env = 1.0;
+      if (t < 0.005) {
+        env = t / 0.005;
+      } else if (t > sagStartSec) {
+        const u = (t - sagStartSec) / Math.max(0.01, durationSec - sagStartSec);
+        env = Math.max(0.0, 1.0 - 0.72 * Math.pow(u, 1.4));
+      }
+
+      let sigL = 0;
+      let sigR = 0;
+      for (let p = 0; p < partials.length; p++) {
+        const part = partials[p];
+        phases[p] += (2 * Math.PI * instFreq * part.ratio) / sampleRate;
+        const s = Math.sin(phases[p]) * part.amp;
+        sigL += s * (1 - Math.max(0, part.pan));
+        sigR += s * (1 + Math.min(0, part.pan));
+      }
+
+      // Pressurized air turbulence modulated by diaphragm opening
+      const airBurst = t < 0.025 ? 0.32 * (1 - t / 0.025) : 0.12;
+      const nL = nextNoise() * airBurst * (0.5 + 0.5 * Math.abs(sigL));
+      const nR = nextNoise() * airBurst * (0.5 + 0.5 * Math.abs(sigR));
+
+      // Non-linear diaphragm clipping inside horn throat
+      left[i] = Math.tanh((sigL + nL) * 2.4) * env;
+      right[i] = Math.tanh((sigR + nR) * 2.4) * env;
+    }
+
+    // Apply acoustic horn bell filtering:
+    // Steep 2-stage highpass at 620 Hz (eliminates all <400Hz foghorn mud)
+    // + resonant horn flare formant peak at 2150 Hz
+    const applyBiquadInPlace = (arr, type, freq, q, gainDb = 0) => {
+      const w0 = (2 * Math.PI * freq) / sampleRate;
+      const cosW0 = Math.cos(w0);
+      const sinW0 = Math.sin(w0);
+      const alpha = sinW0 / (2 * q);
+      const A = Math.pow(10, gainDb / 40);
+      let b0 = 1,
+        b1 = 0,
+        b2 = 0,
+        a0 = 1,
+        a1 = 0,
+        a2 = 0;
+      if (type === "highpass") {
+        b0 = (1 + cosW0) / 2;
+        b1 = -(1 + cosW0);
+        b2 = (1 + cosW0) / 2;
+        a0 = 1 + alpha;
+        a1 = -2 * cosW0;
+        a2 = 1 - alpha;
+      } else if (type === "peaking") {
+        b0 = 1 + alpha * A;
+        b1 = -2 * cosW0;
+        b2 = 1 - alpha * A;
+        a0 = 1 + alpha / A;
+        a1 = -2 * cosW0;
+        a2 = 1 - alpha / A;
+      } else if (type === "lowpass") {
+        b0 = (1 - cosW0) / 2;
+        b1 = 1 - cosW0;
+        b2 = (1 - cosW0) / 2;
+        a0 = 1 + alpha;
+        a1 = -2 * cosW0;
+        a2 = 1 - alpha;
+      }
+      const nb0 = b0 / a0,
+        nb1 = b1 / a0,
+        nb2 = b2 / a0,
+        na1 = a1 / a0,
+        na2 = a2 / a0;
+      let x1 = 0,
+        x2 = 0,
+        y1 = 0,
+        y2 = 0;
+      for (let i = 0; i < arr.length; i++) {
+        const x = arr[i];
+        const y = nb0 * x + nb1 * x1 + nb2 * x2 - na1 * y1 - na2 * y2;
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+        arr[i] = y;
+      }
+    };
+
+    for (const ch of [left, right]) {
+      applyBiquadInPlace(ch, "highpass", 620, 0.85);
+      applyBiquadInPlace(ch, "highpass", 620, 0.85);
+      applyBiquadInPlace(ch, "peaking", 2150, 2.2, 8.5);
+      applyBiquadInPlace(ch, "peaking", 3100, 2.5, 5.0);
+      applyBiquadInPlace(ch, "lowpass", 7500, 0.707);
+    }
+
+    // Normalize peak to 0.92
+    let maxPeak = 1e-6;
+    for (let i = 0; i < numFrames; i++) {
+      const m = Math.max(Math.abs(left[i]), Math.abs(right[i]));
+      if (m > maxPeak) maxPeak = m;
+    }
+    const normGain = 0.92 / maxPeak;
+    for (let i = 0; i < numFrames; i++) {
+      left[i] *= normGain;
+      right[i] *= normGain;
+    }
+  } else if (preset === "reggae-siren") {
+    // Classic Jamaican King Tubby / NJD Dub Siren (LFO square/triangle sweep 550Hz..1450Hz)
+    let phase = 0;
+    for (let i = 0; i < numFrames; i++) {
+      const t = i / sampleRate;
+      const lfo = Math.sin(2 * Math.PI * 5.5 * t);
+      const freq = 920 + 420 * lfo;
+      phase += (2 * Math.PI * freq) / sampleRate;
+      const sq = Math.tanh(Math.sin(phase) * 4.0) * 0.8;
+      const env = t < 0.01 ? t / 0.01 : Math.min(1, (durationSec - t) / 0.08);
+      left[i] = sq * env;
+      right[i] = sq * env;
+    }
+  } else if (preset === "sub-drop") {
+    let phase = 0;
+    for (let i = 0; i < numFrames; i++) {
+      const t = i / sampleRate;
+      const freq = 110 * Math.pow(0.28, t / durationSec);
+      phase += (2 * Math.PI * freq) / sampleRate;
+      const env = Math.max(0, 1 - t / durationSec);
+      const s = Math.tanh(Math.sin(phase) * 1.6) * env;
+      left[i] = s;
+      right[i] = s;
+    }
+  } else if (preset === "laser-zap") {
+    let phase = 0;
+    for (let i = 0; i < numFrames; i++) {
+      const t = i / sampleRate;
+      const freq = 2400 * Math.exp(-8.5 * (t / durationSec)) + 90;
+      phase += (2 * Math.PI * freq) / sampleRate;
+      const env = Math.max(0, 1 - t / durationSec);
+      left[i] = Math.sin(phase) * env * 0.85;
+      right[i] = left[i];
+    }
+  } else {
+    // white-noise-riser
+    for (let i = 0; i < numFrames; i++) {
+      const u = i / numFrames;
+      const env = u * u;
+      left[i] = (Math.random() * 2 - 1) * env * 0.7;
+      right[i] = (Math.random() * 2 - 1) * env * 0.7;
+    }
+  }
+
+  sfxBufferCache.set(cacheKey, buffer);
+  return buffer;
+}
 
 export function setCachedSample(pitch, audioBuffer) {
   sampleCache.set(pitch, audioBuffer);
@@ -478,6 +741,10 @@ export function triggerSynth(
   trackVolume = 1,
   options = {},
 ) {
+  if (params.monophonic) {
+    chokePreviousMonoVoice(dest, when);
+  }
+
   const gate = Boolean(options?.gate);
   const pitch = note.pitch ?? 60;
   const velocity = Math.max(
@@ -501,43 +768,134 @@ export function triggerSynth(
   const release = Math.max(0.02, params.release || 0.15);
 
   const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+  const releaseStart = when + durationSec;
 
-  // Main Oscillator 1
-  const osc1 = ctx.createOscillator();
-  if (waveform === "pulse") {
-    try {
-      const pw = getPulseWave(ctx, params.pulseWidth || 0.5);
-      osc1.setPeriodicWave(pw);
-    } catch (_) {
-      osc1.type = "square";
+  // Pitch Envelope (Attack Scoop + Release Sag)
+  const pitchEnvSt = Number(params.pitchEnvAmount || 0);
+  const pitchAttack = Math.max(0.002, Number(params.pitchAttack || 0.025));
+  const pitchReleaseDropSt = Number(params.pitchReleaseDrop || 0);
+
+  const applyPitchEnvelopeToOsc = (osc, baseFreq, baseDetuneCents = 0) => {
+    if (pitchEnvSt !== 0) {
+      const startFreq = Math.max(20, baseFreq * Math.pow(2, -pitchEnvSt / 12));
+      osc.frequency.setValueAtTime(startFreq, when);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq, when + pitchAttack);
+    } else {
+      osc.frequency.setValueAtTime(baseFreq, when);
     }
-  } else {
-    osc1.type = waveform;
-  }
-  osc1.frequency.setValueAtTime(freq, when);
-  if (params.detune) {
-    osc1.detune.setValueAtTime(Number(params.detune), when);
+    if (pitchReleaseDropSt !== 0 && !gate) {
+      const endFreq = Math.max(
+        20,
+        baseFreq * Math.pow(2, pitchReleaseDropSt / 12),
+      );
+      osc.frequency.setValueAtTime(baseFreq, releaseStart);
+      osc.frequency.exponentialRampToValueAtTime(
+        endFreq,
+        releaseStart + release,
+      );
+    }
+    if (baseDetuneCents !== 0 && osc.detune) {
+      osc.detune.setValueAtTime(baseDetuneCents, when);
+    }
+  };
+
+  // Pre-filter input node (optional Highpass + Horn Formant stage)
+  const filterType = String(params.filterType || "lowpass").toLowerCase();
+  const highpassCutoff = Number(
+    params.highpassCutoff || (filterType === "horn" ? 540 : 20),
+  );
+  let preFilter = null;
+  if (highpassCutoff > 25) {
+    preFilter = ctx.createBiquadFilter();
+    preFilter.type = "highpass";
+    preFilter.frequency.setValueAtTime(highpassCutoff, when);
+    preFilter.Q.setValueAtTime(0.85, when);
   }
 
-  // Filter (Lowpass with optional Filter ADSR Envelope sweep)
+  // Primary Filter (Lowpass / Bandpass / Highpass / Peaking / Horn Formant)
   const filter = ctx.createBiquadFilter();
-  filter.type = "lowpass";
-  filter.Q.setValueAtTime(resonance, when);
+  if (filterType === "horn") {
+    filter.type = "peaking";
+    filter.Q.setValueAtTime(Math.max(1.5, resonance * 0.6), when);
+    if (filter.gain) filter.gain.setValueAtTime(9.0, when);
+  } else if (
+    filterType === "bandpass" ||
+    filterType === "highpass" ||
+    filterType === "peaking"
+  ) {
+    filter.type = filterType;
+    filter.Q.setValueAtTime(resonance, when);
+  } else {
+    filter.type = "lowpass";
+    filter.Q.setValueAtTime(resonance, when);
+  }
 
+  const baseFilterFreq =
+    filterType === "horn"
+      ? Number(params.formantFreq || cutoff || 2100)
+      : cutoff;
   const filterEnvAmount = Number(params.filterEnvAmount || 0);
   const filterDecay = Math.max(0.01, Number(params.filterDecay || decay));
 
   if (filterEnvAmount !== 0) {
-    const peakCutoff = Math.max(20, Math.min(20000, cutoff + filterEnvAmount));
-    filter.frequency.setValueAtTime(cutoff, when);
+    const peakCutoff = Math.max(
+      20,
+      Math.min(20000, baseFilterFreq + filterEnvAmount),
+    );
+    filter.frequency.setValueAtTime(baseFilterFreq, when);
     filter.frequency.linearRampToValueAtTime(peakCutoff, when + attack);
     filter.frequency.exponentialRampToValueAtTime(
-      Math.max(20, cutoff),
+      Math.max(20, baseFilterFreq),
       when + attack + filterDecay,
     );
   } else {
-    filter.frequency.setValueAtTime(cutoff, when);
+    filter.frequency.setValueAtTime(baseFilterFreq, when);
   }
+
+  const voiceTarget = preFilter || filter;
+  if (preFilter) {
+    preFilter.connect(filter);
+  }
+
+  // Unison Oscillator Stack (1..7 voices)
+  const unisonCount = Math.max(
+    1,
+    Math.min(7, Math.round(Number(params.unisonCount || 1))),
+  );
+  const unisonDetune = Number(params.unisonDetune || 0);
+  const baseDetune = Number(params.detune || 0);
+  const unisonOscs = [];
+  const unisonNodes = [];
+  const unisonVoiceGain = 1 / Math.sqrt(unisonCount);
+
+  for (let u = 0; u < unisonCount; u++) {
+    const osc = ctx.createOscillator();
+    if (waveform === "pulse") {
+      try {
+        const pw = getPulseWave(ctx, params.pulseWidth || 0.5);
+        osc.setPeriodicWave(pw);
+      } catch (_) {
+        osc.type = "square";
+      }
+    } else {
+      osc.type = waveform;
+    }
+    const spreadPos = unisonCount === 1 ? 0 : (u / (unisonCount - 1)) * 2 - 1;
+    const voiceDetune = baseDetune + spreadPos * unisonDetune;
+    applyPitchEnvelopeToOsc(osc, freq, voiceDetune);
+
+    if (unisonCount > 1) {
+      const uGain = ctx.createGain();
+      uGain.gain.setValueAtTime(unisonVoiceGain, when);
+      osc.connect(uGain);
+      uGain.connect(voiceTarget);
+      unisonNodes.push(uGain);
+    } else {
+      osc.connect(voiceTarget);
+    }
+    unisonOscs.push(osc);
+  }
+  const osc1 = unisonOscs[0];
 
   // Amp Gain ADSR Envelope
   const amp = ctx.createGain();
@@ -545,7 +903,6 @@ export function triggerSynth(
 
   const peakVal = velocity;
   const sustainVal = Math.max(0.0001, peakVal * sustain);
-  const releaseStart = when + durationSec;
 
   if (gate) {
     // Live MIDI: schedule full Attack -> Decay -> Sustain until handle.release()
@@ -579,12 +936,14 @@ export function triggerSynth(
     amp.gain.linearRampToValueAtTime(0, releaseStart + release + 0.015);
   }
 
-  osc1.connect(filter);
-
   // Secondary Oscillator (Osc 2)
   let osc2 = null;
   let osc2Gain = null;
-  if (params.osc2Waveform && params.osc2Waveform !== "off") {
+  if (
+    params.osc2Waveform &&
+    params.osc2Waveform !== "off" &&
+    params.osc2Waveform !== "none"
+  ) {
     osc2 = ctx.createOscillator();
     if (params.osc2Waveform === "pulse") {
       try {
@@ -598,14 +957,11 @@ export function triggerSynth(
     }
     const osc2Oct = Number(params.osc2Octave || 0);
     const osc2Freq = freq * Math.pow(2, osc2Oct);
-    osc2.frequency.setValueAtTime(osc2Freq, when);
-    if (params.osc2Detune) {
-      osc2.detune.setValueAtTime(Number(params.osc2Detune), when);
-    }
+    applyPitchEnvelopeToOsc(osc2, osc2Freq, Number(params.osc2Detune || 0));
     osc2Gain = ctx.createGain();
     osc2Gain.gain.setValueAtTime(Number(params.osc2Mix ?? 0.35), when);
     osc2.connect(osc2Gain);
-    osc2Gain.connect(filter);
+    osc2Gain.connect(voiceTarget);
     osc2.start(when);
   }
 
@@ -619,25 +975,86 @@ export function triggerSynth(
     subGain = ctx.createGain();
     subGain.gain.setValueAtTime(Number(params.subMix), when);
     subOsc.connect(subGain);
-    subGain.connect(filter);
+    subGain.connect(voiceTarget);
     subOsc.start(when);
   }
 
-  filter.connect(amp);
+  // Pressurized Air / Noise Layer
+  let noiseSrc = null;
+  let noiseGain = null;
+  if (params.noiseMix && Number(params.noiseMix) > 0) {
+    noiseSrc = ctx.createBufferSource();
+    noiseSrc.buffer = createNoiseBuffer(
+      ctx,
+      Math.max(0.5, durationSec + release + 0.1),
+    );
+    noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(Number(params.noiseMix) * 0.5, when);
+    noiseSrc.connect(noiseGain);
+    noiseGain.connect(voiceTarget);
+    noiseSrc.start(when);
+  }
+
+  // Optional LFO (Pitch Vibrato / Filter Wobble)
+  let lfoOsc = null;
+  let lfoGain = null;
+  const lfoPitchDepth = Number(params.lfoPitchDepth || 0);
+  if (lfoPitchDepth > 0) {
+    lfoOsc = ctx.createOscillator();
+    lfoOsc.type = params.lfoWaveform || "sine";
+    lfoOsc.frequency.setValueAtTime(Number(params.lfoRate || 5.5), when);
+    lfoGain = ctx.createGain();
+    lfoGain.gain.setValueAtTime(lfoPitchDepth, when);
+    lfoOsc.connect(lfoGain);
+    for (const uOsc of unisonOscs) {
+      if (uOsc.detune) lfoGain.connect(uOsc.detune);
+    }
+    if (osc2 && osc2.detune) lfoGain.connect(osc2.detune);
+    lfoOsc.start(when);
+  }
+
+  // Optional internal Drive / WaveShaper stage
+  let driveShaper = null;
+  const driveAmt = Number(params.drive || 0);
+  if (driveAmt > 0.01 && typeof ctx.createWaveShaper === "function") {
+    driveShaper = ctx.createWaveShaper();
+    driveShaper.curve = createWavefolderCurve(driveAmt * 16, 1024);
+    filter.connect(driveShaper);
+    driveShaper.connect(amp);
+  } else {
+    filter.connect(amp);
+  }
   amp.connect(dest);
 
-  osc1.start(when);
   const stopTime = gate ? when + 30 : releaseStart + release + 0.05;
-  osc1.stop(stopTime);
+  for (const uOsc of unisonOscs) {
+    uOsc.start(when);
+    uOsc.stop(stopTime);
+  }
   if (osc2) osc2.stop(stopTime);
   if (subOsc) subOsc.stop(stopTime);
+  if (noiseSrc) noiseSrc.stop(stopTime);
+  if (lfoOsc) lfoOsc.stop(stopTime);
 
   const handle = createVoiceHandle(
-    [amp, filter, osc2Gain, subGain].filter(Boolean),
-    [osc1, osc2, subOsc].filter(Boolean),
+    [
+      amp,
+      driveShaper,
+      filter,
+      preFilter,
+      osc2Gain,
+      subGain,
+      noiseGain,
+      lfoGain,
+      ...unisonNodes,
+    ].filter(Boolean),
+    [...unisonOscs, osc2, subOsc, noiseSrc, lfoOsc].filter(Boolean),
     stopTime,
     ctx,
   );
+  if (params.monophonic) {
+    registerMonoVoice(dest, handle);
+  }
   let released = false;
   let currentDetune = Number(params.detune || 0);
   let currentOsc2Detune = Number(params.osc2Detune || 0);
@@ -660,16 +1077,22 @@ export function triggerSynth(
         amp.gain.linearRampToValueAtTime(0, t + release + 0.015);
       }
       const endT = t + release + 0.03;
-      if (typeof osc1.stop === "function") osc1.stop(endT);
+      for (const uOsc of unisonOscs) {
+        if (typeof uOsc.stop === "function") uOsc.stop(endT);
+      }
       if (osc2 && typeof osc2.stop === "function") osc2.stop(endT);
       if (subOsc && typeof subOsc.stop === "function") subOsc.stop(endT);
+      if (noiseSrc && typeof noiseSrc.stop === "function") noiseSrc.stop(endT);
+      if (lfoOsc && typeof lfoOsc.stop === "function") lfoOsc.stop(endT);
     } catch (_) {}
   };
   handle.setPitchBend = (semitones = 0, now = ctx.currentTime) => {
     const bendCents = Number(semitones) * 100;
     try {
-      if (osc1.detune)
-        osc1.detune.setValueAtTime(currentDetune + bendCents, now);
+      for (const uOsc of unisonOscs) {
+        if (uOsc.detune)
+          uOsc.detune.setValueAtTime(currentDetune + bendCents, now);
+      }
       if (osc2 && osc2.detune) {
         osc2.detune.setValueAtTime(currentOsc2Detune + bendCents, now);
       }
@@ -1300,8 +1723,18 @@ export function triggerNano(
   bpm = 120,
   trackVolume = 1,
 ) {
+  if (params.monophonic) {
+    chokePreviousMonoVoice(dest, when);
+  }
+
   const pitch = note.pitch ?? 60;
-  const rootKey = Number(params.rootKey ?? 60);
+  const samplePreset =
+    params.samplePreset && params.samplePreset !== "none"
+      ? String(params.samplePreset).toLowerCase()
+      : null;
+  const rootKey = Number(
+    params.rootKey ?? (samplePreset === "dj-airhorn" ? 66 : 60),
+  );
   const velocity = Math.max(
     0.01,
     Math.min(1, (note.velocity ?? 0.8) * trackVolume),
@@ -1311,30 +1744,89 @@ export function triggerNano(
     0.05,
     pulsesToSeconds(note.duration ?? 240, bpm),
   );
+  const attack = Math.max(0.001, Number(params.attack || 0.005));
+  const release = Math.max(0.01, Number(params.release || 0.2));
 
-  const cachedBuffer = sampleCache.get(pitch) || sampleCache.get(rootKey);
+  let cachedBuffer = sampleCache.get(pitch) || sampleCache.get(rootKey);
+  if (!cachedBuffer && samplePreset) {
+    cachedBuffer = synthesizeSfxBuffer(ctx, samplePreset, {
+      duration: Math.max(0.85, durationSec + release),
+    });
+  }
+
   if (cachedBuffer) {
     const src = ctx.createBufferSource();
     src.buffer = cachedBuffer;
-    src.playbackRate.setValueAtTime(rate, when);
+
+    const pitchEnvSt = Number(params.pitchEnvAmount || 0);
+    const pitchAttack = Math.max(0.002, Number(params.pitchAttack || 0.025));
+    const pitchReleaseDropSt = Number(params.pitchReleaseDrop || 0);
+
+    if (pitchEnvSt !== 0) {
+      const startRate = Math.max(0.1, rate * Math.pow(2, -pitchEnvSt / 12));
+      src.playbackRate.setValueAtTime(startRate, when);
+      src.playbackRate.exponentialRampToValueAtTime(rate, when + pitchAttack);
+    } else {
+      src.playbackRate.setValueAtTime(rate, when);
+    }
+    if (pitchReleaseDropSt !== 0) {
+      const endRate = Math.max(
+        0.1,
+        rate * Math.pow(2, pitchReleaseDropSt / 12),
+      );
+      src.playbackRate.setValueAtTime(rate, when + durationSec);
+      src.playbackRate.exponentialRampToValueAtTime(
+        endRate,
+        when + durationSec + release,
+      );
+    }
 
     const amp = ctx.createGain();
-    const attack = Math.max(0.001, Number(params.attack || 0.005));
-    const release = Math.max(0.01, Number(params.release || 0.2));
-
     amp.gain.setValueAtTime(0.0001, when);
     amp.gain.linearRampToValueAtTime(velocity, when + attack);
     amp.gain.setValueAtTime(velocity, when + durationSec);
     amp.gain.exponentialRampToValueAtTime(0.0001, when + durationSec + release);
 
-    src.connect(amp);
+    const extraNodes = [];
+    let tail = src;
+
+    const hpCutoff = Number(params.highpassCutoff || 20);
+    if (hpCutoff > 25) {
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.setValueAtTime(hpCutoff, when);
+      hp.Q.setValueAtTime(0.8, when);
+      tail.connect(hp);
+      tail = hp;
+      extraNodes.push(hp);
+    }
+
+    const driveAmt = Number(params.drive || 0);
+    if (driveAmt > 0.01 && typeof ctx.createWaveShaper === "function") {
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = createWavefolderCurve(driveAmt * 14, 1024);
+      tail.connect(shaper);
+      tail = shaper;
+      extraNodes.push(shaper);
+    }
+
+    tail.connect(amp);
     amp.connect(dest);
 
     src.start(when);
     const stopTime = when + durationSec + release + 0.05;
     src.stop(stopTime);
 
-    return createVoiceHandle([amp], [src], stopTime, ctx);
+    const handle = createVoiceHandle(
+      [amp, ...extraNodes],
+      [src],
+      stopTime,
+      ctx,
+    );
+    if (params.monophonic) {
+      registerMonoVoice(dest, handle);
+    }
+    return handle;
   }
 
   // Pure synthetic multi-sample tone fallback
@@ -1352,7 +1844,11 @@ export function triggerNano(
   const stopTime = when + durationSec + 0.12;
   osc.stop(stopTime);
 
-  return createVoiceHandle([amp], [osc], stopTime, ctx);
+  const handle = createVoiceHandle([amp], [osc], stopTime, ctx);
+  if (params.monophonic) {
+    registerMonoVoice(dest, handle);
+  }
+  return handle;
 }
 
 /**
