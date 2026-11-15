@@ -2125,38 +2125,48 @@ export class DawWorkbenchElement extends BaseElement {
    */
   async _checkFileUrlParam() {
     if (typeof window === "undefined" || !window.location) return;
+    if (this._checkingFileUrlParam) return;
+    this._checkingFileUrlParam = true;
 
-    const jsonStr = await getCompressedParam("file", window.location);
-    if (!jsonStr) return;
-
-    let songName = "shared song";
     try {
-      const parsed = JSON.parse(jsonStr);
-      if (parsed?.name) songName = parsed.name;
-    } catch (_) {
-      // Invalid JSON; let importProjectFile handle or abort
-    }
+      const jsonStr = await getCompressedParam("file", window.location);
+      if (!jsonStr) return;
 
-    if (
-      typeof customElements !== "undefined" &&
-      !customElements.get("shadow-claw-dialog")
-    ) {
-      await Promise.race([
-        customElements.whenDefined("shadow-claw-dialog"),
-        new Promise((r) => setTimeout(r, 1500)),
-      ]);
-    }
+      let songName = "shared song";
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed?.name) songName = parsed.name;
+      } catch (_) {
+        // Invalid JSON; let importProjectFile handle or abort
+      }
 
-    const confirmed = await this.confirmDialog({
-      title: "Load Song from URL",
-      message: `Would you like to load "${songName}" as a song? This will replace your current project.`,
-      confirmText: "Load Song",
-      cancelText: "Cancel",
-    });
+      if (
+        typeof customElements !== "undefined" &&
+        !customElements.get("shadow-claw-dialog")
+      ) {
+        await Promise.race([
+          customElements.whenDefined("shadow-claw-dialog"),
+          new Promise((r) => setTimeout(r, 1500)),
+        ]);
+      }
 
-    if (confirmed) {
-      await scdaw.importProjectFile(jsonStr);
-      clearUrlParam("file");
+      const confirmed = await this.confirmDialog({
+        title: "Load Song from URL",
+        message: `Would you like to load "${songName}" as a song? This will replace your current project.`,
+        confirmText: "Load Song",
+        cancelText: "Cancel",
+      });
+
+      if (confirmed) {
+        try {
+          await scdaw.importProjectFile(jsonStr);
+          clearUrlParam("file");
+        } catch (err) {
+          console.error("[scdaw] Failed to load song from URL:", err);
+        }
+      }
+    } finally {
+      this._checkingFileUrlParam = false;
     }
   }
 
@@ -2223,15 +2233,47 @@ export class DawWorkbenchElement extends BaseElement {
     }
 
     return new Promise((resolve) => {
-      const handleClose = () => {
+      let settled = false;
+      const cleanup = () => {
         nativeDialog.removeEventListener("close", handleClose);
-        const isConfirmed = nativeDialog.returnValue === "confirm";
+        confirmBtn?.removeEventListener("click", handleConfirmClick);
+        cancelBtn?.removeEventListener("click", handleCancelClick);
+      };
+      const finish = (isConfirmed) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         // Reset returnValue to prevent stale value leakage across dialog displays
         nativeDialog.returnValue = "";
         resolve(isConfirmed);
       };
+      const handleClose = () => {
+        finish(nativeDialog.returnValue === "confirm");
+      };
+      const closeWith = (val) => {
+        nativeDialog.returnValue = val;
+        if (typeof dialogWrapper.close === "function") {
+          dialogWrapper.close(val);
+        } else if (typeof nativeDialog.close === "function") {
+          nativeDialog.close(val);
+        }
+        finish(val === "confirm");
+      };
+      const handleConfirmClick = (e) => {
+        e?.preventDefault?.();
+        closeWith("confirm");
+      };
+      const handleCancelClick = (e) => {
+        e?.preventDefault?.();
+        closeWith("cancel");
+      };
 
       nativeDialog.addEventListener("close", handleClose);
+      confirmBtn?.addEventListener("click", handleConfirmClick);
+      cancelBtn?.addEventListener("click", handleCancelClick);
+      if (nativeDialog.open && typeof nativeDialog.close === "function") {
+        nativeDialog.close();
+      }
       dialogWrapper.showModal();
     });
   }

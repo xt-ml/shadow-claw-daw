@@ -128,3 +128,124 @@ test("scdaw-workbench: includes Press a URL button, #press-url-modal, and ?file/
   assert.match(content, /_checkFileUrlParam\s*\(/);
   assert.match(content, /hashchange/);
 });
+
+test("scdaw-workbench: confirmDialog resolves via explicit button clicks even without form returnValue", async () => {
+  const { DawWorkbenchElement } =
+    await import("../.agents/scripts/components/scdaw-workbench.js");
+
+  function createMockDialog() {
+    const listeners = new Map();
+    const confirmListeners = [];
+    const cancelListeners = [];
+    const nativeDialog = {
+      returnValue: "",
+      open: false,
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(fn);
+      },
+      removeEventListener(type, fn) {
+        const arr = listeners.get(type) || [];
+        const idx = arr.indexOf(fn);
+        if (idx >= 0) arr.splice(idx, 1);
+      },
+      close(val) {
+        if (val !== undefined) this.returnValue = val;
+        this.open = false;
+        for (const fn of [...(listeners.get("close") || [])]) {
+          fn();
+        }
+      },
+    };
+    const dialogWrapper = {
+      dialog: nativeDialog,
+      showModal() {
+        nativeDialog.open = true;
+      },
+      close(val) {
+        nativeDialog.close(val);
+      },
+    };
+    const confirmBtn = {
+      textContent: "",
+      className: "",
+      style: {},
+      addEventListener(type, fn) {
+        if (type === "click") confirmListeners.push(fn);
+      },
+      removeEventListener(type, fn) {
+        const idx = confirmListeners.indexOf(fn);
+        if (idx >= 0) confirmListeners.splice(idx, 1);
+      },
+      click() {
+        // Simulate Android WebView where <form method="dialog"> does NOT set returnValue
+        for (const fn of [...confirmListeners]) {
+          fn({ preventDefault() {} });
+        }
+      },
+    };
+    const cancelBtn = {
+      textContent: "",
+      addEventListener(type, fn) {
+        if (type === "click") cancelListeners.push(fn);
+      },
+      removeEventListener(type, fn) {
+        const idx = cancelListeners.indexOf(fn);
+        if (idx >= 0) cancelListeners.splice(idx, 1);
+      },
+      click() {
+        for (const fn of [...cancelListeners]) {
+          fn({ preventDefault() {} });
+        }
+      },
+    };
+    const titleEl = { textContent: "" };
+    const msgEl = { textContent: "" };
+    const fakeThis = {
+      shadowRoot: {
+        getElementById(id) {
+          if (id === "confirm-dialog") return dialogWrapper;
+          if (id === "confirm-dialog-title") return titleEl;
+          if (id === "confirm-dialog-message") return msgEl;
+          if (id === "confirm-dialog-confirm") return confirmBtn;
+          if (id === "confirm-dialog-cancel") return cancelBtn;
+          return null;
+        },
+      },
+    };
+    return { fakeThis, confirmBtn, cancelBtn, nativeDialog };
+  }
+
+  const { fakeThis, confirmBtn, cancelBtn } = createMockDialog();
+  const p1 = DawWorkbenchElement.prototype.confirmDialog.call(fakeThis, {
+    title: "Load Song from URL",
+    message: "Load?",
+    confirmText: "Load Song",
+    cancelText: "Cancel",
+  });
+  confirmBtn.click();
+  assert.equal(await p1, true);
+
+  const p2 = DawWorkbenchElement.prototype.confirmDialog.call(fakeThis, {
+    title: "Load Song from URL",
+    message: "Load?",
+    confirmText: "Load Song",
+    cancelText: "Cancel",
+  });
+  cancelBtn.click();
+  assert.equal(await p2, false);
+});
+
+test("scdaw-workbench: _checkFileUrlParam guards re-entrancy and handles import errors gracefully", async () => {
+  const workbenchPath = join(
+    __dirname,
+    "../.agents/scripts/components/scdaw-workbench.js",
+  );
+  const content = await readFile(workbenchPath, "utf8");
+
+  assert.match(content, /_checkingFileUrlParam/);
+  assert.match(
+    content,
+    /try\s*\{[\s\S]*?importProjectFile\(jsonStr\)[\s\S]*?\}\s*catch/,
+  );
+});
