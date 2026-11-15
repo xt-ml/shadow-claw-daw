@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { SHARED_STYLES } from "../.agents/scripts/components/scdaw-styles.js";
+import { scdaw } from "../.agents/scripts/scdaw-engine.js";
 import {
   mapNormalizedToValue,
   mapValueToNormalized,
@@ -1121,6 +1122,126 @@ test("scdaw-devices: in-place DOM sync preserves active knob dragging without de
 
   // Inactive knob was updated to latest track parameter
   assert.equal(knobGlide.value, 240);
+});
+
+test("scdaw-devices: omits instrument card when track.instrument is 'none'", () => {
+  const track = {
+    id: "trk_1",
+    name: "Lead",
+    kind: "synth",
+    instrument: "none",
+    midiFx: [{ id: "mfx_1", type: "arpeggio" }],
+    fx: [{ id: "fx_1", type: "fold" }],
+  };
+
+  const chain = getDeviceChainForTrack(track);
+  assert.equal(chain.length, 2);
+  assert.equal(chain[0].role, "midi-fx");
+  assert.equal(chain[1].role, "audio-fx");
+});
+
+test("scdaw-devices: renders '✕' remove button on each device card and dispatches removal commands", () => {
+  const track = {
+    id: "trk_drums",
+    name: "Drums",
+    kind: "drums",
+    instrument: "neon",
+    midiFx: [{ id: "mfx_1", type: "zeitgeist" }],
+    fx: [{ id: "fx_1", type: "fold" }],
+  };
+
+  const origGetProject = scdaw.getProject;
+  const origSendCommand = scdaw.sendCommand;
+  const commands = [];
+  scdaw.getProject = () => ({ tracks: [track] });
+  scdaw.sendCommand = (name, params) => {
+    commands.push({ name, params });
+  };
+
+  try {
+    const removeButtons = [
+      {
+        dataset: { role: "midi-fx", type: "zeitgeist", id: "mfx_1" },
+        listeners: {},
+        addEventListener(ev, fn) {
+          this.listeners[ev] = fn;
+        },
+      },
+      {
+        dataset: { role: "instrument", type: "neon", id: "" },
+        listeners: {},
+        addEventListener(ev, fn) {
+          this.listeners[ev] = fn;
+        },
+      },
+      {
+        dataset: { role: "audio-fx", type: "fold", id: "fx_1" },
+        listeners: {},
+        addEventListener(ev, fn) {
+          this.listeners[ev] = fn;
+        },
+      },
+    ];
+
+    const element = new DawDevicesElement();
+    element._selectedTrackId = "trk_drums";
+    element.shadowRoot = {
+      innerHTML: "",
+      querySelectorAll(sel) {
+        if (sel === ".scdaw-devices__remove-btn") return removeButtons;
+        return [];
+      },
+      getElementById() {
+        return null;
+      },
+    };
+
+    element.render();
+
+    assert.ok(
+      element.shadowRoot.innerHTML.includes("scdaw-devices__remove-btn"),
+      "Rendered HTML should include remove button class",
+    );
+    assert.ok(
+      element.shadowRoot.innerHTML.includes("✕"),
+      "Rendered HTML should include '✕' remove indicator",
+    );
+
+    removeButtons[0].listeners.click();
+    removeButtons[1].listeners.click();
+    removeButtons[2].listeners.click();
+
+    assert.deepEqual(commands, [
+      {
+        name: "manage_fx",
+        params: {
+          action: "remove",
+          trackId: "trk_drums",
+          fxType: "zeitgeist",
+          fxId: "mfx_1",
+        },
+      },
+      {
+        name: "set_instrument",
+        params: {
+          trackId: "trk_drums",
+          instrument: "none",
+        },
+      },
+      {
+        name: "manage_fx",
+        params: {
+          action: "remove",
+          trackId: "trk_drums",
+          fxType: "fold",
+          fxId: "fx_1",
+        },
+      },
+    ]);
+  } finally {
+    scdaw.getProject = origGetProject;
+    scdaw.sendCommand = origSendCommand;
+  }
 });
 
 test("scdaw-mixer: computes 12-segment meter levels and formats decibels", () => {

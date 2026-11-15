@@ -1970,6 +1970,8 @@ export function triggerInstrumentVoice(ctx, dest, event, when, bpm = 120) {
   const params = event.trackParams || {};
 
   switch (inst) {
+    case "none":
+      return null;
     case "drums":
     case "playfield":
       if (

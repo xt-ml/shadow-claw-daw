@@ -22,7 +22,8 @@
           "nano",
           "soundfont",
           "synth",
-          "drums"
+          "drums",
+          "none"
         ],
         "description": "Instrument synthesis model"
       },

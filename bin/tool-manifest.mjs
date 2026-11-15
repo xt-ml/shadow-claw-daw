@@ -1283,6 +1283,7 @@ export const TOOLS = [
             "soundfont",
             "synth",
             "drums",
+            "none",
           ],
           description: "Instrument synthesis model",
         },

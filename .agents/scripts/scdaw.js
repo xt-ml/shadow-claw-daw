@@ -982,10 +982,18 @@ export function applyCommand(project, name, params = {}) {
       const trackId = params.trackId || params.id;
       const track = next.tracks.find((t) => t.id === trackId);
       if (!track) throw new Error(`Track not found: ${trackId}`);
-      const inst = String(params.instrument || "synth").toLowerCase();
+      const rawInst =
+        params.instrument === null || params.instrument === ""
+          ? "none"
+          : params.instrument || "synth";
+      const inst = String(rawInst).toLowerCase();
       track.instrument = inst;
       let ignoredParams = [];
-      if (params.params && typeof params.params === "object") {
+      if (
+        inst !== "none" &&
+        params.params &&
+        typeof params.params === "object"
+      ) {
         const schema = INSTRUMENT_SCHEMAS[inst] || SYNTH_PARAM_SCHEMA;
         const res = validateAndFilterParams(schema, params.params);
         track.params = { ...track.params, ...res.filtered };
@@ -1301,10 +1309,13 @@ export function applyCommand(project, name, params = {}) {
         };
       }
 
+      const findFxItem = () =>
+        params.fxId
+          ? track[fxListKey].find((f) => f.id === params.fxId)
+          : track[fxListKey].find((f) => f.type === fxType);
+
       if (action === "update") {
-        const item = track[fxListKey].find(
-          (f) => f.id === params.fxId || f.type === fxType,
-        );
+        const item = findFxItem();
         if (!item) {
           throw new Error(`FX not found: ${params.fxId || fxType}`);
         }
@@ -1320,9 +1331,7 @@ export function applyCommand(project, name, params = {}) {
       }
 
       if (action === "reset") {
-        const item = track[fxListKey].find(
-          (f) => f.id === params.fxId || f.type === fxType,
-        );
+        const item = findFxItem();
         if (!item) {
           throw new Error(`FX not found: ${params.fxId || fxType}`);
         }
@@ -1338,8 +1347,8 @@ export function applyCommand(project, name, params = {}) {
 
       if (action === "remove") {
         const lenBefore = track[fxListKey].length;
-        track[fxListKey] = track[fxListKey].filter(
-          (f) => f.id !== params.fxId && f.type !== fxType,
+        track[fxListKey] = track[fxListKey].filter((f) =>
+          params.fxId ? f.id !== params.fxId : f.type !== fxType,
         );
         if (track[fxListKey].length === lenBefore) {
           throw new Error(`FX not found: ${params.fxId || fxType}`);

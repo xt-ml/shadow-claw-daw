@@ -1231,6 +1231,7 @@ export const TOOLS_METADATA = [
             "soundfont",
             "synth",
             "drums",
+            "none",
           ],
           description: "Instrument synthesis model",
         },

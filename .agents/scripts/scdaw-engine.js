@@ -673,14 +673,16 @@ export class DawEngine extends EventTarget {
 
       if (this.ctx && dest) {
         const instrument =
-          track.kind === "drums"
+          track.instrument ||
+          (track.kind === "drums"
             ? "drums"
-            : track.params?.instrument || "synth";
+            : track.params?.instrument || "synth");
         const voice = triggerInstrumentVoice(
           this.ctx,
           dest,
           {
             instrument,
+            trackInstrument: track.instrument,
             trackKind: track.kind,
             note: { pitch: n.pitch, velocity: n.velocity, duration: 480 },
             params: track.params || {},

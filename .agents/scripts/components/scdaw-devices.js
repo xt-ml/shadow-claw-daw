@@ -30,31 +30,37 @@ export function getDeviceChainForTrack(track) {
 
   // 2. Instrument
   const rawInst =
-    track.instrument || (track.kind === "drums" ? "drums" : "synth");
-  const instKind = String(rawInst).toLowerCase();
-  const instNames = {
-    808: "808 Sub Bass",
-    cubed: "Cubed (TB-303 Acid)",
-    pluck: "Pluck (Karplus-Strong)",
-    tubular: "Tubular (DX7 6-Op FM)",
-    neon: "Neon (CZ-101 PD)",
-    "noise-pad": "Noise Pad (Atmospheric)",
-    korpus: "Korpus (Modal Resonator)",
-    nano: "Nano (Micro-Sampler)",
-    soundfont: "SoundFont (GM Synth)",
-    drums: "Playfield (12-Drum Kit)",
-    synth: "Vaporisateur (Synth)",
-    vaporisateur: "Vaporisateur (Synth)",
-  };
-  const instName =
-    instNames[instKind] || `${instKind.toUpperCase()} (Instrument)`;
+    track.instrument !== undefined
+      ? track.instrument
+      : track.kind === "drums"
+        ? "drums"
+        : "synth";
+  const instKind = rawInst ? String(rawInst).toLowerCase() : "none";
+  if (instKind !== "none") {
+    const instNames = {
+      808: "808 Sub Bass",
+      cubed: "Cubed (TB-303 Acid)",
+      pluck: "Pluck (Karplus-Strong)",
+      tubular: "Tubular (DX7 6-Op FM)",
+      neon: "Neon (CZ-101 PD)",
+      "noise-pad": "Noise Pad (Atmospheric)",
+      korpus: "Korpus (Modal Resonator)",
+      nano: "Nano (Micro-Sampler)",
+      soundfont: "SoundFont (GM Synth)",
+      drums: "Playfield (12-Drum Kit)",
+      synth: "Vaporisateur (Synth)",
+      vaporisateur: "Vaporisateur (Synth)",
+    };
+    const instName =
+      instNames[instKind] || `${instKind.toUpperCase()} (Instrument)`;
 
-  chain.push({
-    role: "instrument",
-    type: instKind,
-    name: instName,
-    params: track.params || {},
-  });
+    chain.push({
+      role: "instrument",
+      type: instKind,
+      name: instName,
+      params: track.params || {},
+    });
+  }
 
   // 3. Audio FX
   if (Array.isArray(track.fx)) {
@@ -421,6 +427,24 @@ export class DawDevicesElement extends BaseElement {
           padding-bottom: 4px;
           gap: 0.4rem;
         }
+        .scdaw-devices__card-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          flex-shrink: 0;
+        }
+        .scdaw-devices__remove-btn {
+          padding: 0.15rem 0.35rem;
+          font-size: 0.7rem;
+          line-height: 1;
+        }
+        .scdaw-devices__empty {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          padding: 1rem;
+          margin: auto;
+          text-align: center;
+        }
         .scdaw-devices__controls,
         .controls-row {
           display: flex;
@@ -442,21 +466,36 @@ export class DawDevicesElement extends BaseElement {
           </div>
         </div>
         <div class="scdaw-devices__rack rack-container">
-          ${chain
-            .map(
-              (dev) => `
+          ${
+            chain.length === 0
+              ? `<div class="scdaw-devices__empty">No devices loaded. Click an instrument or effect in the Browser to add one.</div>`
+              : chain
+                  .map(
+                    (dev) => `
             <div class="scdaw-devices__card device-card" data-role="${dev.role}" data-type="${dev.type}" data-id="${dev.params?.id || ""}">
               <div class="scdaw-devices__card-header device-card-header">
                 <span style="font-weight:700; font-size:0.78rem; color:var(--accent);">${dev.name}</span>
-                <span class="badge" style="font-size:0.65rem;">${dev.role}</span>
+                <div class="scdaw-devices__card-actions">
+                  <span class="badge" style="font-size:0.65rem;">${dev.role}</span>
+                  <button
+                    type="button"
+                    class="btn btn-icon btn-danger scdaw-devices__remove-btn remove-device-btn"
+                    data-role="${dev.role}"
+                    data-type="${dev.type}"
+                    data-id="${dev.params?.id || ""}"
+                    aria-label="Remove ${dev.name}"
+                    title="Remove ${dev.name}"
+                  >✕</button>
+                </div>
               </div>
               <div class="scdaw-devices__controls controls-row">
                 ${renderDeviceControls(dev)}
               </div>
             </div>
           `,
-            )
-            .join("")}
+                  )
+                  .join("")
+          }
         </div>
       </div>
     `;
@@ -521,6 +560,32 @@ export class DawDevicesElement extends BaseElement {
         });
       });
     });
+
+    // Remove device buttons
+    this.shadowRoot
+      .querySelectorAll(".scdaw-devices__remove-btn")
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!this._selectedTrackId) return;
+          const role = btn.dataset.role;
+          const devType = btn.dataset.type;
+          const devId = btn.dataset.id;
+
+          if (role === "instrument") {
+            scdaw.sendCommand("set_instrument", {
+              trackId: this._selectedTrackId,
+              instrument: "none",
+            });
+          } else if (role === "audio-fx" || role === "midi-fx") {
+            scdaw.sendCommand("manage_fx", {
+              action: "remove",
+              trackId: this._selectedTrackId,
+              fxType: devType,
+              fxId: devId || undefined,
+            });
+          }
+        });
+      });
 
     // Reset device button
     this.shadowRoot

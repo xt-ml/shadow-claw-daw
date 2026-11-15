@@ -262,6 +262,39 @@ test("applyCommand('manage_fx'): adds, updates, resets, and removes audio/midi f
   assert.equal(p.tracks.find((t) => t.id === trackId).fx.length, 0);
 });
 
+test("applyCommand('manage_fx'): remove with fxId only removes the targeted FX instance when duplicates exist", () => {
+  let p = createProject("basic-beat");
+  const trackId = "trk_bass";
+
+  p = applyCommand(p, "manage_fx", {
+    trackId,
+    action: "add",
+    fxType: "fold",
+    fxId: "fx_fold_1",
+    params: { driveDb: 6 },
+  }).project;
+  p = applyCommand(p, "manage_fx", {
+    trackId,
+    action: "add",
+    fxType: "fold",
+    fxId: "fx_fold_2",
+    params: { driveDb: 12 },
+  }).project;
+
+  assert.equal(p.tracks.find((t) => t.id === trackId).fx.length, 2);
+
+  p = applyCommand(p, "manage_fx", {
+    trackId,
+    action: "remove",
+    fxType: "fold",
+    fxId: "fx_fold_2",
+  }).project;
+
+  const remaining = p.tracks.find((t) => t.id === trackId).fx;
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].id, "fx_fold_1");
+});
+
 test("INSTRUMENT_SCHEMAS: defines parameters and defaults for all 9 roster instruments", () => {
   const expected = [
     "vaporisateur",
