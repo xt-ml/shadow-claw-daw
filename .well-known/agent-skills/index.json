@@ -1052,7 +1052,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:edb89c1e93d25625017de90649a5f7a80577c955703b142607e4cca061d8e877"
+      "digest": "sha256:39d7237ebd729084fb8a0a289af10cfa0e3eda83224e0f8d9969058f404bbba4"
     },
     {
       "name": "scdaw-adapter",

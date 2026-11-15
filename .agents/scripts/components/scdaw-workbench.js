@@ -2129,15 +2129,22 @@ export class DawWorkbenchElement extends BaseElement {
     this._checkingFileUrlParam = true;
 
     try {
-      const jsonStr = await getCompressedParam("file", window.location);
-      if (!jsonStr) return;
-
+      let jsonStr = await getCompressedParam("file", window.location);
       let songName = "shared song";
-      try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed?.name) songName = parsed.name;
-      } catch (_) {
-        // Invalid JSON; let importProjectFile handle or abort
+
+      if (jsonStr) {
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed?.name) songName = parsed.name;
+        } catch (_) {
+          // Invalid JSON; let importProjectFile handle or abort
+        }
+        globalThis.__scdawPendingUrlSong = { jsonStr, songName };
+      } else if (globalThis.__scdawPendingUrlSong?.jsonStr) {
+        jsonStr = globalThis.__scdawPendingUrlSong.jsonStr;
+        songName = globalThis.__scdawPendingUrlSong.songName || songName;
+      } else {
+        return;
       }
 
       if (
@@ -2150,6 +2157,8 @@ export class DawWorkbenchElement extends BaseElement {
         ]);
       }
 
+      if (this.isConnected === false) return;
+
       const confirmed = await this.confirmDialog({
         title: "Load Song from URL",
         message: `Would you like to load "${songName}" as a song? This will replace your current project.`,
@@ -2158,12 +2167,15 @@ export class DawWorkbenchElement extends BaseElement {
       });
 
       if (confirmed) {
+        globalThis.__scdawPendingUrlSong = null;
         try {
           await scdaw.importProjectFile(jsonStr);
           clearUrlParam("file");
         } catch (err) {
           console.error("[scdaw] Failed to load song from URL:", err);
         }
+      } else if (this.isConnected !== false) {
+        globalThis.__scdawPendingUrlSong = null;
       }
     } finally {
       this._checkingFileUrlParam = false;
