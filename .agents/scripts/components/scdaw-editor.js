@@ -618,7 +618,7 @@ export class DawEditorElement extends BaseElement {
               .map(
                 (r) => `
               <div class="pr-row">
-                <div class="pr-key ${r.isBlack ? "black" : ""}">${r.name}</div>
+                <div class="pr-key ${r.isBlack ? "black" : ""}" data-pitch="${r.pitch}">${r.name}</div>
                 <div class="pr-cells">
                   ${Array.from({ length: numSteps }, (_, step) => {
                     const hasNote = activeMap.has(`${r.pitch}:${step}`);
@@ -698,18 +698,39 @@ export class DawEditorElement extends BaseElement {
         e.target.value = "";
       });
 
-    // Note cell clicks
-    this.shadowRoot.querySelectorAll(".pr-cell").forEach((cell) => {
-      cell.addEventListener("click", (e) => {
+    // Piano key clicks -> audition pitch
+    this.shadowRoot.querySelectorAll(".pr-key[data-pitch]").forEach((keyEl) => {
+      keyEl.addEventListener("click", (e) => {
         e.preventDefault();
         if (!this._selectedTrackId) return;
+        const pitch = Number(keyEl.dataset.pitch);
+        if (!Number.isNaN(pitch)) {
+          scdaw.previewNote?.(this._selectedTrackId, pitch, 0.85, 240);
+        }
+      });
+    });
+
+    // Note cell clicks
+    this.shadowRoot.querySelectorAll(".pr-cell").forEach((cell) => {
+      cell.addEventListener("click", async (e) => {
+        e.preventDefault();
+        if (!this._selectedTrackId) return;
+        const trackId = this._selectedTrackId;
         const pitch = Number(cell.dataset.pitch);
         const step = Number(cell.dataset.step);
-        scdaw.sendCommand("toggle_step", {
-          trackId: this._selectedTrackId,
+        const res = await scdaw.sendCommand("toggle_step", {
+          trackId,
           step,
           pitch,
         });
+        if (res?.toggled === "on") {
+          scdaw.previewNote?.(
+            trackId,
+            res.note?.pitch ?? pitch,
+            res.note?.velocity ?? 0.85,
+            res.note?.duration ?? 240,
+          );
+        }
       });
     });
 

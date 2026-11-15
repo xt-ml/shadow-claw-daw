@@ -301,7 +301,7 @@ export class DawSequencerElement extends BaseElement {
     `;
 
     const gridContainer = this.shadowRoot.querySelector(".grid-container");
-    gridContainer?.addEventListener("click", (e) => {
+    gridContainer?.addEventListener("click", async (e) => {
       const cell = e.target?.closest?.(".seq-cell");
       if (!cell) return;
       const trackId = cell.dataset.track;
@@ -314,11 +314,19 @@ export class DawSequencerElement extends BaseElement {
           : undefined;
       const step = Number(cell.dataset.step);
 
-      scdaw.sendCommand("toggle_step", {
+      const res = await scdaw.sendCommand("toggle_step", {
         trackId,
         step,
         pitch,
       });
+      if (res?.toggled === "on") {
+        scdaw.previewNote?.(
+          trackId,
+          res.note?.pitch ?? pitch,
+          res.note?.velocity ?? 0.85,
+          res.note?.duration ?? 240,
+        );
+      }
     });
   }
 }

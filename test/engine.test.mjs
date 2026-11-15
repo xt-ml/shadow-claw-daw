@@ -1187,3 +1187,30 @@ test("Instruments: triggerSynth avoids ADSR gain discontinuity clicks when note 
     `Expected interpolated attack level ${expectedVal2}, got ${attackRampAtRelease.val}`,
   );
 });
+
+test("DawEngine: previewNote auditions a short non-gated voice on the target track without recording MIDI capture", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+  const track = engine.getProject().tracks[0];
+  const initialOscCount = ctx.oscillators.length;
+
+  const voice = engine.previewNote(track.id, 64, 0.85, 240);
+  assert.ok(voice, "previewNote should return an active voice handle");
+  assert.ok(
+    ctx.oscillators.length > initialOscCount || ctx.bufferSources.length > 0,
+    "previewNote should trigger Web Audio synthesis for the track",
+  );
+  assert.equal(
+    engine.midiCaptureCount.get(),
+    0,
+    "previewNote must not pollute MIDI capture buffer",
+  );
+  assert.equal(
+    engine.previewNote("non_existent_track", 60),
+    null,
+    "previewNote should return null for unknown track",
+  );
+});

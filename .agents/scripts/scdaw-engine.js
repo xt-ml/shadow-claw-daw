@@ -620,6 +620,57 @@ export class DawEngine extends EventTarget {
     return Math.max(0, Math.round(unwrapped % totalPulses));
   }
 
+  /**
+   * Auditions a short non-gated note on a track (e.g. when adding a note in the
+   * Piano Roll or Step Sequencer) without polluting MIDI capture.
+   */
+  previewNote(trackId, pitch, velocity = 0.85, durationPpqn = 240) {
+    const p = this.project.get();
+    const targetId = trackId || this.selectedTrackId.get();
+    const track = p.tracks.find((t) => t.id === targetId);
+    if (!track) return null;
+
+    if (
+      this.ctx?.state === "suspended" &&
+      typeof this.ctx.resume === "function"
+    ) {
+      this.ctx.resume().catch(() => {});
+    }
+
+    if (!this.ctx) return null;
+    const dest =
+      this.graph?.tracks?.get(track.id)?.input || this.ctx.destination;
+    if (!dest) return null;
+
+    const instrument =
+      track.instrument ||
+      (track.kind === "drums" ? "drums" : track.params?.instrument || "synth");
+    const voice = triggerInstrumentVoice(
+      this.ctx,
+      dest,
+      {
+        instrument,
+        trackInstrument: track.instrument,
+        trackKind: track.kind,
+        note: { pitch, velocity, duration: durationPpqn },
+        params: track.params || {},
+        trackVolume: track.volume ?? 0.8,
+        trackPan: track.pan ?? 0,
+        gate: false,
+      },
+      this.ctx.currentTime,
+      p.bpm || 120,
+    );
+    if (voice) {
+      voice.trackId = track.id;
+      this._activeVoices.add(voice);
+      voice.onended = () => {
+        this._activeVoices.delete(voice);
+      };
+    }
+    return voice || null;
+  }
+
   liveNoteOn(
     trackId,
     pitch,

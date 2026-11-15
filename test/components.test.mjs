@@ -4490,3 +4490,106 @@ test("scdaw-editor: chord selector inserts chord at current timeline playhead po
     "Measure 2 should have C Major chord at position PPQN.Bar (3840)",
   );
 });
+
+test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only when adding a note (toggled === 'on')", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { DawSequencerElement } =
+    await import("../.agents/scripts/components/scdaw-sequencer.js");
+
+  await scdaw.sendCommand("new_project", {
+    name: "Audition Test",
+    template: "empty",
+    clear: true,
+  });
+  const added = await scdaw.sendCommand("add_track", {
+    kind: "synth",
+    name: "Lead",
+  });
+  const trackId = added.trackId;
+  scdaw.selectTrack(trackId);
+
+  const previewCalls = [];
+  const origPreview = scdaw.previewNote.bind(scdaw);
+  scdaw.previewNote = (tId, pitch, vel, dur) => {
+    previewCalls.push({ tId, pitch, vel, dur });
+    return null;
+  };
+
+  try {
+    // 1. Piano Roll (.pr-cell) click -> add note (auditions), click again -> remove note (silent)
+    const cellClickListeners = [];
+    const mockCell = {
+      dataset: { pitch: "64", step: "0" },
+      addEventListener(type, fn) {
+        if (type === "click") cellClickListeners.push(fn);
+      },
+    };
+    const fakeEditor = {
+      _selectedTrackId: trackId,
+      shadowRoot: {
+        getElementById: () => null,
+        querySelectorAll: (sel) => (sel === ".pr-cell" ? [mockCell] : []),
+        querySelector: () => null,
+      },
+    };
+    DawEditorElement.prototype._attachEventListeners.call(fakeEditor);
+    assert.equal(cellClickListeners.length, 1);
+
+    await cellClickListeners[0]({ preventDefault() {} });
+    assert.equal(
+      previewCalls.length,
+      1,
+      "Adding a note in Piano Roll must audition it",
+    );
+    assert.equal(previewCalls[0].tId, trackId);
+    assert.equal(previewCalls[0].pitch, 64);
+
+    await cellClickListeners[0]({ preventDefault() {} });
+    assert.equal(
+      previewCalls.length,
+      1,
+      "Removing a note in Piano Roll must NOT audition",
+    );
+
+    // 2. Step Sequencer (.seq-cell) click -> add note (auditions), click again -> remove note (silent)
+    let gridClickHandler = null;
+    const mockGrid = {
+      addEventListener(type, fn) {
+        if (type === "click") gridClickHandler = fn;
+      },
+    };
+    const fakeSeq = Object.create(DawSequencerElement.prototype);
+    fakeSeq.shadowRoot = {
+      innerHTML: "",
+      querySelector: (sel) => (sel === ".grid-container" ? mockGrid : null),
+      querySelectorAll: () => [],
+    };
+    fakeSeq.render();
+    assert.ok(typeof gridClickHandler === "function");
+
+    const seqCellTarget = {
+      closest: (sel) =>
+        sel === ".seq-cell"
+          ? { dataset: { track: trackId, pitch: "67", step: "4" } }
+          : null,
+    };
+    await gridClickHandler({ target: seqCellTarget });
+    assert.equal(
+      previewCalls.length,
+      2,
+      "Adding a note in Step Sequencer must audition it",
+    );
+    assert.equal(previewCalls[1].pitch, 67);
+
+    await gridClickHandler({ target: seqCellTarget });
+    assert.equal(
+      previewCalls.length,
+      2,
+      "Removing a note in Step Sequencer must NOT audition",
+    );
+  } finally {
+    scdaw.previewNote = origPreview;
+  }
+});
