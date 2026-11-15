@@ -11,18 +11,20 @@ Daw is built upon a 4-tier modular architecture designed for maximum performance
 
 ### Architectural Layers
 
-1. **Pure Logic, Composition, Schemas & Codecs (`scdaw.js`, `scdaw-compose.js`, `scdaw-soundfont.js`, `scdaw-schema.js`, `scdaw-presets.js`, `scdaw-dsp.js`, `scdaw-midi.js`, `scdaw-dawproject.js`, `scdaw-zip.js`, `scdaw-signals.js`)**:
+1. **Pure Logic, Composition, Schemas & Codecs (`scdaw.js`, `scdaw-compose.js`, `scdaw-soundfont.js`, `scdaw-schema.js`, `scdaw-presets.js`, `scdaw-dsp.js`, `scdaw-midi.js`, `scdaw-dawproject.js`, `scdaw-zip.js`, `scdaw-compress.js`, `scdaw-url-param.js`, `scdaw-signals.js`)**:
    - Zero DOM or browser dependencies.
    - High-level multi-bar arrangement compiler (`scdaw-compose.js`) with multi-chord bar parsing (`parseProgression`), rest parsing (`parseMotif`), custom signature motifs (`motifs: { bass, rhythm, lead }`), and genre feel templates (e.g., `blues-rock` eighth-note shuffle).
    - SoundFont 2 (SF2) RIFF parser, sample decoding, generator resolution, zone simplification, voice DSP (pitch-rate interpolation, linear ADSR, 3ms filter smoothing, pan), 128-instrument GM program map, and sample caching (`scdaw-soundfont.js`).
-   - Exact Pulses Per Quarter Note (`PPQN = 960`) musical timebase math and 16th-note swing displacement.
+   - Exact Pulses Per Quarter Note (`PPQN = 960`) musical timebase math, auto-expanding bar length calculations, and 16th-note swing displacement.
    - Deterministic transaction reducers (`applyCommand` supporting note mutations, automation, audio clips, and `move_track`/`reorder_tracks`) and undo snapshot history.
-   - 16-bit, 24-bit PCM, and 32-bit Float RIFF WAVE binary encoders, pure-JS ZIP archive codec with CRC-32 integrity, SMF Format 0/1 MIDI codec, and DAWproject v1.0 XML/ZIP interchange.
+   - 16-bit, 24-bit PCM, and 32-bit Float RIFF WAVE binary encoders, pure-JS ZIP archive codec with CRC-32 integrity, SMF Format 0/1 MIDI codec + live MIDI message parsing/encoding (`parseMidiMessage`, `encodeMidiMessage`), Web Streams (`CompressionStream`/`DecompressionStream`) + Base64URL `#file=` / `?file=` URL song sharing (`scdaw-compress.js`, `scdaw-url-param.js`), and DAWproject v1.0 XML/ZIP interchange.
    - Microtask-batched reactive Signals for UI and engine state.
 
-2. **Web Audio Synthesis, Scheduling & Storage (`scdaw-engine.js`, `scdaw-instruments.js`, `scdaw-fs.js`)**:
-   - Non-blocking Web Worker clock tick (25ms) impervious to background tab throttling.
-   - Lookahead event scheduler buffering audio nodes 100ms in advance with gapless loop wrap-around.
+2. **Web Audio Synthesis, Scheduling, Web MIDI & Storage (`scdaw-engine.js`, `scdaw-instruments.js`, `scdaw-midi-io.js`, `scdaw-fs.js`)**:
+   - Non-blocking Web Worker clock tick (25ms) impervious to background tab throttling, with clock stall recovery (dropping late pre-stall notes and re-anchoring on live BPM changes).
+   - Lookahead event scheduler buffering audio nodes 100ms in advance with gapless loop wrap-around, Play/Pause/Seek (`pause()`, `seek(ppqn)`), and a resolved note cache with binary-search range lookup (`computeEventsInRange`).
+   - Live parameter modulation fast paths (`setLiveTrackParam`, `setLiveMasterParam`, `setLiveTransportParam`) using `setTargetAtTime` and in-place synth AudioParam modulation without rebuilding the audio graph or interrupting playback.
+   - Web MIDI API integration (`scdaw-midi-io.js`) with hot-plug port enumeration, track MIDI input/output routing, MIDI Learn CC mapping, live note capture, and `SoftwareMidiInput` QWERTY keyboard fallback.
    - Polyphonic `Vaporisateur` dual-oscillator synthesizers, procedural 12-drum `Playfield` synthesizers, SoundFont 2 GM instrument engine (`A320U.sf2`, `gm-lofi.sf2`), and extended MIDI/Audio FX chains (equalizer, delay, reverb, bitcrusher, wavefolder, stereo tool, autotune, vocoder, maximizer limiter, transient shaper, guitar overdrive).
    - Dynamic audio node graph with track gain, stereo panning, real-time peak/RMS and mix analysis DSP (`analyzeAudioBuffer`), master bus safety limiter, offline WAV/stem rendering, and direct OPFS conversation file persistence.
 
@@ -30,8 +32,8 @@ Daw is built upon a 4-tier modular architecture designed for maximum performance
    - Web Locks leader election ensuring exactly one document holds the AudioContext and replies to agent tool dispatches.
    - Dual BroadcastChannel protocol (`scdaw-commands`, `scdaw-results`) providing sub-millisecond local RPC between the ShadowClaw agent worker and workbench.
    - `scdaw-state` event broadcasting keeping detached UI surfaces synchronized at 10 Hz.
-   - Native ModelContext API registration for all 40 `scdaw_*` tools.
+   - Native ModelContext API registration for all 43 `scdaw_*` tools.
 
 4. **Mobile-First Web Component Workbench (`scdaw-element.js`, `components/scdaw-*.js`)**:
-   - 11 encapsulated Custom Elements (`<scdaw-workbench>`, `<scdaw-transport>`, `<scdaw-browser>`, `<scdaw-timeline>`, `<scdaw-editor>`, `<scdaw-sequencer>`, `<scdaw-devices>`, `<scdaw-mixer>`, `<scdaw-knob>`, `<scdaw-resize-handle>`, `<scdaw-statusbar>`).
+   - 12 encapsulated Custom Elements (`<scdaw-workbench>`, `<scdaw-transport>`, `<scdaw-browser>`, `<scdaw-timeline>`, `<scdaw-editor>`, `<scdaw-sequencer>`, `<scdaw-devices>`, `<scdaw-mixer>`, `<scdaw-knob>`, `<scdaw-resize-handle>`, `<scdaw-statusbar>`, `<scdaw-midi-keyboard>`).
    - Mobile-first responsive CSS Container Queries (`@container`), `@media` graceful degradation fallbacks, strict BEM naming, WCAG 2.1 AA ARIA landmarks, and Shadow DOM styling using `--shadow-claw-*` design tokens.

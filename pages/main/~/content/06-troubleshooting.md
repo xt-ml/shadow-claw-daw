@@ -29,3 +29,12 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 ### 4. Metronome Click Sound
 
 - **How it Works**: Clicking **"🔔 Metro"** (`#metro-btn`) enables the metronome click track. When toggled on while stopped, the DAW unlocks audio (if needed) and plays an instant audition click. During playback or recording, the metronome synthesizes woodblock-style click pulses on every quarter-note beat with an accented pitch on beat 1 (downbeat) following the project tempo and time signature.
+
+### 5. Web MIDI API & Hardware Controllers
+
+- **Browser Support & Permissions**: Hardware MIDI via `navigator.requestMIDIAccess()` requires a Chromium-based or Web MIDI-enabled browser served over HTTPS (or `localhost`).
+- **Fallback**: When Web MIDI is unavailable or permission is denied, Daw gracefully degrades to the on-screen `<scdaw-midi-keyboard>` and QWERTY keyboard input without disrupting audio playback or editing.
+
+### 6. Sharing Songs via Compressed URLs (`#file=`)
+
+- **How it Works**: Clicking **"🔗 Press a URL"** in the Export modal compresses the `.scdaw.json` project using Web Streams (`deflate-raw`) + Base64URL and places it in the URL `#file=` hash fragment by default so large arrangements never trigger HTTP 431 / 414 header size limits. `?file=` query parameters are also supported on load.

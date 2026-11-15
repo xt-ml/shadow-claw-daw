@@ -8,8 +8,8 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
 
 - **Assistant Name**: `ShadowClaw DAW` (`Daw`)
 - **Prefix Isolation**:
-  - Tools prefix: `scdaw_*` (40 declarative tools)
-  - Custom Elements prefix: `scdaw-*` (11 modular Web Components)
+  - Tools prefix: `scdaw_*` (43 declarative tools)
+  - Custom Elements prefix: `scdaw-*` (12 modular Web Components)
   - Broadcast Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
   - Pinned workbench: `pages/main/index.html` (`/main/`)
 
@@ -32,10 +32,11 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - High-level song composition engine, multi-bar arrangement compiler, multi-chord bar parser (`parseProgression`), rest parsing (`parseMotif`), custom signature motifs (`motifs: { bass, rhythm, lead }`), and genre feel templates live in `.agents/scripts/scdaw-compose.js`.
    - SoundFont 2 (SF2) RIFF parser, sample decoding, generator resolution, zone simplification, voice DSP (pitch interpolation, ADSR envelope, filter smoothing, pan), GM instrument map (128 melodic programs + drum kit aliases), and sample caching live in `.agents/scripts/scdaw-soundfont.js`.
    - Parameter schemas, automatable parameter definitions (`AUTOMATABLE_PARAMS`), curated presets, and custom DSP curves/processors (overdrive, wavefolder, bitcrusher, stereo tool, plate reverb, mix analysis) live in `.agents/scripts/scdaw-schema.js`, `.agents/scripts/scdaw-presets.js`, and `.agents/scripts/scdaw-dsp.js`.
-   - SMF MIDI codec, DAWproject v1.0 XML/ZIP interchange (including Points automation lanes and embedded Audio sample stems), zero-dependency ZIP archive encoding/decoding, and OPFS conversation storage live in `.agents/scripts/scdaw-midi.js`, `.agents/scripts/scdaw-dawproject.js`, `.agents/scripts/scdaw-zip.js`, and `.agents/scripts/scdaw-fs.js`.
+   - SMF MIDI codec, live MIDI message parsing/encoding, DAWproject v1.0 XML/ZIP interchange (including Points automation lanes and embedded Audio sample stems), zero-dependency ZIP archive encoding/decoding, compressed `#file=` / `?file=` URL sharing (`CompressionStream`/`DecompressionStream` + Base64URL), and OPFS conversation storage live in `.agents/scripts/scdaw-midi.js`, `.agents/scripts/scdaw-dawproject.js`, `.agents/scripts/scdaw-zip.js`, `.agents/scripts/scdaw-compress.js`, `.agents/scripts/scdaw-url-param.js`, and `.agents/scripts/scdaw-fs.js`.
+   - Web MIDI API integration, hot-plug device enumeration, MIDI Learn CC mapping, hardware MIDI output, and `SoftwareMidiInput` QWERTY keyboard fallback live in `.agents/scripts/scdaw-midi-io.js`.
    - Reactive signal primitives live in `.agents/scripts/scdaw-signals.js`.
-   - Audio graph creation, instrument synthesis (`Vaporisateur` synth, `Playfield` drums, and SoundFont GM voices), timeline audio clip buffer playback, real-time lookahead scheduling, parameter ramping (`linearRampToValueAtTime`), auxiliary send/bus routing, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
-   - UI Web Components live in `.agents/scripts/scdaw-element.js` and `.agents/scripts/components/scdaw-*.js`.
+   - Audio graph creation, instrument synthesis (`Vaporisateur` synth, `Playfield` drums, and SoundFont GM voices), timeline audio clip buffer playback, real-time lookahead scheduling with clock stall recovery, Play/Pause/Seek (`pause()`, `seek(ppqn)`), resolved note cache, live parameter modulation fast paths (`setLiveTrackParam`, `setLiveMasterParam`, `setLiveTransportParam` via `setTargetAtTime`), auxiliary send/bus routing, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
+   - UI Web Components live in `.agents/scripts/scdaw-element.js` and `.agents/scripts/components/scdaw-*.js` (including `scdaw-midi-keyboard.js`).
    - Worker-to-main IPC bridge and WebMCP registration live in `.agents/scripts/scdaw-adapter.js`.
 
 4. **Mobile-First Responsive Layout, BEM & Accessibility**:
@@ -46,7 +47,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - When checking Web IDL interfaces such as `LaunchParams`, always test property existence with `"files" in window.LaunchParams.prototype` rather than invoking prototype getters directly.
 
 5. **Declarative Tools & WebMCP**:
-   - Single source of truth for all 40 tools is `bin/tool-manifest.mjs`.
+   - Single source of truth for all 43 tools is `bin/tool-manifest.mjs`.
    - Generated into `.agents/tools/*.json` via `npm run build:tools` (`bin/generate-tools.mjs`).
    - Dynamically registered into `document.modelContext` by `scdaw-adapter.js` with WebMCP boolean annotations (`readOnlyHint`, `consequentialHint`) for full client discovery and execution.
 
