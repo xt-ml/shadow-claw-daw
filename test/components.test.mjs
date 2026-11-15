@@ -4144,3 +4144,71 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
   );
   assert.equal(maxStep, 23); // 0..23 = 24 steps for 2 bars of 3/4
 });
+
+test("scdaw-workbench: New Project button (#new-btn) creates a completely blank project while Reset (#reset-btn) restores starter template", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawWorkbenchElement } =
+    await import("../.agents/scripts/components/scdaw-workbench.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+  assert.ok(
+    scdaw.getProject().tracks.length > 0,
+    "Precondition: starter project has tracks",
+  );
+
+  const listeners = new Map();
+  const makeEl = (id) => ({
+    addEventListener(type, fn) {
+      if (!listeners.has(id)) listeners.set(id, {});
+      listeners.get(id)[type] = fn;
+    },
+    classList: { toggle() {}, add() {}, remove() {} },
+    setAttribute() {},
+    removeAttribute() {},
+  });
+
+  const wb = new DawWorkbenchElement();
+  const dialogCalls = [];
+  wb.confirmDialog = async (opts) => {
+    dialogCalls.push(opts);
+    return true;
+  };
+  wb.shadowRoot = {
+    getElementById: (id) => makeEl(id),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener() {},
+  };
+  wb._attachEventListeners();
+
+  // Clicking New Project (#new-btn) must create a completely blank project (0 tracks)
+  const newClick = listeners.get("new-btn")?.click;
+  assert.ok(typeof newClick === "function", "#new-btn must bind click handler");
+  await newClick();
+
+  const afterNew = scdaw.getProject();
+  assert.equal(
+    afterNew.tracks.length,
+    0,
+    "New Project must create a completely blank project with 0 tracks",
+  );
+  assert.match(
+    dialogCalls[0]?.message || "",
+    /blank|empty/i,
+    "New Project confirmation message should indicate a blank project",
+  );
+
+  // Clicking Reset (#reset-btn) must still restore the starter template
+  const resetClick = listeners.get("reset-btn")?.click;
+  assert.ok(
+    typeof resetClick === "function",
+    "#reset-btn must bind click handler",
+  );
+  await resetClick();
+
+  const afterReset = scdaw.getProject();
+  assert.ok(
+    afterReset.tracks.length > 0,
+    "Reset Project must restore the starter template with tracks",
+  );
+});

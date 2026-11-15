@@ -1533,13 +1533,13 @@ export class DawWorkbenchElement extends BaseElement {
         const ok = await this.confirmDialog({
           title: "New Project",
           message:
-            "Start a new project? This will reset the workbench to the starter template.",
+            "Start a new blank project? This will clear all tracks and patterns.",
           confirmText: "New Project",
           cancelText: "Cancel",
           isDestructive: true,
         });
         if (ok) {
-          await scdaw.resetProject({ template: "basic-beat" });
+          await scdaw.newProject({ template: "empty" });
         }
       });
     this.shadowRoot
