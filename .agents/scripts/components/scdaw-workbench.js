@@ -14,6 +14,7 @@ import {
   getBaseHref,
   createCompressedUrl,
   getCompressedParam,
+  getUrlParam,
   clearUrlParam,
 } from "../scdaw-url-param.js";
 import { effect } from "../scdaw-signals.js";
@@ -2129,21 +2130,49 @@ export class DawWorkbenchElement extends BaseElement {
     this._checkingFileUrlParam = true;
 
     try {
+      const rawAutoplay = getUrlParam("autoplay", window.location);
+      const shouldAutoplay =
+        rawAutoplay === "true" ||
+        rawAutoplay === "1" ||
+        Boolean(globalThis.__scdawPendingUrlSong?.autoplay);
+
       let jsonStr = await getCompressedParam("file", window.location);
       let songName = "shared song";
 
       if (jsonStr) {
+        if (globalThis.__scdawHandledUrlSong === jsonStr) {
+          clearUrlParam("file");
+          if (shouldAutoplay) clearUrlParam("autoplay");
+          return;
+        }
         try {
           const parsed = JSON.parse(jsonStr);
           if (parsed?.name) songName = parsed.name;
         } catch (_) {
           // Invalid JSON; let importProjectFile handle or abort
         }
-        globalThis.__scdawPendingUrlSong = { jsonStr, songName };
+        globalThis.__scdawPendingUrlSong = {
+          jsonStr,
+          songName,
+          autoplay: shouldAutoplay,
+        };
       } else if (globalThis.__scdawPendingUrlSong?.jsonStr) {
         jsonStr = globalThis.__scdawPendingUrlSong.jsonStr;
         songName = globalThis.__scdawPendingUrlSong.songName || songName;
+        if (globalThis.__scdawHandledUrlSong === jsonStr) {
+          globalThis.__scdawPendingUrlSong = null;
+          return;
+        }
       } else {
+        if (shouldAutoplay && !globalThis.__scdawHandledAutoplay) {
+          globalThis.__scdawHandledAutoplay = true;
+          clearUrlParam("autoplay");
+          try {
+            await scdaw.play();
+          } catch (err) {
+            console.warn("[scdaw] Autoplay failed or was blocked:", err);
+          }
+        }
         return;
       }
 
@@ -2167,15 +2196,26 @@ export class DawWorkbenchElement extends BaseElement {
       });
 
       if (confirmed) {
+        globalThis.__scdawHandledUrlSong = jsonStr;
         globalThis.__scdawPendingUrlSong = null;
         try {
           await scdaw.importProjectFile(jsonStr);
           clearUrlParam("file");
+          if (shouldAutoplay) {
+            globalThis.__scdawHandledAutoplay = true;
+            clearUrlParam("autoplay");
+            await scdaw.play();
+          }
         } catch (err) {
           console.error("[scdaw] Failed to load song from URL:", err);
         }
       } else if (this.isConnected !== false) {
+        globalThis.__scdawHandledUrlSong = jsonStr;
         globalThis.__scdawPendingUrlSong = null;
+        if (shouldAutoplay) {
+          globalThis.__scdawHandledAutoplay = true;
+          clearUrlParam("autoplay");
+        }
       }
     } finally {
       this._checkingFileUrlParam = false;

@@ -244,8 +244,44 @@ test("scdaw-workbench: _checkFileUrlParam guards re-entrancy and handles import 
   const content = await readFile(workbenchPath, "utf8");
 
   assert.match(content, /_checkingFileUrlParam/);
+  assert.match(content, /__scdawHandledUrlSong/);
   assert.match(
     content,
     /try\s*\{[\s\S]*?importProjectFile\(jsonStr\)[\s\S]*?\}\s*catch/,
   );
+});
+
+test("scdaw-url-param: getUrlParam reads autoplay from query string or hash fragment", async () => {
+  const { getUrlParam } = await import("../.agents/scripts/scdaw-url-param.js");
+  assert.equal(typeof getUrlParam, "function");
+  assert.equal(
+    getUrlParam(
+      "autoplay",
+      "https://xt-ml.github.io/shadow-claw-daw/?autoplay=true#file=abc",
+    ),
+    "true",
+  );
+  assert.equal(
+    getUrlParam(
+      "autoplay",
+      "https://xt-ml.github.io/shadow-claw-daw/#file=abc&autoplay=1",
+    ),
+    "1",
+  );
+  assert.equal(
+    getUrlParam("autoplay", "https://xt-ml.github.io/shadow-claw-daw/"),
+    null,
+  );
+});
+
+test("scdaw-workbench: _checkFileUrlParam supports ?autoplay=true with and without #file=", async () => {
+  const workbenchPath = join(
+    __dirname,
+    "../.agents/scripts/components/scdaw-workbench.js",
+  );
+  const content = await readFile(workbenchPath, "utf8");
+
+  assert.match(content, /getUrlParam\(["']autoplay["']/);
+  assert.match(content, /clearUrlParam\(["']autoplay["']\)/);
+  assert.match(content, /scdaw\.play\(\)/);
 });

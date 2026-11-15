@@ -106,6 +106,23 @@ function readParamValue(paramName, source) {
 }
 
 /**
+ * Extracts a raw parameter value from a URL, Location, URLSearchParams, or string,
+ * checking both query search parameters (`?param=`) and hash fragments (`#param=`).
+ *
+ * @param {string} paramName
+ * @param {string|URL|URLSearchParams|Location} [source]
+ * @returns {string|null}
+ */
+export function getUrlParam(
+  paramName,
+  source = typeof globalThis.location !== "undefined"
+    ? globalThis.location
+    : "",
+) {
+  return readParamValue(paramName, source);
+}
+
+/**
  * Extracts and decompresses a parameter from a URL, query string, or hash fragment.
  *
  * @param {string} [paramName='file']

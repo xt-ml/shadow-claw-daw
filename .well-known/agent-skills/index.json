@@ -1052,7 +1052,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:39d7237ebd729084fb8a0a289af10cfa0e3eda83224e0f8d9969058f404bbba4"
+      "digest": "sha256:c1e8e1155a6e66fd46c7f4564b79eb5faae8c7e69d66f2ebc90b58ae584e5f29"
     },
     {
       "name": "scdaw-adapter",
@@ -1160,7 +1160,7 @@
       "name": "scdaw-url-param",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-url-param.",
       "url": "../../.agents/scripts/scdaw-url-param.js",
-      "digest": "sha256:00cf13ca72b3c93c27acbbeba6031b8c832fa136b15d0a8722c57516bf76699b"
+      "digest": "sha256:8844e424a1844a7dfa7351de84ff6f92ff4d964d33c3c400ce2427f977fa7cd5"
     },
     {
       "name": "scdaw-zip",
