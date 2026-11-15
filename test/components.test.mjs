@@ -4212,3 +4212,160 @@ test("scdaw-workbench: New Project button (#new-btn) creates a completely blank 
     "Reset Project must restore the starter template with tracks",
   );
 });
+
+test("scdaw-editor: chord selector (#add-chord-select) offers all 12 major and 12 minor chords and inserts selected chord notes", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const editorMod =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { DawEditorElement, CHORD_OPTIONS, buildChordNotes } = editorMod;
+
+  assert.ok(Array.isArray(CHORD_OPTIONS), "CHORD_OPTIONS must be exported");
+  assert.equal(
+    CHORD_OPTIONS.length,
+    24,
+    "Must provide all 12 major and 12 minor chords",
+  );
+
+  // Verify triad intervals for C Major and C Minor
+  const cMaj = buildChordNotes("C:maj");
+  assert.deepEqual(
+    cMaj.map((n) => n.pitch),
+    [48, 52, 55],
+  );
+  const cMin = buildChordNotes("C:min");
+  assert.deepEqual(
+    cMin.map((n) => n.pitch),
+    [48, 51, 55],
+  );
+
+  await scdaw.resetProject({ template: "empty" });
+  await scdaw.sendCommand("set_transport", { lengthBars: 2 });
+  const addRes = await scdaw.sendCommand("add_track", {
+    kind: "synth",
+    name: "Chord Synth",
+  });
+  const trackId = addRes.trackId;
+
+  const listeners = new Map();
+  const makeEl = (id) => ({
+    addEventListener(type, fn) {
+      if (!listeners.has(id)) listeners.set(id, {});
+      listeners.get(id)[type] = fn;
+    },
+    value: "",
+  });
+
+  const editor = new DawEditorElement();
+  editor._selectedTrackId = trackId;
+  editor.shadowRoot = {
+    innerHTML: "",
+    getElementById: (id) => makeEl(id),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  editor.render();
+
+  assert.match(
+    editor.shadowRoot.innerHTML,
+    /<select[^>]+id="add-chord-select"/,
+    "Must render #add-chord-select instead of static C Minor button",
+  );
+  assert.doesNotMatch(
+    editor.shadowRoot.innerHTML,
+    /id="add-chord-btn"/,
+    "Must replace #add-chord-btn with #add-chord-select",
+  );
+  assert.match(editor.shadowRoot.innerHTML, /C Major/);
+  assert.match(editor.shadowRoot.innerHTML, /F# Minor/);
+  assert.match(editor.shadowRoot.innerHTML, /B Major/);
+  assert.match(editor.shadowRoot.innerHTML, /B Minor/);
+
+  editor._attachEventListeners();
+  const onChange = listeners.get("add-chord-select")?.change;
+  assert.ok(
+    typeof onChange === "function",
+    "#add-chord-select must bind change listener",
+  );
+
+  const selectTarget = { value: "G:maj" };
+  await onChange({ target: selectTarget });
+  assert.equal(
+    selectTarget.value,
+    "",
+    "Select should reset to placeholder after inserting chord",
+  );
+
+  const track = scdaw.getProject().tracks.find((t) => t.id === trackId);
+  assert.deepEqual(
+    track.notes.map((n) => n.pitch).sort((a, b) => a - b),
+    [55, 59, 62],
+    "Selecting G:maj should insert G3, B3, D4 into the track",
+  );
+});
+
+test("scdaw-editor: chord selector inserts chord at current timeline playhead position (e.g. Measure 1 then Measure 2)", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { PPQN } = await import("../.agents/scripts/scdaw.js");
+  const { DawEditorElement } =
+    await import("../.agents/scripts/components/scdaw-editor.js");
+
+  await scdaw.resetProject({ template: "empty" });
+  await scdaw.sendCommand("set_transport", { lengthBars: 2 });
+  const addRes = await scdaw.sendCommand("add_track", {
+    kind: "synth",
+    name: "Chord Synth",
+  });
+  const trackId = addRes.trackId;
+
+  const listeners = new Map();
+  const makeEl = (id) => ({
+    addEventListener(type, fn) {
+      if (!listeners.has(id)) listeners.set(id, {});
+      listeners.get(id)[type] = fn;
+    },
+    value: "",
+  });
+
+  const editor = new DawEditorElement();
+  editor._selectedTrackId = trackId;
+  editor.shadowRoot = {
+    innerHTML: "",
+    getElementById: (id) => makeEl(id),
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  };
+  editor.render();
+  editor._attachEventListeners();
+
+  const onChange = listeners.get("add-chord-select")?.change;
+  assert.ok(typeof onChange === "function");
+
+  // Measure 1 (position 0) -> C Minor
+  scdaw.seek(0);
+  await onChange({ target: { value: "C:min" } });
+
+  // Measure 2 (position PPQN.Bar = 3840 in 4/4) -> C Major
+  scdaw.seek(PPQN.Bar);
+  await onChange({ target: { value: "C:maj" } });
+
+  const track = scdaw.getProject().tracks.find((t) => t.id === trackId);
+  const bar1Notes = track.notes
+    .filter((n) => n.position === 0)
+    .map((n) => n.pitch)
+    .sort((a, b) => a - b);
+  const bar2Notes = track.notes
+    .filter((n) => n.position === PPQN.Bar)
+    .map((n) => n.pitch)
+    .sort((a, b) => a - b);
+
+  assert.deepEqual(
+    bar1Notes,
+    [48, 51, 55],
+    "Measure 1 should have C Minor chord at position 0",
+  );
+  assert.deepEqual(
+    bar2Notes,
+    [48, 52, 55],
+    "Measure 2 should have C Major chord at position PPQN.Bar (3840)",
+  );
+});

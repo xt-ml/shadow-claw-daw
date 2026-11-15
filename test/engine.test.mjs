@@ -1087,3 +1087,103 @@ test("DawEngine: pause() preserves position, seek() updates start position, and 
     await engine.stop();
   }
 });
+
+test("Instruments: triggerSynth avoids ADSR gain discontinuity clicks when note is shorter than attack+decay", () => {
+  const ctx = new FakeAudioContext();
+  const dest = ctx.createGain();
+
+  // Case 1: 16th note at 128 BPM (durationSec ≈ 0.1171875s) < attack (0.01s) + decay (0.15s)
+  const when1 = 1.0;
+  const bpm = 128;
+  const durationSec1 = 60 / bpm / 4; // 240 PPQN = 1/16th note = 0.1171875s
+  const releaseStart1 = when1 + durationSec1;
+  triggerInstrumentVoice(
+    ctx,
+    dest,
+    {
+      trackKind: "synth",
+      trackParams: {
+        attack: 0.01,
+        decay: 0.15,
+        sustain: 0.4,
+        release: 0.15,
+      },
+      note: { pitch: 42, velocity: 0.8, duration: 240 },
+    },
+    when1,
+    bpm,
+  );
+
+  // The amp GainNode is the last GainNode connected to dest
+  const amp1 = dest.inputs[dest.inputs.length - 1];
+  const events1 = amp1.gain.events;
+
+  // Must not jump via setValueAtTime(sustainVal, releaseStart) while decay ramp is still pending
+  const setAtRelease1 = events1.find(
+    (e) =>
+      e.type === "setValueAtTime" && Math.abs(e.time - releaseStart1) < 1e-6,
+  );
+  assert.equal(
+    setAtRelease1,
+    undefined,
+    "Should not call setValueAtTime(sustainVal, releaseStart) when decay has not finished",
+  );
+
+  // Every event time must be monotonically non-decreasing and no decay ramp past releaseStart
+  for (let i = 1; i < events1.length; i++) {
+    assert.ok(
+      events1[i].time >= events1[i - 1].time - 1e-9,
+      `Envelope events must be monotonic: ${events1[i - 1].time} -> ${events1[i].time}`,
+    );
+  }
+  const decayRampAtRelease = events1.find(
+    (e) =>
+      e.type === "linearRampToValueAtTime" &&
+      Math.abs(e.time - releaseStart1) < 1e-6,
+  );
+  assert.ok(
+    decayRampAtRelease,
+    "Should smoothly ramp to the interpolated decay level at releaseStart",
+  );
+  const expectedVal1 = 0.8 + (0.8 * 0.4 - 0.8) * ((durationSec1 - 0.01) / 0.15);
+  assert.ok(
+    Math.abs(decayRampAtRelease.val - expectedVal1) < 1e-5,
+    `Expected interpolated level ${expectedVal1}, got ${decayRampAtRelease.val}`,
+  );
+
+  // Case 2: note shorter than attack (durationSec < attack)
+  const when2 = 2.0;
+  const releaseStart2 = when2 + durationSec1;
+  triggerInstrumentVoice(
+    ctx,
+    dest,
+    {
+      trackKind: "synth",
+      trackParams: {
+        attack: 0.25,
+        decay: 0.15,
+        sustain: 0.4,
+        release: 0.15,
+      },
+      note: { pitch: 42, velocity: 0.8, duration: 240 },
+    },
+    when2,
+    bpm,
+  );
+  const amp2 = dest.inputs[dest.inputs.length - 1];
+  const events2 = amp2.gain.events;
+  const attackRampAtRelease = events2.find(
+    (e) =>
+      e.type === "linearRampToValueAtTime" &&
+      Math.abs(e.time - releaseStart2) < 1e-6,
+  );
+  assert.ok(
+    attackRampAtRelease,
+    "Should smoothly ramp to the interpolated attack level at releaseStart",
+  );
+  const expectedVal2 = 0.0001 + (0.8 - 0.0001) * (durationSec1 / 0.25);
+  assert.ok(
+    Math.abs(attackRampAtRelease.val - expectedVal2) < 1e-5,
+    `Expected interpolated attack level ${expectedVal2}, got ${attackRampAtRelease.val}`,
+  );
+});

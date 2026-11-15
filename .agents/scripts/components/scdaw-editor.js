@@ -21,6 +21,57 @@ const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 const MIN_PITCH = 0; // C-1
 const MAX_PITCH = 127; // G9
 
+const CHORD_ROOTS = [
+  { name: "C", semitone: 0 },
+  { name: "C#", semitone: 1 },
+  { name: "D", semitone: 2 },
+  { name: "D#", semitone: 3 },
+  { name: "E", semitone: 4 },
+  { name: "F", semitone: 5 },
+  { name: "F#", semitone: 6 },
+  { name: "G", semitone: 7 },
+  { name: "G#", semitone: 8 },
+  { name: "A", semitone: 9 },
+  { name: "A#", semitone: 10 },
+  { name: "B", semitone: 11 },
+];
+
+export const CHORD_OPTIONS = Object.freeze([
+  ...CHORD_ROOTS.map((r) =>
+    Object.freeze({
+      id: `${r.name}:maj`,
+      label: `${r.name} Major`,
+      quality: "major",
+      semitone: r.semitone,
+      intervals: Object.freeze([0, 4, 7]),
+    }),
+  ),
+  ...CHORD_ROOTS.map((r) =>
+    Object.freeze({
+      id: `${r.name}:min`,
+      label: `${r.name} Minor`,
+      quality: "minor",
+      semitone: r.semitone,
+      intervals: Object.freeze([0, 3, 7]),
+    }),
+  ),
+]);
+
+export function buildChordNotes(
+  chordId,
+  { step = 0, durationSteps = 4, velocity = 0.8, octave = 3 } = {},
+) {
+  const chord = CHORD_OPTIONS.find((c) => c.id === chordId);
+  if (!chord) return [];
+  const rootPitch = (octave + 1) * 12 + chord.semitone;
+  return chord.intervals.map((interval) => ({
+    step,
+    pitch: rootPitch + interval,
+    durationSteps,
+    velocity,
+  }));
+}
+
 export function pitchToPianoRollRow(pitch) {
   const p = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.round(pitch)));
   return MAX_PITCH - p;
@@ -542,7 +593,24 @@ export class DawEditorElement extends BaseElement {
             <div>Track: <strong id="inspector-track-name">${currentTrack?.name || "None"}</strong></div>
             <div>Total Notes: <strong id="inspector-notes-count">${currentTrack?.notes.length || 0}</strong></div>
             <div style="margin-top:auto;">
-              <button id="add-chord-btn" class="btn" style="width:100%; justify-content:center;">+ C Minor Chord</button>
+              <select
+                id="add-chord-select"
+                class="scdaw-editor__chord-select"
+                aria-label="Insert major or minor chord"
+                style="width:100%; background:var(--bg-elevated); color:inherit; border:1px solid var(--border); border-radius:4px; font-size:0.78rem; padding:6px 8px; cursor:pointer;"
+              >
+                <option value="">+ Add Chord...</option>
+                <optgroup label="Major Chords">
+                  ${CHORD_OPTIONS.filter((c) => c.quality === "major")
+                    .map((c) => `<option value="${c.id}">${c.label}</option>`)
+                    .join("")}
+                </optgroup>
+                <optgroup label="Minor Chords">
+                  ${CHORD_OPTIONS.filter((c) => c.quality === "minor")
+                    .map((c) => `<option value="${c.id}">${c.label}</option>`)
+                    .join("")}
+                </optgroup>
+              </select>
             </div>
           </div>
           <div class="grid-area">
@@ -610,16 +678,16 @@ export class DawEditorElement extends BaseElement {
         }
       });
 
-    // Add chord shortcut
+    // Add chord selector
     this.shadowRoot
-      .getElementById("add-chord-btn")
-      ?.addEventListener("click", () => {
-        if (this._selectedTrackId) {
-          const chordNotes = [
-            { step: 0, pitch: 48, durationSteps: 4, velocity: 0.8 },
-            { step: 0, pitch: 51, durationSteps: 4, velocity: 0.8 },
-            { step: 0, pitch: 55, durationSteps: 4, velocity: 0.8 },
-          ];
+      .getElementById("add-chord-select")
+      ?.addEventListener("change", (e) => {
+        const chordId = e.target?.value;
+        if (!chordId || !this._selectedTrackId) return;
+        const posPpqn = scdaw.state?.get?.()?.positionPpqn || 0;
+        const step = Math.max(0, ppqnToStep(posPpqn));
+        const chordNotes = buildChordNotes(chordId, { step });
+        if (chordNotes.length > 0) {
           scdaw.sendCommand("write_notes", {
             trackId: this._selectedTrackId,
             notes: chordNotes,
@@ -627,6 +695,7 @@ export class DawEditorElement extends BaseElement {
             mode: "merge",
           });
         }
+        e.target.value = "";
       });
 
     // Note cell clicks

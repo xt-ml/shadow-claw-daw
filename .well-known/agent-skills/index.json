@@ -980,7 +980,7 @@
       "name": "scdaw-editor",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-editor.",
       "url": "../../.agents/scripts/components/scdaw-editor.js",
-      "digest": "sha256:0c4abaca4fa1269fb587a6b8f8320bfc0ef5e4ed62a2bef8abe540627c2bf463"
+      "digest": "sha256:0db9f49227dee8e2173454901c51aff6b8ebdac56bf87ad31894209ad974cf7b"
     },
     {
       "name": "scdaw-knob",
@@ -1094,7 +1094,7 @@
       "name": "scdaw-instruments",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
       "url": "../../.agents/scripts/scdaw-instruments.js",
-      "digest": "sha256:7b98a65c03b29c31547719b8309c8a5079b2ed18cadeaf3a9a5d49bb605f8d89"
+      "digest": "sha256:e7f619df8e815caa529171a4b3d258bb1abc02d58f918ea4eb39248e120a4963"
     },
     {
       "name": "scdaw-midi-io",

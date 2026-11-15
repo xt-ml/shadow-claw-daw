@@ -543,19 +543,40 @@ export function triggerSynth(
   const amp = ctx.createGain();
   amp.gain.setValueAtTime(0.0001, when);
 
-  // Attack stage
   const peakVal = velocity;
-  amp.gain.linearRampToValueAtTime(peakVal, when + attack);
-
-  // Decay stage
   const sustainVal = Math.max(0.0001, peakVal * sustain);
-  amp.gain.linearRampToValueAtTime(sustainVal, when + attack + decay);
-
-  // Release stage (scheduled immediately unless gate=true for live MIDI)
   const releaseStart = when + durationSec;
-  if (!gate) {
+
+  if (gate) {
+    // Live MIDI: schedule full Attack -> Decay -> Sustain until handle.release()
+    amp.gain.linearRampToValueAtTime(peakVal, when + attack);
+    amp.gain.linearRampToValueAtTime(sustainVal, when + attack + decay);
+  } else if (durationSec < attack) {
+    // Note ends during Attack: ramp directly to interpolated attack level at releaseStart
+    const releaseVal = Math.max(
+      0.0001,
+      0.0001 + (peakVal - 0.0001) * (durationSec / attack),
+    );
+    amp.gain.linearRampToValueAtTime(releaseVal, releaseStart);
+    amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
+    amp.gain.linearRampToValueAtTime(0, releaseStart + release + 0.015);
+  } else if (durationSec < attack + decay) {
+    // Note ends during Decay: finish Attack, then ramp to interpolated decay level at releaseStart
+    amp.gain.linearRampToValueAtTime(peakVal, when + attack);
+    const releaseVal = Math.max(
+      0.0001,
+      peakVal + (sustainVal - peakVal) * ((durationSec - attack) / decay),
+    );
+    amp.gain.linearRampToValueAtTime(releaseVal, releaseStart);
+    amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
+    amp.gain.linearRampToValueAtTime(0, releaseStart + release + 0.015);
+  } else {
+    // Full Attack -> Decay -> Sustain -> Release
+    amp.gain.linearRampToValueAtTime(peakVal, when + attack);
+    amp.gain.linearRampToValueAtTime(sustainVal, when + attack + decay);
     amp.gain.setValueAtTime(sustainVal, releaseStart);
     amp.gain.exponentialRampToValueAtTime(0.0001, releaseStart + release);
+    amp.gain.linearRampToValueAtTime(0, releaseStart + release + 0.015);
   }
 
   osc1.connect(filter);
