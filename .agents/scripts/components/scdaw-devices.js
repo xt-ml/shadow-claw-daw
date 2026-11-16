@@ -46,6 +46,7 @@ export function getDeviceChainForTrack(track) {
       "noise-pad": "Noise Pad (Atmospheric)",
       korpus: "Korpus (Modal Resonator)",
       nano: "Nano (Micro-Sampler)",
+      psg: "PSG (Chiptune Synth)",
       soundfont: "SoundFont (GM Synth)",
       drums: "Playfield (12-Drum Kit)",
       synth: "Vaporisateur (Synth)",
@@ -135,6 +136,14 @@ export function renderDeviceControls(dev) {
       return `
         <scdaw-knob label="RootKey" min="0" max="127" step="1" unit="st" value="${p.rootKey ?? 60}" default="60" data-param="rootKey"></scdaw-knob>
         <scdaw-knob label="Attack" min="0.001" max="2.0" unit="s" value="${p.attack ?? 0.01}" default="0.01" data-param="attack"></scdaw-knob>
+        <scdaw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></scdaw-knob>
+      `;
+    case "psg":
+      return `
+        <scdaw-knob label="Duty" min="0.125" max="0.875" step="0.125" unit="" value="${p.duty ?? 0.5}" default="0.5" data-param="duty"></scdaw-knob>
+        <scdaw-knob label="Noise" min="1" max="31" step="1" unit="" value="${p.noisePeriod ?? 16}" default="16" data-param="noisePeriod"></scdaw-knob>
+        <scdaw-knob label="Tune" min="-24" max="24" step="1" unit="st" value="${p.tune ?? 0}" default="0" data-param="tune"></scdaw-knob>
+        <scdaw-knob label="Arp" min="0" max="12" step="1" unit="st" value="${p.arpSteps ?? 0}" default="0" data-param="arpSteps"></scdaw-knob>
         <scdaw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></scdaw-knob>
       `;
     case "soundfont":

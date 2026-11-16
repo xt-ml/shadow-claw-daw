@@ -300,14 +300,79 @@ export const PLUCK_SCHEMA = Object.freeze({
   width: { default: 0.75, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
 });
 
+function buildTubularOperatorSchema() {
+  const defaultRatios = [1.0, 2.0, 1.0, 3.0, 1.0, 4.0];
+  const defaultLevels = [1.0, 0.75, 0.6, 0.45, 0.0, 0.0];
+  const ops = {};
+  for (let op = 1; op <= 6; op++) {
+    ops[`op${op}Ratio`] = {
+      default: defaultRatios[op - 1],
+      min: 0.25,
+      max: 16.0,
+      step: 0.25,
+      unit: "x",
+    };
+    ops[`op${op}Level`] = {
+      default: defaultLevels[op - 1],
+      min: 0.0,
+      max: 1.0,
+      step: 0.01,
+      unit: "ratio",
+    };
+    ops[`op${op}Detune`] = {
+      default: 0,
+      min: -100,
+      max: 100,
+      step: 1,
+      unit: "cents",
+    };
+    ops[`op${op}Attack`] = {
+      default: 0.01,
+      min: 0.002,
+      max: 2.0,
+      step: 0.005,
+      unit: "s",
+    };
+    ops[`op${op}Decay`] = {
+      default: 0.5,
+      min: 0.02,
+      max: 4.0,
+      step: 0.02,
+      unit: "s",
+    };
+  }
+  return ops;
+}
+
 export const TUBULAR_SCHEMA = Object.freeze({
   algorithm: { default: 1, min: 1, max: 32, step: 1, unit: "algo" },
   feedback: { default: 4.0, min: 0.0, max: 7.0, step: 1, unit: "level" },
   modIndex: { default: 2.5, min: 0.0, max: 10.0, step: 0.1, unit: "ratio" },
+  brightness: { default: 1.0, min: 0.1, max: 2.0, step: 0.05, unit: "ratio" },
+  patchName: { default: "INIT VOICE", type: "string" },
+  lfoRate: { default: 4.0, min: 0.1, max: 30.0, step: 0.1, unit: "Hz" },
+  lfoPitchDepth: { default: 0, min: 0, max: 100, step: 1, unit: "cents" },
   attack: { default: 0.01, min: 0.002, max: 2.0, step: 0.01, unit: "s" },
   decay: { default: 0.5, min: 0.05, max: 4.0, step: 0.05, unit: "s" },
   sustain: { default: 0.4, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
   release: { default: 0.3, min: 0.02, max: 4.0, step: 0.05, unit: "s" },
+  ...buildTubularOperatorSchema(),
+});
+
+export const PSG_SCHEMA = Object.freeze({
+  mode: {
+    default: "ym",
+    type: "enum",
+    values: ["ym", "ay", "noise", "mix"],
+  },
+  duty: { default: 0.5, min: 0.125, max: 0.875, step: 0.125, unit: "ratio" },
+  noisePeriod: { default: 16, min: 1, max: 31, step: 1, unit: "" },
+  tune: { default: 0, min: -24, max: 24, step: 1, unit: "st" },
+  arpSteps: { default: 0, min: 0, max: 12, step: 1, unit: "st" },
+  attack: { default: 0.005, min: 0.002, max: 1.0, step: 0.005, unit: "s" },
+  decay: { default: 0.25, min: 0.02, max: 2.0, step: 0.01, unit: "s" },
+  sustain: { default: 0.6, min: 0.0, max: 1.0, step: 0.05, unit: "ratio" },
+  release: { default: 0.2, min: 0.01, max: 3.0, step: 0.01, unit: "s" },
 });
 
 export const NEON_SCHEMA = Object.freeze({
@@ -431,6 +496,7 @@ export const INSTRUMENT_SCHEMAS = Object.freeze({
   "noise-pad": NOISE_PAD_SCHEMA,
   korpus: KORPUS_SCHEMA,
   nano: NANO_SCHEMA,
+  psg: PSG_SCHEMA,
   soundfont: SOUNDFONT_SCHEMA,
 });
 

@@ -65,6 +65,12 @@ import {
   setupWorkbenchFullscreen,
 } from "../.agents/scripts/components/scdaw-workbench.js";
 import {
+  getSynthSectionsForInstrument,
+  shouldPreserveSynthDom,
+  computeAdsrSvgPath,
+  DawSynthElement,
+} from "../.agents/scripts/components/scdaw-synth.js";
+import {
   clampSize,
   computeKeyboardResize,
   getAriaAttributes,
@@ -4592,4 +4598,71 @@ test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only w
   } finally {
     scdaw.previewNote = origPreview;
   }
+});
+
+test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG registration", async () => {
+  const sections = getSynthSectionsForInstrument("tubular");
+  assert.equal(sections.length, 4);
+  assert.ok(sections.some((s) => s.id === "ops"));
+
+  assert.equal(
+    shouldPreserveSynthDom({
+      renderedTrackId: "trk_1",
+      targetTrackId: "trk_1",
+      renderedInstrument: "synth",
+      targetInstrument: "synth",
+      renderedSection: "osc",
+      targetSection: "osc",
+      hasContainer: true,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldPreserveSynthDom({
+      renderedTrackId: "trk_1",
+      targetTrackId: "trk_1",
+      renderedInstrument: "tubular",
+      targetInstrument: "tubular",
+      renderedSection: "ops",
+      targetSection: "ops",
+      renderedAlgorithm: 1,
+      targetAlgorithm: 5,
+      hasContainer: true,
+    }),
+    false,
+  );
+
+  const svgPath = computeAdsrSvgPath({
+    attack: 0.05,
+    decay: 0.3,
+    sustain: 0.6,
+    release: 0.4,
+  });
+  assert.match(svgPath, /^M\s/);
+  assert.equal(typeof DawSynthElement, "function");
+
+  const synthSrc = await fs.readFile(
+    new URL("../.agents/scripts/components/scdaw-synth.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    synthSrc,
+    /@container scdaw-synth\s*\(\s*min-width:\s*640px\s*\)/,
+  );
+  assert.match(synthSrc, /role=["']tablist["']/);
+  assert.match(synthSrc, /role=["']tabpanel["']/);
+  assert.match(synthSrc, /aria-pressed/);
+  assert.match(synthSrc, /scdaw-synth__op-grid/);
+
+  // Verify PSG in browser & devices
+  const browser = new DawBrowserElement();
+  assert.ok(browser._getItems().some((i) => i.kind === "psg"));
+  const psgChain = getDeviceChainForTrack({
+    id: "trk_psg",
+    name: "PSG",
+    kind: "synth",
+    instrument: "psg",
+    params: {},
+  });
+  assert.equal(psgChain[0].type, "psg");
 });

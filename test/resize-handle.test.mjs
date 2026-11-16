@@ -212,7 +212,21 @@ test("scdaw-workbench: resolveWorkbenchResponsiveLayout adapts mobile-first and 
   assert.equal(seqFull.showBrowserHandle, false);
   assert.equal(seqFull.showMixerHandle, false);
 
-  // 5. Mixer full-width view mode
+  // 5. Synth full-width view mode
+  const synthFull = resolveWorkbenchResponsiveLayout({
+    containerWidth: 1200,
+    viewMode: "synth-full",
+    showBrowser: true,
+    showMixer: true,
+    browserWidth: 220,
+    mixerWidth: 320,
+  });
+  assert.equal(synthFull.gridTemplateColumns, "1fr");
+  assert.equal(synthFull.isFullWidth, true);
+  assert.equal(synthFull.activeFocus, "synth");
+  assert.equal(synthFull.showResizeHandles, false);
+
+  // 6. Mixer full-width view mode
   const mixerFull = resolveWorkbenchResponsiveLayout({
     containerWidth: 1200,
     viewMode: "mixer-full",
@@ -504,13 +518,16 @@ test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Togg
       "center-toggle-devices-btn",
       "editor-container",
       "seq-container",
+      "synth-container",
       "devices-container",
       "mixer-handle",
       "mixer-container",
       "mode-studio-btn",
       "mode-piano-full-btn",
       "mode-seq-full-btn",
+      "mode-synth-full-btn",
       "mode-mixer-full-btn",
+      "center-editor-synth-btn",
       "toggle-browser-btn",
       "toggle-mixer-btn",
       "new-btn",
@@ -544,6 +561,7 @@ test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Togg
     const centerStack = elements.get("center-stack");
     const edCont = elements.get("editor-container");
     const seqCont = elements.get("seq-container");
+    const synthCont = elements.get("synth-container");
     const devCont = elements.get("devices-container");
     const mHandle = elements.get("mixer-handle");
     const mCont = elements.get("mixer-container");
@@ -553,6 +571,7 @@ test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Togg
     const mixerFullBtn = elements.get("mode-mixer-full-btn");
     const pianoFullBtn = elements.get("mode-piano-full-btn");
     const seqFullBtn = elements.get("mode-seq-full-btn");
+    const synthFullBtn = elements.get("mode-synth-full-btn");
 
     // 2. Verify initial Studio state: Browser, Studio, AND Mixer are all visible and highlighted
     assert.equal(grid.style.gridTemplateColumns, "230px 8px 1fr 8px 320px");
@@ -652,6 +671,20 @@ test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Togg
     assert.equal(devCont.classList.contains("hidden"), true);
     centerDevBtn.click();
     assert.equal(devCont.classList.contains("hidden"), false);
+
+    // 10. Synth tab in Studio and Synth (Full) view mode
+    const centerSynthBtn = elements.get("center-editor-synth-btn");
+    centerSynthBtn.click();
+    assert.equal(synthCont.classList.contains("hidden"), false);
+    assert.equal(edCont.classList.contains("hidden"), true);
+    assert.equal(seqCont.classList.contains("hidden"), true);
+
+    synthFullBtn.click();
+    assert.equal(synthFullBtn.classList.contains("btn-primary"), true);
+    assert.equal(synthCont.classList.contains("hidden"), false);
+    assert.equal(bCont.classList.contains("hidden"), true);
+    assert.equal(mCont.classList.contains("hidden"), true);
+    assert.equal(grid.style.gridTemplateColumns, "1fr");
 
     el.disconnectedCallback();
   } finally {

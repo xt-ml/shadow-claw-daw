@@ -29,12 +29,21 @@ import {
   triggerNoisePad,
   triggerKorpus,
   triggerNano,
+  triggerPsg,
   triggerSoundfont,
   triggerInstrumentVoice,
   setCachedSoundfont,
   getCachedSoundfont,
   clearSoundfontCache,
 } from "../.agents/scripts/scdaw-instruments.js";
+import {
+  DX7_ALGORITHMS,
+  describeDx7Algorithm,
+  renderAlgorithmSvg,
+  parseDx7Sysex,
+  encodeDx7SysexVoice,
+  encodeDx7SysexBank,
+} from "../.agents/scripts/scdaw-syx.js";
 import {
   INSTRUMENT_SCHEMAS,
   getDefaultParams,
@@ -729,4 +738,143 @@ test("scdaw-schema: defines complete schemas and defaults for new Audio FX", () 
   assert.equal(getDefaultParams("autotune").scale, "chromatic");
   assert.equal(getDefaultParams("maximizer").lookahead, true);
   assert.equal(getDefaultParams("zeitgeist").template, "swing16");
+});
+
+test("scdaw-syx: decodes all 32 DX7 algorithms, generates SVG diagrams, and round-trips .syx voice & 32-voice banks", () => {
+  assert.equal(DX7_ALGORITHMS.length, 32);
+
+  // Alg 1: carriers OP1 & OP3, feedback on OP6
+  const alg1 = describeDx7Algorithm(1);
+  assert.deepEqual(alg1.carriers, [1, 3]);
+  assert.equal(alg1.operators[5].hasFeedback, true);
+
+  // Alg 5: 3 dual-op stacks (carriers 1, 3, 5)
+  const alg5 = describeDx7Algorithm(5);
+  assert.deepEqual(alg5.carriers, [1, 3, 5]);
+  assert.ok(alg5.operators[1].targets.includes(1));
+
+  // Alg 32: all 6 operators are carriers
+  const alg32 = describeDx7Algorithm(32);
+  assert.deepEqual(alg32.carriers, [1, 2, 3, 4, 5, 6]);
+
+  const svg = renderAlgorithmSvg(5, 2);
+  assert.match(svg, /<svg[^>]+class="scdaw-synth__algo-svg"/);
+  assert.match(svg, /OP1/);
+  assert.match(svg, /OP6/);
+
+  // Single 163-byte VCED round-trip
+  const voiceBytes = encodeDx7SysexVoice(
+    {
+      algorithm: 5,
+      feedback: 6,
+      op1Ratio: 1.0,
+      op1Level: 0.99,
+      op2Ratio: 2.0,
+      op2Level: 0.65,
+      patchName: "TEST EP",
+    },
+    "TEST EP",
+  );
+  assert.equal(voiceBytes.length, 163);
+  const parsedVoice = parseDx7Sysex(voiceBytes);
+  assert.equal(parsedVoice.length, 1);
+  assert.equal(parsedVoice[0].name, "TEST EP");
+  assert.equal(parsedVoice[0].algorithm, 5);
+  assert.equal(parsedVoice[0].feedback, 6);
+  assert.equal(parsedVoice[0].params.op2Ratio, 2);
+
+  // 4104-byte 32-voice cartridge round-trip
+  const bankBytes = encodeDx7SysexBank([
+    { name: "BANK P1", params: { algorithm: 16, feedback: 5, op1Ratio: 1 } },
+    { name: "BANK P2", params: { algorithm: 32, feedback: 2, op1Ratio: 2 } },
+  ]);
+  assert.equal(bankBytes.length, 4104);
+  const parsedBank = parseDx7Sysex(bankBytes);
+  assert.equal(parsedBank.length, 32);
+  assert.equal(parsedBank[0].name, "BANK P1");
+  assert.equal(parsedBank[0].algorithm, 16);
+  assert.equal(parsedBank[1].name, "BANK P2");
+  assert.equal(parsedBank[1].algorithm, 32);
+});
+
+test("Tubular 6-Op FM & PSG Chiptune: trigger multi-operator FM graphs, feedback PeriodicWave, and YM2149 PSG modes", () => {
+  const ctx = new FakeAudioContext();
+  const dest = ctx.createGain();
+
+  const fmVoice = triggerTubular(
+    ctx,
+    dest,
+    { pitch: 60, velocity: 0.9, duration: 480 },
+    0,
+    {
+      algorithm: 1,
+      feedback: 5,
+      modIndex: 3.0,
+      op1Ratio: 1,
+      op1Level: 1,
+      op2Ratio: 2,
+      op2Level: 0.8,
+      op3Ratio: 1,
+      op3Level: 0.7,
+      op4Ratio: 3,
+      op4Level: 0.6,
+      op5Ratio: 1,
+      op5Level: 0.5,
+      op6Ratio: 4,
+      op6Level: 0.4,
+    },
+    120,
+    1,
+    { gate: true },
+  );
+  assert.ok(
+    ctx.oscillators.length >= 6,
+    "All 6 FM operators should instantiate",
+  );
+  assert.ok(
+    ctx.oscillators.some((o) => o.periodicWave),
+    "Feedback operator must bind cached Bessel PeriodicWave",
+  );
+  fmVoice.setPitchBend(2);
+  fmVoice.updateParams({ modIndex: 4.5 });
+  fmVoice.release(0.2);
+
+  for (const mode of ["ym", "ay", "noise", "mix"]) {
+    const psgVoice = triggerPsg(
+      ctx,
+      dest,
+      { pitch: 64, velocity: 0.85, duration: 240 },
+      0,
+      { mode, duty: 0.25, noisePeriod: 12, arpSteps: 7 },
+      120,
+      1,
+    );
+    assert.ok(typeof psgVoice.stop === "function");
+    psgVoice.stop(0.2);
+  }
+});
+
+test("set_step_lock & computeEventsInRange: merges per-step parameter locks onto scheduled events", () => {
+  let p = createProject("basic-beat");
+  const trackId = "trk_bass";
+  // basic-beat has bass note at position 480 -> step 2
+  const lockRes = applyCommand(p, "set_step_lock", {
+    trackId,
+    step: 2,
+    param: "cutoff",
+    value: 3400,
+  });
+  p = lockRes.project;
+  assert.equal(lockRes.result.updated, 1);
+  assert.equal(lockRes.result.locks.cutoff, 3400);
+
+  const events = computeEventsInRange(p, 0, 3840);
+  const lockedEv = events.find(
+    (e) => e.trackId === trackId && e.position === 480,
+  );
+  const unlockedEv = events.find(
+    (e) => e.trackId === trackId && e.position === 1440,
+  );
+  assert.equal(lockedEv.trackParams.cutoff, 3400);
+  assert.equal(unlockedEv.trackParams.cutoff, 800);
 });

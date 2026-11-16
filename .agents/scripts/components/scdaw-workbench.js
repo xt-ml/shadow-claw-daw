@@ -30,6 +30,7 @@ import "./scdaw-browser.js";
 import "./scdaw-timeline.js";
 import "./scdaw-editor.js";
 import "./scdaw-sequencer.js";
+import "./scdaw-synth.js";
 import "./scdaw-devices.js";
 import "./scdaw-mixer.js";
 import "./scdaw-statusbar.js";
@@ -133,7 +134,7 @@ export function resolveDropAction({
 
 export function resolveWorkbenchResponsiveLayout({
   containerWidth = 1200,
-  viewMode = "studio", // "studio" | "piano-roll-full" | "sequencer-full" | "mixer-full"
+  viewMode = "studio", // "studio" | "piano-roll-full" | "sequencer-full" | "synth-full" | "mixer-full"
   showBrowser = true,
   showMixer = true,
   browserWidth = 220,
@@ -146,11 +147,13 @@ export function resolveWorkbenchResponsiveLayout({
   const isFullWidth =
     viewMode === "piano-roll-full" ||
     viewMode === "sequencer-full" ||
+    viewMode === "synth-full" ||
     viewMode === "mixer-full";
 
   let activeFocus = "studio";
   if (viewMode === "piano-roll-full") activeFocus = "piano-roll";
   else if (viewMode === "sequencer-full") activeFocus = "sequencer";
+  else if (viewMode === "synth-full") activeFocus = "synth";
   else if (viewMode === "mixer-full") activeFocus = "mixer";
 
   if (isFullWidth || isMobile) {
@@ -210,7 +213,11 @@ export function resolveWorkbenchPanels(showBrowser, showMixer, editorMode) {
     showBrowser: Boolean(showBrowser),
     showMixer: Boolean(showMixer),
     editorMode:
-      editorMode === "step-sequencer" ? "step-sequencer" : "piano-roll",
+      editorMode === "step-sequencer"
+        ? "step-sequencer"
+        : editorMode === "synth"
+          ? "synth"
+          : "piano-roll",
     gridColumns:
       showBrowser && showMixer
         ? "240px 1fr 280px"
@@ -255,6 +262,10 @@ export function resolveWorkbenchButtonStates({
     },
     sequencerFull: {
       active: viewMode === "sequencer-full",
+      disabled: false,
+    },
+    synthFull: {
+      active: viewMode === "synth-full",
       disabled: false,
     },
     mixerFull: {
@@ -742,11 +753,11 @@ export class DawWorkbenchElement extends BaseElement {
           width: 100%;
         }
 
-        /* Full-width focus views: 3 equal columns on mobile (no scrollbar) */
+        /* Full-width focus views: 2x2 grid on mobile (no scrollbar) */
         .scdaw-workbench__toolbar-group--views,
         .scdaw-workbench__view-switcher {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 4px;
           background: rgba(0, 0, 0, 0.25);
           padding: 3px;
@@ -825,7 +836,7 @@ export class DawWorkbenchElement extends BaseElement {
 
         .scdaw-workbench__editor-tabs {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           align-items: center;
           gap: 0.35rem;
           width: 100%;
@@ -1220,6 +1231,7 @@ export class DawWorkbenchElement extends BaseElement {
               <button id="mode-mixer-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
               <button id="mode-piano-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
               <button id="mode-seq-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
+              <button id="mode-synth-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Synthesizer Workbench" aria-pressed="false" aria-selected="false">🎛️ Synth (Full)</button>
             </div>
           </nav>
         </header>
@@ -1246,6 +1258,7 @@ export class DawWorkbenchElement extends BaseElement {
               <div class="scdaw-workbench__editor-tabs" role="group" aria-label="Active Detail View">
                 <button id="center-editor-piano-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Show Piano Roll Note Editor in Studio">🎹 Piano Roll</button>
                 <button id="center-editor-seq-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show 16-Step Drum Matrix in Studio">🥁 Step Sequencer</button>
+                <button id="center-editor-synth-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show Synthesizer Workbench in Studio">🎛️ Synth</button>
               </div>
               <button id="center-toggle-devices-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Toggle Track Device Chain Rack">🎛️ Device Rack</button>
             </div>
@@ -1254,6 +1267,9 @@ export class DawWorkbenchElement extends BaseElement {
             </div>
             <div id="seq-container" class="scdaw-workbench__section scdaw-workbench__section--sequencer hidden" hidden>
               <scdaw-sequencer></scdaw-sequencer>
+            </div>
+            <div id="synth-container" class="scdaw-workbench__section scdaw-workbench__section--synth hidden" hidden>
+              <scdaw-synth></scdaw-synth>
             </div>
             <div id="devices-container" class="scdaw-workbench__section scdaw-workbench__section--devices">
               <scdaw-devices></scdaw-devices>
@@ -1469,6 +1485,13 @@ export class DawWorkbenchElement extends BaseElement {
         this._updatePanels();
       });
     this.shadowRoot
+      .getElementById("mode-synth-full-btn")
+      ?.addEventListener("click", () => {
+        this._viewMode = "synth-full";
+        this._editorMode = "synth";
+        this._updatePanels();
+      });
+    this.shadowRoot
       .getElementById("mode-mixer-full-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "mixer-full";
@@ -1491,7 +1514,7 @@ export class DawWorkbenchElement extends BaseElement {
         this._updatePanels();
       });
 
-    // Center Stack Detail Editor Switcher (Piano Roll / Step Sequencer / Device Rack)
+    // Center Stack Detail Editor Switcher (Piano Roll / Step Sequencer / Synth / Device Rack)
     this.shadowRoot
       .getElementById("center-editor-piano-btn")
       ?.addEventListener("click", () => {
@@ -1502,6 +1525,12 @@ export class DawWorkbenchElement extends BaseElement {
       .getElementById("center-editor-seq-btn")
       ?.addEventListener("click", () => {
         this._editorMode = "step-sequencer";
+        this._updatePanels();
+      });
+    this.shadowRoot
+      .getElementById("center-editor-synth-btn")
+      ?.addEventListener("click", () => {
+        this._editorMode = "synth";
         this._updatePanels();
       });
     this.shadowRoot
@@ -2354,6 +2383,7 @@ export class DawWorkbenchElement extends BaseElement {
     const editorBar = this.shadowRoot.getElementById("editor-bar");
     const edCont = this.shadowRoot.getElementById("editor-container");
     const seqCont = this.shadowRoot.getElementById("seq-container");
+    const synthCont = this.shadowRoot.getElementById("synth-container");
     const devCont = this.shadowRoot.getElementById("devices-container");
 
     if (centerStack) {
@@ -2394,6 +2424,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(editorBar, false, "flex");
       setVisible(edCont, true);
       setVisible(seqCont, false);
+      setVisible(synthCont, false);
       setVisible(devCont, false);
     } else if (this._viewMode === "sequencer-full") {
       setVisible(bCont, false);
@@ -2405,6 +2436,19 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(editorBar, false, "flex");
       setVisible(edCont, false);
       setVisible(seqCont, true);
+      setVisible(synthCont, false);
+      setVisible(devCont, false);
+    } else if (this._viewMode === "synth-full") {
+      setVisible(bCont, false);
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, false);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, true, "flex");
+      setVisible(timelineCont, false);
+      setVisible(editorBar, false, "flex");
+      setVisible(edCont, false);
+      setVisible(seqCont, false);
+      setVisible(synthCont, true);
       setVisible(devCont, false);
     } else if (this._viewMode === "mixer-full") {
       setVisible(bCont, false);
@@ -2412,6 +2456,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(mCont, true);
       setVisible(mHandle, false, "inline-flex");
       setVisible(centerStack, false, "flex");
+      setVisible(synthCont, false);
     } else {
       // Studio layout: On mobile, side docks are hidden by default to prioritize workspace
       const showBrowser = btnStates.browser.visible;
@@ -2425,6 +2470,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(editorBar, true, "flex");
       setVisible(edCont, this._editorMode === "piano-roll");
       setVisible(seqCont, this._editorMode === "step-sequencer");
+      setVisible(synthCont, this._editorMode === "synth");
       setVisible(devCont, this._showDevices);
     }
 
@@ -2434,6 +2480,9 @@ export class DawWorkbenchElement extends BaseElement {
     );
     const centerSeqBtn = this.shadowRoot.getElementById(
       "center-editor-seq-btn",
+    );
+    const centerSynthBtn = this.shadowRoot.getElementById(
+      "center-editor-synth-btn",
     );
     const centerDevBtn = this.shadowRoot.getElementById(
       "center-toggle-devices-btn",
@@ -2450,6 +2499,12 @@ export class DawWorkbenchElement extends BaseElement {
       centerSeqBtn.classList.toggle("scdaw-workbench__btn--active", isSeq);
       centerSeqBtn.setAttribute("aria-pressed", String(isSeq));
     }
+    if (centerSynthBtn) {
+      const isSynth = this._editorMode === "synth";
+      centerSynthBtn.classList.toggle("btn-primary", isSynth);
+      centerSynthBtn.classList.toggle("scdaw-workbench__btn--active", isSynth);
+      centerSynthBtn.setAttribute("aria-pressed", String(isSynth));
+    }
     if (centerDevBtn) {
       centerDevBtn.classList.toggle("btn-primary", this._showDevices);
       centerDevBtn.classList.toggle(
@@ -2463,6 +2518,7 @@ export class DawWorkbenchElement extends BaseElement {
     const modeStudio = this.shadowRoot.getElementById("mode-studio-btn");
     const modePiano = this.shadowRoot.getElementById("mode-piano-full-btn");
     const modeSeq = this.shadowRoot.getElementById("mode-seq-full-btn");
+    const modeSynth = this.shadowRoot.getElementById("mode-synth-full-btn");
     const modeMixer = this.shadowRoot.getElementById("mode-mixer-full-btn");
     const bBtn = this.shadowRoot.getElementById("toggle-browser-btn");
     const mBtn = this.shadowRoot.getElementById("toggle-mixer-btn");
@@ -2518,6 +2574,26 @@ export class DawWorkbenchElement extends BaseElement {
       modeSeq.setAttribute(
         "aria-selected",
         String(btnStates.sequencerFull.active),
+      );
+    }
+    if (modeSynth) {
+      modeSynth.disabled = btnStates.synthFull.disabled;
+      modeSynth.setAttribute(
+        "aria-disabled",
+        String(btnStates.synthFull.disabled),
+      );
+      modeSynth.classList.toggle("btn-primary", btnStates.synthFull.active);
+      modeSynth.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.synthFull.active,
+      );
+      modeSynth.setAttribute(
+        "aria-pressed",
+        String(btnStates.synthFull.active),
+      );
+      modeSynth.setAttribute(
+        "aria-selected",
+        String(btnStates.synthFull.active),
       );
     }
     if (modeMixer) {

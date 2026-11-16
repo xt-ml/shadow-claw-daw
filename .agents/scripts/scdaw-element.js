@@ -8,6 +8,7 @@
  * - <scdaw-timeline>
  * - <scdaw-editor>
  * - <scdaw-sequencer>
+ * - <scdaw-synth>
  * - <scdaw-devices>
  * - <scdaw-mixer>
  * - <scdaw-knob>
@@ -24,6 +25,7 @@ export { DawBrowserElement } from "./components/scdaw-browser.js";
 export { DawTimelineElement } from "./components/scdaw-timeline.js";
 export { DawEditorElement } from "./components/scdaw-editor.js";
 export { DawSequencerElement } from "./components/scdaw-sequencer.js";
+export { DawSynthElement } from "./components/scdaw-synth.js";
 export { DawDevicesElement } from "./components/scdaw-devices.js";
 export { DawMixerElement } from "./components/scdaw-mixer.js";
 export { DawStatusBarElement } from "./components/scdaw-statusbar.js";

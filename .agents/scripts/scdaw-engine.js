@@ -1356,7 +1356,10 @@ export class DawEngine extends EventTarget {
 
       for (const note of resolvedNotes) {
         const when = pulsesToSeconds(note.position, bpm);
-        let trackParams = track.params;
+        let trackParams =
+          note.locks && typeof note.locks === "object"
+            ? { ...(track.params || {}), ...note.locks }
+            : track.params;
         if (track.automation?.cutoff?.length > 0) {
           const autoCutoff = automationValueAt(
             track,
@@ -1585,13 +1588,17 @@ export class DawEngine extends EventTarget {
 
         for (const note of resolvedNotes) {
           const when = pulsesToSeconds(note.position, bpm);
+          const trackParams =
+            note.locks && typeof note.locks === "object"
+              ? { ...(track.params || {}), ...note.locks }
+              : track.params;
           triggerInstrumentVoice(
             masterCtx,
             gain,
             {
               trackKind: track.kind || track.type,
               trackInstrument: track.instrument || track.kind || track.type,
-              trackParams: track.params,
+              trackParams,
               trackVolume: tap === "pre-fader" ? 1.0 : track.volume,
               trackPan: tap === "pre-fader" ? 0 : track.pan,
               note,
@@ -1666,13 +1673,17 @@ export class DawEngine extends EventTarget {
 
       for (const note of resolvedNotes) {
         const when = pulsesToSeconds(note.position, bpm);
+        const trackParams =
+          note.locks && typeof note.locks === "object"
+            ? { ...(track.params || {}), ...note.locks }
+            : track.params;
         triggerInstrumentVoice(
           trackCtx,
           gain,
           {
             trackKind: track.kind || track.type,
             trackInstrument: track.instrument || track.kind || track.type,
-            trackParams: track.params,
+            trackParams,
             trackVolume: tap === "pre-fader" ? 1.0 : track.volume,
             trackPan: tap === "pre-fader" ? 0 : track.pan,
             note,
@@ -1866,6 +1877,10 @@ export class DawEngine extends EventTarget {
         for (const note of resolvedNotes) {
           const when = pulsesToSeconds(note.position, bpm);
           if (when >= durSec) continue;
+          const trackParams =
+            note.locks && typeof note.locks === "object"
+              ? { ...(track.params || {}), ...note.locks }
+              : track.params;
 
           triggerInstrumentVoice(
             offlineCtx,
@@ -1873,7 +1888,7 @@ export class DawEngine extends EventTarget {
             {
               trackKind: track.kind || track.type,
               trackInstrument: track.instrument || track.kind || track.type,
-              trackParams: track.params,
+              trackParams,
               trackVolume: track.volume,
               trackPan: track.pan,
               note,

@@ -15,7 +15,7 @@ You are **Daw**, the intelligent audio workstation copilot and electronic music 
 
 1. **Namespace Isolation**:
    - Tools prefix: `scdaw_*` (43 declarative WebMCP tools, including Web MIDI tools `scdaw_get_midi_status`, `scdaw_configure_midi`, `scdaw_trigger_midi`)
-   - Custom elements: `scdaw-*` (12 modular Web Components, including `<scdaw-midi-keyboard>`)
+   - Custom elements: `scdaw-*` (13 modular Web Components, including `<scdaw-synth>` and `<scdaw-midi-keyboard>`)
    - Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
    - Direct workbench page: `/pages/main/index.html` (`/main/`)
 

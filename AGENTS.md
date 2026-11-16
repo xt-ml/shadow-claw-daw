@@ -9,7 +9,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
 - **Assistant Name**: `ShadowClaw DAW` (`Daw`)
 - **Prefix Isolation**:
   - Tools prefix: `scdaw_*` (43 declarative tools)
-  - Custom Elements prefix: `scdaw-*` (12 modular Web Components)
+  - Custom Elements prefix: `scdaw-*` (13 modular Web Components)
   - Broadcast Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
   - Pinned workbench: `pages/main/index.html` (`/main/`)
 
@@ -35,8 +35,8 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - SMF MIDI codec, live MIDI message parsing/encoding, DAWproject v1.0 XML/ZIP interchange (including Points automation lanes and embedded Audio sample stems), zero-dependency ZIP archive encoding/decoding, compressed `#file=` / `?file=` URL sharing (`CompressionStream`/`DecompressionStream` + Base64URL), and OPFS conversation storage live in `.agents/scripts/scdaw-midi.js`, `.agents/scripts/scdaw-dawproject.js`, `.agents/scripts/scdaw-zip.js`, `.agents/scripts/scdaw-compress.js`, `.agents/scripts/scdaw-url-param.js`, and `.agents/scripts/scdaw-fs.js`.
    - Web MIDI API integration, hot-plug device enumeration, MIDI Learn CC mapping, hardware MIDI output, and `SoftwareMidiInput` QWERTY keyboard fallback live in `.agents/scripts/scdaw-midi-io.js`.
    - Reactive signal primitives live in `.agents/scripts/scdaw-signals.js`.
-   - Audio graph creation, instrument synthesis (`Vaporisateur` synth, `Playfield` drums, and SoundFont GM voices), timeline audio clip buffer playback, real-time lookahead scheduling with clock stall recovery, Play/Pause/Seek (`pause()`, `seek(ppqn)`), resolved note cache, live parameter modulation fast paths (`setLiveTrackParam`, `setLiveMasterParam`, `setLiveTransportParam` via `setTargetAtTime`), auxiliary send/bus routing, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
-   - UI Web Components live in `.agents/scripts/scdaw-element.js` and `.agents/scripts/components/scdaw-*.js` (including `scdaw-midi-keyboard.js`).
+   - Instrument synthesis (`Vaporisateur` synth, `Tubular` 6-operator / 32-algorithm DX7 FM, `PSG` YM2149 chiptune, `Playfield` drums, and SoundFont GM voices), DX7 `.syx` cartridge codec (`.agents/scripts/scdaw-syx.js`), timeline audio clip buffer playback, real-time lookahead scheduling with clock stall recovery, Play/Pause/Seek (`pause()`, `seek(ppqn)`), resolved note cache, live parameter modulation fast paths (`setLiveTrackParam`, `setLiveMasterParam`, `setLiveTransportParam` via `setTargetAtTime`), auxiliary send/bus routing, reactive track selection (`selectedTrackId`), and offline WAV/stems bouncing live in `.agents/scripts/scdaw-engine.js` and `.agents/scripts/scdaw-instruments.js`.
+   - UI Web Components live in `.agents/scripts/scdaw-element.js` and `.agents/scripts/components/scdaw-*.js` (including `scdaw-synth.js` and `scdaw-midi-keyboard.js`).
    - Worker-to-main IPC bridge and WebMCP registration live in `.agents/scripts/scdaw-adapter.js`.
 
 4. **Mobile-First Responsive Layout, BEM & Accessibility**:

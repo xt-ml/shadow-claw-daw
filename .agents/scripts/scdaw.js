@@ -1098,7 +1098,14 @@ export function applyCommand(project, name, params = {}) {
         };
       }
       if (scope === "synth") {
-        const def = SYNTH_PARAM_SCHEMA[param]?.default;
+        const instKey = (
+          track.instrument ||
+          track.kind ||
+          "synth"
+        ).toLowerCase();
+        const schema = INSTRUMENT_SCHEMAS[instKey] || SYNTH_PARAM_SCHEMA;
+        const def =
+          schema[param]?.default ?? SYNTH_PARAM_SCHEMA[param]?.default;
         if (def === undefined) throw new Error(`Unknown synth param: ${param}`);
         track.params = track.params || {};
         track.params[param] = def;
@@ -1121,7 +1128,8 @@ export function applyCommand(project, name, params = {}) {
         track.solo = TRACK_MIX_SCHEMA.solo.default;
       }
       if (mode === "params" || mode === "all") {
-        track.params = getDefaultParams(track.kind);
+        const instKey = track.instrument || track.kind;
+        track.params = getDefaultParams(instKey);
       }
       return { project: next, result: { ok: true, trackId: track.id, mode } };
     }
@@ -1388,6 +1396,9 @@ export function applyCommand(project, name, params = {}) {
           pitch: removedNote.pitch,
           duration: removedNote.duration,
           velocity: removedNote.velocity,
+          ...(removedNote.locks
+            ? { locks: structuredClone(removedNote.locks) }
+            : {}),
         };
         track.notes.splice(existingIndex, 1);
         return {
@@ -1412,6 +1423,7 @@ export function applyCommand(project, name, params = {}) {
           duration,
           pitch,
           velocity,
+          ...(mem?.locks ? { locks: structuredClone(mem.locks) } : {}),
         };
         track.notes.push(newNote);
         track.notes.sort((a, b) => a.position - b.position);
@@ -1455,6 +1467,69 @@ export function applyCommand(project, name, params = {}) {
           step,
           velocity,
           updated,
+        },
+      };
+    }
+
+    case "set_step_lock": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      const step = Math.max(0, Math.round(Number(params.step ?? 0)));
+      const clearAll = Boolean(params.clear && !params.param);
+
+      const lockPatch =
+        params.locks && typeof params.locks === "object"
+          ? { ...params.locks }
+          : params.param
+            ? { [params.param]: params.clear ? null : params.value }
+            : {};
+
+      let updated = 0;
+      let lastLocks = {};
+      for (const note of track.notes) {
+        if (ppqnToStep(note.position) !== step) continue;
+        if (clearAll) {
+          delete note.locks;
+        } else {
+          const nextLocks = { ...(note.locks || {}) };
+          for (const [k, v] of Object.entries(lockPatch)) {
+            if (v === null || v === undefined) {
+              delete nextLocks[k];
+            } else {
+              nextLocks[k] = v;
+            }
+          }
+          if (Object.keys(nextLocks).length > 0) {
+            note.locks = nextLocks;
+          } else {
+            delete note.locks;
+          }
+          lastLocks = note.locks ? { ...note.locks } : {};
+        }
+        updated++;
+      }
+
+      if (track.stepMemory && track.stepMemory[step]) {
+        if (clearAll) {
+          delete track.stepMemory[step].locks;
+        } else {
+          const memLocks = { ...(track.stepMemory[step].locks || {}) };
+          for (const [k, v] of Object.entries(lockPatch)) {
+            if (v === null || v === undefined) delete memLocks[k];
+            else memLocks[k] = v;
+          }
+          track.stepMemory[step].locks = memLocks;
+        }
+      }
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          step,
+          updated,
+          locks: lastLocks,
         },
       };
     }
@@ -2247,6 +2322,9 @@ export function resolveTrackNotes(
         duration: note.duration,
         pitch: note.pitch,
         velocity: note.velocity,
+        ...(note.locks && typeof note.locks === "object"
+          ? { locks: structuredClone(note.locks) }
+          : {}),
       });
     }
   }
@@ -2340,7 +2418,10 @@ export function computeEventsInRange(project, fromPpqn, toPpqn) {
         trackKind: track.kind,
         trackInstrument:
           track.instrument || track.params?.instrument || track.kind,
-        trackParams: track.params,
+        trackParams:
+          note.locks && typeof note.locks === "object"
+            ? { ...(track.params || {}), ...note.locks }
+            : track.params,
         trackVolume: track.volume,
         trackPan: track.pan,
         position: note.position,

@@ -21,8 +21,8 @@ test("Namespace isolation: verifies scoped naming conventions and zero conflicts
   );
   assert.equal(
     result.report.elements.length,
-    12,
-    "Must define 12 custom elements",
+    13,
+    "Must define 13 custom elements",
   );
   assert.equal(
     result.report.channels.length,

@@ -45,6 +45,7 @@
       "scdaw-timeline",
       "scdaw-editor",
       "scdaw-sequencer",
+      "scdaw-synth",
       "scdaw-devices",
       "scdaw-mixer",
       "scdaw-knob",

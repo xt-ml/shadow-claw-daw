@@ -437,6 +437,8 @@ export async function handleToolDispatch(name, params) {
         browser: "<scdaw-browser></scdaw-browser>",
         timeline: "<scdaw-timeline></scdaw-timeline>",
         editor: "<scdaw-editor></scdaw-editor>",
+        sequencer: "<scdaw-sequencer></scdaw-sequencer>",
+        synth: "<scdaw-synth></scdaw-synth>",
         devices: "<scdaw-devices></scdaw-devices>",
         statusbar: "<scdaw-statusbar></scdaw-statusbar>",
         knob: "<scdaw-knob></scdaw-knob>",

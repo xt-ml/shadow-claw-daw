@@ -165,6 +165,13 @@ export class DawBrowserElement extends BaseElement {
       kind: "nano",
     });
     items.push({
+      id: "dev_psg",
+      name: "PSG (Chiptune Synth)",
+      type: "devices",
+      category: "Instrument",
+      kind: "psg",
+    });
+    items.push({
       id: "dev_soundfont",
       name: "SoundFont (GM Synth)",
       type: "devices",
