@@ -8,7 +8,7 @@
  * Zero DOM and zero Web Audio dependencies.
  */
 
-import { PPQN, barPulses, beatsPerBar } from "./scdaw.js";
+import { PPQN, barPulses, beatsPerBar, stepsPerBar } from "./scdaw.js";
 import { resolveGmProgram } from "./scdaw-soundfont.js";
 
 // --- Music Theory Constants (openDAW & claw-daw) ---
@@ -57,11 +57,19 @@ export const SCALES = {
   ionian: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
   aeolian: [0, 2, 3, 5, 7, 8, 10],
+  harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+  melodic_minor: [0, 2, 3, 5, 7, 9, 11],
   mixolydian: [0, 2, 4, 5, 7, 9, 10],
   dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  locrian: [0, 1, 3, 5, 6, 8, 10],
   blues: [0, 3, 5, 6, 7, 10],
   pentatonic_major: [0, 2, 4, 7, 9],
   pentatonic_minor: [0, 3, 5, 7, 10],
+  whole_tone: [0, 2, 4, 6, 8, 10],
+  hirajoshi: [0, 2, 3, 7, 8],
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 };
 
 export const CHORD_INTERVALS = {
@@ -71,6 +79,8 @@ export const CHORD_INTERVALS = {
   m: [0, 3, 7],
   min: [0, 3, 7],
   minor: [0, 3, 7],
+  6: [0, 4, 7, 9],
+  m6: [0, 3, 7, 9],
   7: [0, 4, 7, 10], // dominant 7
   dom7: [0, 4, 7, 10],
   maj7: [0, 4, 7, 11],
@@ -80,10 +90,18 @@ export const CHORD_INTERVALS = {
   dim7: [0, 3, 6, 9],
   m7b5: [0, 3, 6, 10],
   aug: [0, 4, 8],
+  aug7: [0, 4, 8, 10],
   sus4: [0, 5, 7],
+  "7sus4": [0, 5, 7, 10],
   sus2: [0, 2, 7],
+  add2: [0, 2, 4, 7],
   add9: [0, 4, 7, 14],
+  madd9: [0, 3, 7, 14],
   9: [0, 4, 7, 10, 14],
+  maj9: [0, 4, 7, 11, 14],
+  m9: [0, 3, 7, 10, 14],
+  11: [0, 4, 7, 10, 14, 17],
+  13: [0, 4, 7, 10, 14, 21],
 };
 
 export const STYLE_PRESETS = Object.freeze({
@@ -134,6 +152,60 @@ export const STYLE_PRESETS = Object.freeze({
     drumKit: "lofi-kit",
     bassType: "laidback",
     swing: 0.22,
+  },
+  waltz: {
+    feel: "waltz",
+    defaultBpm: 96,
+    signature: [3, 4],
+    mode: "major",
+    drumKit: "jazz-kit",
+    bassType: "waltz",
+    swing: 0.0,
+  },
+  ballad: {
+    feel: "ballad",
+    defaultBpm: 60,
+    signature: [6, 8],
+    mode: "major",
+    drumKit: "jazz-kit",
+    bassType: "legato",
+    swing: 0.0,
+    legato: true,
+  },
+  choral: {
+    feel: "choral",
+    defaultBpm: 56,
+    signature: [4, 4],
+    mode: "major",
+    drumKit: "none",
+    bassType: "legato",
+    swing: 0.0,
+    legato: true,
+  },
+  "jazz-swing": {
+    feel: "jazz-swing",
+    defaultBpm: 132,
+    mode: "dorian",
+    drumKit: "jazz-kit",
+    bassType: "walking",
+    swing: 0.3,
+  },
+  bossa: {
+    feel: "bossa",
+    defaultBpm: 120,
+    mode: "major",
+    drumKit: "jazz-kit",
+    bassType: "bossa",
+    swing: 0.0,
+  },
+  march: {
+    feel: "march",
+    defaultBpm: 112,
+    signature: [2, 4],
+    mode: "major",
+    drumKit: "rock-kit",
+    bassType: "march",
+    swing: 0.0,
   },
 });
 
@@ -257,36 +329,98 @@ function generateDrumsForSection(
   feel = "straight-rock",
   rng,
   isSongStart = false,
+  signature = [4, 4],
 ) {
   const notes = [];
-  const barPulseCount = PPQN.Bar;
+  const barPulseCount = barPulses(signature);
+  const barSteps = stepsPerBar(signature);
   const quarter = PPQN.Quarter;
   const sixteenth = PPQN.SemiQuaver;
+  const eighth = Math.round(PPQN.Quarter / 2);
+
+  if (feel === "choral") {
+    return notes;
+  }
 
   const isShuffle =
     feel.includes("shuffle") ||
     feel.includes("blues") ||
     feel === "blues-rock" ||
-    feel === "lofi";
+    feel === "lofi" ||
+    feel === "jazz-swing";
 
   // Downbeat crash cymbal (pitch 49) at the very start of a section with higher energy or song start
   if (isSongStart || energy >= 0.6) {
     notes.push({
       position: sectionStartPulse,
-      duration: quarter * 2,
+      duration: Math.min(barPulseCount, quarter * 2),
       pitch: 49, // Crash Cymbal 1
       velocity: 0.9 + rng() * 0.1,
     });
   }
 
+  const isCompound68 = signature[1] === 8 && signature[0] % 3 === 0;
+  const isWaltz34 = signature[0] === 3 && signature[1] === 4;
+
   for (let b = 0; b < sectionBars; b++) {
     const barOffset = sectionStartPulse + b * barPulseCount;
     const isLastBar = b === sectionBars - 1;
 
+    if (isCompound68) {
+      // Compound meter (e.g. 6/8, 9/8, 12/8): pulse in eighth notes grouped by 3
+      const eighthCount = signature[0];
+      for (let e = 0; e < eighthCount; e++) {
+        const pos = barOffset + e * eighth;
+        const isDottedBeat = e % 3 === 0;
+        notes.push({
+          position: pos,
+          duration: eighth,
+          pitch: 42,
+          velocity: isDottedBeat ? 0.78 : 0.56,
+        });
+        if (e === 0) {
+          notes.push({
+            position: pos,
+            duration: eighth,
+            pitch: 36,
+            velocity: 0.92,
+          });
+        } else if (e === 3 || (eighthCount >= 9 && e % 6 === 3)) {
+          notes.push({
+            position: pos,
+            duration: eighth,
+            pitch: 38,
+            velocity: 0.85,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (isWaltz34) {
+      for (let beat = 0; beat < 3; beat++) {
+        const pos = barOffset + beat * quarter;
+        notes.push({
+          position: pos,
+          duration: eighth,
+          pitch: 42,
+          velocity: beat === 0 ? 0.8 : 0.6,
+        });
+        notes.push({
+          position: pos,
+          duration: quarter,
+          pitch: beat === 0 ? 36 : 38,
+          velocity: beat === 0 ? 0.92 : 0.72,
+        });
+      }
+      continue;
+    }
+
     if (isShuffle) {
-      // Swung eighth-note shuffle hat pattern (steps 0, 2, 4, 6, 8, 10, 12, 14)
-      for (let s = 0; s < 16; s += 2) {
-        if (isLastBar && s >= 12 && energy >= 0.5) continue;
+      // Swung eighth-note shuffle hat pattern
+      for (let s = 0; s < barSteps; s += 2) {
+        if (isLastBar && barSteps >= 16 && s >= barSteps - 4 && energy >= 0.5)
+          continue;
         const hatPos = barOffset + s * sixteenth;
         const isQuarter = s % 4 === 0;
         let hatPitch = 42; // Closed Hat
@@ -306,10 +440,11 @@ function generateDrumsForSection(
       }
     } else {
       // 16th hat pattern across the bar
-      for (let s = 0; s < 16; s++) {
+      for (let s = 0; s < barSteps; s++) {
         const hatPos = barOffset + s * sixteenth;
         // Skip the last 4 16ths if playing a fill on the last bar
-        if (isLastBar && s >= 12 && energy >= 0.5) continue;
+        if (isLastBar && barSteps >= 16 && s >= barSteps - 4 && energy >= 0.5)
+          continue;
 
         const isQuarter = s % 4 === 0;
         const isEighth = s % 2 === 0;
@@ -323,7 +458,7 @@ function generateDrumsForSection(
         }
 
         // Open hat accents on offbeats occasionally
-        if (s === 2 || s === 6 || s === 10 || s === 14) {
+        if (s % 4 === 2) {
           if (rng() < 0.25 * energy) {
             hatPitch = 46; // Open Hat
             hatVel += 0.15;
@@ -339,7 +474,7 @@ function generateDrumsForSection(
       }
     }
 
-    if (isLastBar && energy >= 0.5) {
+    if (isLastBar && energy >= 0.5 && barPulseCount >= quarter * 4) {
       // 1-bar ending drum fill (snare + toms buildup)
       notes.push({
         position: barOffset + 0,
@@ -392,46 +527,37 @@ function generateDrumsForSection(
         velocity: 1.0,
       }); // Low Tom
     } else {
-      // Standard rock groove:
-      // Kick on Beat 1 (0) and Beat 3 (quarter * 2), plus optional push on 3.5
-      notes.push({
-        position: barOffset + 0,
-        duration: quarter,
-        pitch: 36,
-        velocity: 0.95 + rng() * 0.05,
-      });
-      notes.push({
-        position: barOffset + quarter * 2,
-        duration: quarter,
-        pitch: 36,
-        velocity: 0.9 + rng() * 0.05,
-      });
-
-      if (energy >= 0.7 && rng() < 0.6) {
+      const numBeats = Math.max(1, Math.floor(barPulseCount / quarter));
+      for (let beatIdx = 0; beatIdx < numBeats; beatIdx++) {
+        const beatPos = barOffset + beatIdx * quarter;
+        const isKickBeat = beatIdx % 2 === 0;
         notes.push({
-          position: barOffset + quarter * 2 + sixteenth * 2,
-          duration: sixteenth * 2,
-          pitch: 36,
-          velocity: 0.85,
+          position: beatPos,
+          duration: quarter,
+          pitch: isKickBeat ? 36 : 38,
+          velocity: 0.92 + rng() * 0.06,
         });
+        if (
+          isKickBeat &&
+          beatIdx >= 2 &&
+          energy >= 0.7 &&
+          rng() < 0.6 &&
+          beatPos + sixteenth * 2 < barOffset + barPulseCount
+        ) {
+          notes.push({
+            position: beatPos + sixteenth * 2,
+            duration: sixteenth * 2,
+            pitch: 36,
+            velocity: 0.85,
+          });
+        }
       }
 
-      // Snare backbeat on Beat 2 (quarter) and Beat 4 (quarter * 3)
-      notes.push({
-        position: barOffset + quarter,
-        duration: quarter,
-        pitch: 38,
-        velocity: 0.95 + rng() * 0.05,
-      });
-      notes.push({
-        position: barOffset + quarter * 3,
-        duration: quarter,
-        pitch: 38,
-        velocity: 0.95 + rng() * 0.05,
-      });
-
       // Ghost notes on snare for funk/shuffle groove
-      if (feel.includes("shuffle") || feel.includes("funk")) {
+      if (
+        (feel.includes("shuffle") || feel.includes("funk")) &&
+        quarter + sixteenth * 2 < barPulseCount
+      ) {
         notes.push({
           position: barOffset + quarter + sixteenth * 2,
           duration: sixteenth,
@@ -456,11 +582,15 @@ function generateBassForSection(
   energy = 0.7,
   feel = "straight-rock",
   rng,
+  signature = [4, 4],
+  legato = false,
 ) {
   const notes = [];
-  const barPulseCount = PPQN.Bar;
+  const barPulseCount = barPulses(signature);
   const quarter = PPQN.Quarter;
-  const sixteenth = PPQN.SemiQuaver;
+  const durFactor =
+    legato || feel === "choral" || feel === "ballad" ? 1.0 : 0.9;
+  const isCompound68 = signature[1] === 8 && signature[0] % 3 === 0;
 
   for (let b = 0; b < sectionBars; b++) {
     const barOffset = sectionStartPulse + b * barPulseCount;
@@ -468,81 +598,85 @@ function generateBassForSection(
     const barChords = barChord.chordsInBar || [barChord];
 
     if (barChords.length >= 2) {
-      // Multi-chord bar (e.g. F Bb): allocate chords across the bar
-      const subLength = barChords.length === 2 ? 2 : 1; // beats per chord
+      // Multi-chord bar: divide barPulses evenly across chords
+      const subDur = Math.max(
+        PPQN.SemiQuaver,
+        Math.floor(barPulseCount / barChords.length),
+      );
       for (let cIdx = 0; cIdx < barChords.length && cIdx < 4; cIdx++) {
         const c = barChords[cIdx];
         const rootBass = c.bass || 40;
-        const subOffset = barOffset + cIdx * subLength * quarter;
+        const subOffset = barOffset + cIdx * subDur;
 
-        // Downbeat of chord
         notes.push({
-          position: subOffset + 0,
-          duration: Math.round(quarter * 0.9),
+          position: subOffset,
+          duration: Math.round(
+            (subDur >= quarter * 2 ? quarter : subDur) * durFactor,
+          ),
           pitch: rootBass,
           velocity: 0.9,
         });
 
-        if (subLength === 2) {
-          // Second beat of 2-beat chord: play root, 5th, or octave
+        if (subDur >= quarter * 2) {
           const beat2Pitch =
             rng() < 0.4 ? rootBass + 7 : rng() < 0.3 ? rootBass + 12 : rootBass;
           notes.push({
             position: subOffset + quarter,
-            duration: Math.round(quarter * 0.8),
+            duration: Math.round((subDur - quarter) * durFactor),
             pitch: beat2Pitch,
             velocity: 0.82,
           });
         }
       }
+    } else if (isCompound68) {
+      // Compound 6/8 or 12/8: dotted quarter beats (1440 pulses per beat)
+      const rootBass = barChord.bass || 40;
+      const dq = Math.round(quarter * 1.5); // 1440
+      const compoundBeats = Math.max(1, Math.round(barPulseCount / dq));
+      for (let cb = 0; cb < compoundBeats; cb++) {
+        const pitch =
+          cb === 0 ? rootBass : cb % 2 === 1 ? rootBass + 7 : rootBass;
+        notes.push({
+          position: barOffset + cb * dq,
+          duration: Math.round(dq * durFactor),
+          pitch,
+          velocity: cb === 0 ? 0.9 : 0.82,
+        });
+      }
     } else {
       // Single chord across the entire bar
       const rootBass = barChord.bass || 40;
+      const numBeats = Math.max(1, Math.floor(barPulseCount / quarter));
 
-      // Beat 1: Root note
-      notes.push({
-        position: barOffset + 0,
-        duration: Math.round(quarter * 0.9),
-        pitch: rootBass,
-        velocity: 0.9,
-      });
+      for (let beatIdx = 0; beatIdx < numBeats; beatIdx++) {
+        const pos = barOffset + beatIdx * quarter;
+        let pitch = rootBass;
+        let vel = 0.85;
 
-      // Beat 2: Root octave or fifth
-      const beat2Pitch = rng() < 0.3 ? rootBass + 12 : rootBass;
-      notes.push({
-        position: barOffset + quarter,
-        duration: Math.round(quarter * 0.8),
-        pitch: beat2Pitch,
-        velocity: 0.8,
-      });
+        if (beatIdx === 0) {
+          vel = 0.9;
+        } else if (beatIdx === 1) {
+          pitch = rng() < 0.3 ? rootBass + 12 : rootBass;
+          vel = 0.8;
+        } else if (beatIdx === 2) {
+          pitch = rng() < 0.4 ? rootBass + 7 : rootBass;
+          vel = 0.85;
+        } else if (beatIdx === numBeats - 1) {
+          const nextBarChord = chords[(b + 1) % chords.length] || chords[0];
+          const nextRoot =
+            (nextBarChord.chordsInBar?.[0] || nextBarChord).bass || 40;
+          if (nextRoot > rootBass) pitch = nextRoot - 1;
+          else if (nextRoot < rootBass) pitch = nextRoot + 1;
+          vel = 0.78;
+        }
 
-      // Beat 3: Sync with kick (root or 5th)
-      const fifthPitch = rootBass + 7;
-      const beat3Pitch = rng() < 0.4 ? fifthPitch : rootBass;
-      notes.push({
-        position: barOffset + quarter * 2,
-        duration: Math.round(quarter * 0.9),
-        pitch: beat3Pitch,
-        velocity: 0.85,
-      });
-
-      // Beat 4: Passing tone to next chord
-      const nextBarChord = chords[(b + 1) % chords.length] || chords[0];
-      const nextRoot =
-        (nextBarChord.chordsInBar?.[0] || nextBarChord).bass || 40;
-      let passingPitch = rootBass;
-      if (nextRoot > rootBass) {
-        passingPitch = nextRoot - 1; // Leading tone from below
-      } else if (nextRoot < rootBass) {
-        passingPitch = nextRoot + 1; // Passing tone from above
+        notes.push({
+          position: pos,
+          duration: Math.round(quarter * durFactor),
+          pitch,
+          velocity: vel,
+        });
       }
-
-      notes.push({
-        position: barOffset + quarter * 3,
-        duration: Math.round(quarter * 0.75),
-        pitch: passingPitch,
-        velocity: 0.78,
-      });
     }
   }
 
@@ -551,7 +685,7 @@ function generateBassForSection(
 
 /**
  * Generates rhythm guitar / keyboard chord comping with strum offsets.
- * Respects sub-bar chord changes.
+ * Respects sub-bar chord changes, non-4/4 signatures, and legato phrasing.
  */
 function generateCompingForSection(
   sectionStartPulse,
@@ -560,41 +694,51 @@ function generateCompingForSection(
   energy = 0.7,
   feel = "straight-rock",
   rng,
+  signature = [4, 4],
+  legato = false,
 ) {
   const notes = [];
-  const barPulseCount = PPQN.Bar;
+  const barPulseCount = barPulses(signature);
   const quarter = PPQN.Quarter;
-  const sixteenth = PPQN.SemiQuaver;
+  const isLegato = legato || feel === "choral" || feel === "ballad";
+  const isCompound68 = signature[1] === 8 && signature[0] % 3 === 0;
+  const dq = Math.round(quarter * 1.5); // 1440
 
   for (let b = 0; b < sectionBars; b++) {
     const barOffset = sectionStartPulse + b * barPulseCount;
     const barChord = chords[b % chords.length] || chords[0];
     const barChords = barChord.chordsInBar || [barChord];
 
-    // Rhythm comping: strum on beats 1, 2, 3, 4
-    const strumRhythms = [0, quarter, quarter * 2, quarter * 3];
+    const stepPulse = isCompound68 ? dq : quarter;
+    const strumCount = Math.max(1, Math.round(barPulseCount / stepPulse));
+    const strumRhythms = Array.from(
+      { length: strumCount },
+      (_, idx) => idx * stepPulse,
+    );
 
     for (let sIdx = 0; sIdx < strumRhythms.length; sIdx++) {
       const strumPos = strumRhythms[sIdx];
       let activeChord = barChords[0];
       if (barChords.length === 2) {
-        activeChord = sIdx < 2 ? barChords[0] : barChords[1];
+        activeChord =
+          sIdx < Math.ceil(strumCount / 2) ? barChords[0] : barChords[1];
       } else if (barChords.length >= 3) {
         activeChord = barChords[sIdx % barChords.length];
       }
       const pitches = activeChord.pitches || [60, 64, 67];
 
-      // Downstroke vs Upstroke alternation
-      const isUpstroke = strumPos === quarter || strumPos === quarter * 3;
+      const isUpstroke = !isLegato && sIdx % 2 === 1;
       const orderedPitches = isUpstroke ? [...pitches].reverse() : [...pitches];
-      const strumOffsetTicks = 12; // ~15ms spread at 120bpm
+      const strumOffsetTicks = isLegato ? 0 : 12;
+      const noteDuration = isLegato ? stepPulse : Math.round(stepPulse * 0.85);
 
       for (let i = 0; i < orderedPitches.length; i++) {
         const notePitch = orderedPitches[i];
         const notePos = barOffset + strumPos + i * strumOffsetTicks;
+        if (notePos >= barOffset + barPulseCount) continue;
         notes.push({
           position: notePos,
-          duration: Math.round(quarter * 0.85),
+          duration: noteDuration,
           pitch: notePitch,
           velocity: Math.min(1.0, 0.75 + rng() * 0.1),
         });
@@ -615,21 +759,36 @@ export function parseMotif(motifStr, defaultOctave = 4) {
     const [notePart, durPart] = token.split(":");
     let durTicks = PPQN.Quarter;
     if (durPart) {
-      if (durPart === "16") durTicks = PPQN.SemiQuaver;
-      else if (durPart === "8")
+      const dp = durPart.toLowerCase();
+      if (dp === "32")
+        durTicks = Math.round(PPQN.Quarter / 8); // 120
+      else if (dp === "16")
+        durTicks = PPQN.SemiQuaver; // 240
+      else if (dp === "16." || dp === "ds")
+        durTicks = Math.round(PPQN.SemiQuaver * 1.5); // 360
+      else if (dp === "8")
         durTicks = Math.round(PPQN.Quarter / 2); // 480
-      else if (durPart === "4" || durPart === "q")
+      else if (dp === "8." || dp === "de")
+        durTicks = Math.round(PPQN.Quarter * 0.75); // 720
+      else if (dp === "4" || dp === "q")
         durTicks = PPQN.Quarter; // 960
-      else if (durPart === "2" || durPart === "h")
+      else if (dp === "4." || dp === "dq")
+        durTicks = Math.round(PPQN.Quarter * 1.5); // 1440
+      else if (dp === "2" || dp === "h")
         durTicks = PPQN.Quarter * 2; // 1920
-      else if (durPart === "1" || durPart === "w")
+      else if (dp === "2." || dp === "dh")
+        durTicks = PPQN.Quarter * 3; // 2880
+      else if (dp === "1" || dp === "w")
         durTicks = PPQN.Bar; // 3840
-      else if (durPart.endsWith("t")) {
-        const base = parseInt(durPart, 10);
-        if (base === 8) durTicks = Math.round((PPQN.Quarter * 2) / 3);
-        else if (base === 16) durTicks = Math.round(PPQN.Quarter / 3);
-      } else if (!isNaN(Number(durPart))) {
-        const num = Number(durPart);
+      else if (dp.endsWith("t")) {
+        const base = parseInt(dp, 10);
+        if (base === 4)
+          durTicks = Math.round((PPQN.Quarter * 2) / 3); // 640
+        else if (base === 8)
+          durTicks = Math.round(PPQN.Quarter / 3); // 320
+        else if (base === 16) durTicks = Math.round(PPQN.Quarter / 6); // 160
+      } else if (!isNaN(Number(dp))) {
+        const num = Number(dp);
         if (num > 16) durTicks = num;
       }
     }
@@ -682,9 +841,10 @@ function generateLeadForSection(
   key = "E",
   energy = 0.8,
   rng,
+  signature = [4, 4],
 ) {
   const notes = [];
-  const barPulseCount = PPQN.Bar;
+  const barPulseCount = barPulses(signature);
   const quarter = PPQN.Quarter;
   const sixteenth = PPQN.SemiQuaver;
   const rootSemi = NOTE_TO_SEMITONE[key.toUpperCase()] ?? 4; // E
@@ -699,18 +859,25 @@ function generateLeadForSection(
       const p1 = basePitch + scaleIntervals[idx1];
       const p2 = basePitch + scaleIntervals[idx2];
 
+      const pos1 =
+        barOffset +
+        Math.min(quarter + sixteenth * 2, Math.floor(barPulseCount / 2));
       notes.push({
-        position: barOffset + quarter + sixteenth * 2,
+        position: pos1,
         duration: sixteenth * 2,
         pitch: p1,
         velocity: 0.85 + rng() * 0.1,
       });
-      notes.push({
-        position: barOffset + quarter * 3,
-        duration: quarter,
-        pitch: p2,
-        velocity: 0.9,
-      });
+      const pos2 =
+        barOffset + Math.min(quarter * 3, Math.max(0, barPulseCount - quarter));
+      if (pos2 > pos1 && pos2 < barOffset + barPulseCount) {
+        notes.push({
+          position: pos2,
+          duration: Math.min(quarter, barOffset + barPulseCount - pos2),
+          pitch: p2,
+          velocity: 0.9,
+        });
+      }
     }
   }
   return notes;
@@ -723,6 +890,8 @@ export function compileSong(spec = {}) {
   const title = spec.title || "Untitled Song";
   const bpm = Number(spec.bpm) || 120;
   const signature = Array.isArray(spec.signature) ? spec.signature : [4, 4];
+  const barPulseCount = barPulses(signature);
+  const legato = Boolean(spec.legato);
   const rng = createRng(spec.seed ?? 42);
 
   const sections =
@@ -794,6 +963,7 @@ export function compileSong(spec = {}) {
       spec.feel || "straight-rock",
       rng,
       isFirst,
+      signature,
     );
     drumNotes.push(...drums);
 
@@ -801,9 +971,9 @@ export function compileSong(spec = {}) {
     if (parsedBassMotifNotes.length > 0) {
       const motifDuration = parsedBassMotifNotes.reduce(
         (max, n) => Math.max(max, n.relPulse + n.duration),
-        PPQN.Bar,
+        barPulseCount,
       );
-      const sectionPulses = sec.bars * PPQN.Bar;
+      const sectionPulses = sec.bars * barPulseCount;
       let motifCursor = 0;
       while (motifCursor < sectionPulses) {
         for (const m of parsedBassMotifNotes) {
@@ -826,6 +996,8 @@ export function compileSong(spec = {}) {
         sec.energy,
         spec.feel || "straight-rock",
         rng,
+        signature,
+        legato,
       );
       bassNotes.push(...bass);
     }
@@ -834,9 +1006,9 @@ export function compileSong(spec = {}) {
     if (parsedRhythmMotifNotes.length > 0) {
       const motifDuration = parsedRhythmMotifNotes.reduce(
         (max, n) => Math.max(max, n.relPulse + n.duration),
-        PPQN.Bar,
+        barPulseCount,
       );
-      const sectionPulses = sec.bars * PPQN.Bar;
+      const sectionPulses = sec.bars * barPulseCount;
       let motifCursor = 0;
       while (motifCursor < sectionPulses) {
         for (const m of parsedRhythmMotifNotes) {
@@ -859,6 +1031,8 @@ export function compileSong(spec = {}) {
         sec.energy,
         spec.feel || "straight-rock",
         rng,
+        signature,
+        legato,
       );
       rhythmNotes.push(...rhythm);
     }
@@ -868,9 +1042,9 @@ export function compileSong(spec = {}) {
       if (parsedMotifNotes.length > 0) {
         const motifDuration = parsedMotifNotes.reduce(
           (max, n) => Math.max(max, n.relPulse + n.duration),
-          PPQN.Bar,
+          barPulseCount,
         );
-        const sectionPulses = sec.bars * PPQN.Bar;
+        const sectionPulses = sec.bars * barPulseCount;
         let motifCursor = 0;
         while (motifCursor < sectionPulses) {
           for (const m of parsedMotifNotes) {
@@ -893,12 +1067,13 @@ export function compileSong(spec = {}) {
           spec.key || "E",
           sec.energy,
           rng,
+          signature,
         );
         leadNotes.push(...lead);
       }
     }
 
-    currentPulse += sec.bars * PPQN.Bar;
+    currentPulse += sec.bars * barPulseCount;
     totalBars += sec.bars;
   }
 

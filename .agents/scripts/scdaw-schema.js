@@ -5,6 +5,15 @@
  * Ported concepts from openDAW forge-boxes and Defaults.ts.
  */
 
+export const MIN_BPM = 20;
+export const MAX_BPM = 300;
+
+export const TRANSPORT_SCHEMA = Object.freeze({
+  bpm: { default: 120, min: MIN_BPM, max: MAX_BPM, step: 1, unit: "bpm" },
+  swing: { default: 0, min: 0.0, max: 0.5, step: 0.01, unit: "ratio" },
+  lengthBars: { default: 1, min: 1, max: 512, step: 1, unit: "bars" },
+});
+
 export const MASTER_SCHEMA = Object.freeze({
   volume: { default: 0.8, min: 0.0, max: 1.0, step: 0.01, unit: "linear" },
 });

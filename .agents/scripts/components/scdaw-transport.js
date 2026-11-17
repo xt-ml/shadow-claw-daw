@@ -91,7 +91,18 @@ export function shouldPromptRecordOptions({ targetTrack, currentBeat = 0 }) {
   });
 }
 
-export const SIGNATURE_PRESETS = ["4/4", "3/4", "6/8", "2/4", "5/4", "7/8"];
+export const SIGNATURE_PRESETS = [
+  "4/4",
+  "3/4",
+  "6/8",
+  "12/8",
+  "9/8",
+  "2/4",
+  "2/2",
+  "5/4",
+  "7/8",
+  "3/8",
+];
 
 /**
  * Adjusts project length in bars with Shift+click x4 multiplier and [1, 512] clamping.
@@ -142,8 +153,8 @@ export function calculateBpmDragValue({
   startY,
   currentY,
   startValue = 120,
-  min = 40,
-  max = 240,
+  min = 20,
+  max = 300,
   pixelsPerUnit = 2,
   shiftKey = false,
   shiftMultiplier = 0.2,
@@ -192,8 +203,8 @@ export function setupBpmDragControl({
     }
     if (hasMoved) {
       e.preventDefault?.();
-      const min = Number(bpmInput.min || 40);
-      const max = Number(bpmInput.max || 240);
+      const min = Number(bpmInput.min || 20);
+      const max = Number(bpmInput.max || 300);
       const nextBpm = calculateBpmDragValue({
         startY,
         currentY: e.clientY,
@@ -253,8 +264,8 @@ export function setupTransportWheelControls({
         const nextVal = calculateTransportWheelValue({
           currentValue: curVal,
           deltaY: e.deltaY,
-          min: Number(bpmInput.min || 40),
-          max: Number(bpmInput.max || 240),
+          min: Number(bpmInput.min || 20),
+          max: Number(bpmInput.max || 300),
           step: 1,
           shiftMultiplier: 5,
           shiftKey: Boolean(e.shiftKey),
@@ -877,31 +888,43 @@ export class DawTransportElement extends BaseElement {
         dialog::backdrop {
           overscroll-behavior: contain;
         }
+
+        @media (pointer: coarse) {
+          .scdaw-transport__btn,
+          .scdaw-transport__step-btn,
+          .scdaw-transport__select,
+          .scdaw-transport__input {
+            min-height: 44px;
+          }
+          .scdaw-transport__step-btn {
+            min-width: 44px;
+          }
+        }
       </style>
       <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
-          <button id="play-btn" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Pause playback" : "Start playback"}">
+          <button id="play-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Pause playback" : "Start playback"}">
             ${s.playing ? "⏸ Pause" : "▶ Play"}
           </button>
-          <button id="stop-btn" class="scdaw-transport__btn scdaw-transport__btn--stop btn" aria-label="Stop playback and return to start">
+          <button id="stop-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--stop btn" aria-label="Stop playback and return to start">
             ⏹ Stop
           </button>
-          <button id="rec-btn" class="scdaw-transport__btn scdaw-transport__btn--rec btn ${s.recording ? "btn-danger" : ""}" aria-label="${s.recording ? "Stop recording" : "Record audio"}" aria-pressed="${Boolean(s.recording)}">
+          <button id="rec-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--rec btn ${s.recording ? "btn-danger" : ""}" aria-label="${s.recording ? "Stop recording" : "Record audio"}" aria-pressed="${Boolean(s.recording)}">
             ${s.recording ? "⏹ Stop REC" : "● REC"}
           </button>
-          <button id="metro-btn" class="scdaw-transport__btn scdaw-transport__btn--metro btn ${p.metronome?.enabled ? "btn-primary" : ""}" aria-label="Toggle Metronome" aria-pressed="${Boolean(p.metronome?.enabled)}" title="Metronome click track">
+          <button id="metro-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--metro btn ${p.metronome?.enabled ? "btn-primary" : ""}" aria-label="Toggle Metronome" aria-pressed="${Boolean(p.metronome?.enabled)}" title="Metronome click track">
             🔔 Metro
           </button>
-          <button id="midi-btn" class="scdaw-transport__btn btn" aria-haspopup="dialog" aria-label="MIDI Devices and Routing" title="Configure Web MIDI Devices & Routing">
+          <button id="midi-btn" type="button" class="scdaw-transport__btn btn" aria-haspopup="dialog" aria-label="MIDI Devices and Routing" title="Configure Web MIDI Devices & Routing">
             🎹 MIDI
           </button>
-          <button id="capture-midi-btn" class="scdaw-transport__btn btn" aria-label="Capture recent MIDI notes" title="Capture recent live MIDI notes to selected track">
+          <button id="capture-midi-btn" type="button" class="scdaw-transport__btn btn" aria-label="Capture recent MIDI notes" title="Capture recent live MIDI notes to selected track">
             ⏺ Capture
           </button>
-          <button id="keys-btn" class="scdaw-transport__btn btn" aria-pressed="false" aria-label="Toggle Software MIDI Keyboard" title="Toggle on-screen / QWERTY MIDI Keyboard">
+          <button id="keys-btn" type="button" class="scdaw-transport__btn btn" aria-pressed="false" aria-label="Toggle Software MIDI Keyboard" title="Toggle on-screen / QWERTY MIDI Keyboard">
             ⌨ Keys
           </button>
-          <button id="audio-btn" class="scdaw-transport__btn scdaw-transport__btn--audio btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}" aria-label="Start Audio Processing Engine">
+          <button id="audio-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--audio btn btn-primary" style="${s.audio === "running" ? "display:none;" : ""}" aria-label="Start Audio Processing Engine">
             🔊 Start Audio
           </button>
           <span id="pos-badge" class="scdaw-transport__pos pos-display" role="status" aria-live="off" aria-label="Current musical position (Bar, Beat, Step)">
@@ -912,7 +935,7 @@ export class DawTransportElement extends BaseElement {
         <div class="scdaw-transport__group scdaw-transport__group--tempo transport-group" role="group" aria-label="Tempo, Groove and Transport Settings">
           <div class="scdaw-transport__item scdaw-transport__item--bpm" title="Touch & drag up/down or mouse wheel to adjust BPM (Shift for fine control). Double-click to reset to 120">
             <label for="bpm-input" class="scdaw-transport__label" title="Touch & drag up/down to adjust BPM">BPM:</label>
-            <input id="bpm-input" class="scdaw-transport__input" type="number" min="40" max="240" value="${p.bpm}" title="Touch & drag up/down or mouse wheel to adjust (Shift for fine control). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
+            <input id="bpm-input" class="scdaw-transport__input" type="number" min="20" max="300" value="${p.bpm}" title="Touch & drag up/down or mouse wheel to adjust (Shift for fine control). Double-click to reset to 120" aria-label="Tempo in beats per minute" />
           </div>
 
           <div class="scdaw-transport__item scdaw-transport__item--swing">
@@ -973,7 +996,7 @@ export class DawTransportElement extends BaseElement {
           </div>
 
           <div class="scdaw-transport__item scdaw-transport__item--panic">
-            <button id="panic-btn" class="scdaw-transport__btn scdaw-transport__btn--panic btn btn-icon btn-danger" title="All Notes Off (Emergency Mute)" aria-label="Panic: stop all playing notes and sounds immediately">
+            <button id="panic-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--panic btn btn-icon btn-danger" title="All Notes Off (Emergency Mute)" aria-label="Panic: stop all playing notes and sounds immediately">
               ⏹ Panic
             </button>
           </div>

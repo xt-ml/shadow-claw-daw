@@ -1,10 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_get_project",
-  "description": "Return the complete project JSON graph including all tracks, notes, volume, pan, and synthesis parameters.",
+  "description": "Return the project JSON graph including all tracks, notes, volume, pan, and synthesis parameters, or a compact human-readable score representation when view='score'.",
   "input_schema": {
     "type": "object",
-    "properties": {},
+    "properties": {
+      "view": {
+        "type": "string",
+        "enum": ["full", "score"],
+        "description": "Output format: 'full' (default raw PPQN JSON graph) or 'score' (compact bar:beat pitch duration readout across all time signatures)"
+      },
+      "scoreView": {
+        "type": "boolean",
+        "description": "Shorthand boolean equivalent to view='score'"
+      }
+    },
     "additionalProperties": false
   },
   "annotations": {

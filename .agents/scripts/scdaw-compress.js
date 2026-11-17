@@ -7,6 +7,61 @@
  */
 
 /**
+ * Default maximum Base64URL payload length (in characters) safe across modern
+ * browsers when encoded inside hash fragments (`#file=...`) or share links.
+ */
+export const MAX_URL_PAYLOAD_CHARS = 32768;
+
+/**
+ * Valid Base64URL character pattern (unpadded RFC 4648 Section 5).
+ */
+const BASE64URL_RE = /^[A-Za-z0-9\-_]*$/;
+
+/**
+ * Pre-validates a Base64URL string before embedding it in a URL parameter.
+ *
+ * @param {string} b64url - Base64URL string to inspect.
+ * @param {object} [options] - Validation constraints.
+ * @param {number} [options.maxLength=MAX_URL_PAYLOAD_CHARS] - Maximum character budget.
+ * @returns {{ valid: boolean, length: number, maxLength: number, reason: string|null }}
+ */
+export function validateBase64UrlLength(
+  b64url,
+  { maxLength = MAX_URL_PAYLOAD_CHARS } = {},
+) {
+  if (typeof b64url !== "string" || b64url.length === 0) {
+    return {
+      valid: false,
+      length: 0,
+      maxLength,
+      reason: "Base64URL payload must be a non-empty string.",
+    };
+  }
+  if (!BASE64URL_RE.test(b64url)) {
+    return {
+      valid: false,
+      length: b64url.length,
+      maxLength,
+      reason: "Payload contains characters outside the Base64URL alphabet.",
+    };
+  }
+  if (b64url.length > maxLength) {
+    return {
+      valid: false,
+      length: b64url.length,
+      maxLength,
+      reason: `Base64URL payload length (${b64url.length} chars) exceeds limit of ${maxLength} chars.`,
+    };
+  }
+  return {
+    valid: true,
+    length: b64url.length,
+    maxLength,
+    reason: null,
+  };
+}
+
+/**
  * Encodes a Uint8Array into a URL-safe Base64URL string (RFC 4648 §5).
  * Omits padding (`=`) to keep query strings minimal.
  *

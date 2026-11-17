@@ -11,7 +11,9 @@
       },
       "bpm": {
         "type": "number",
-        "description": "Tempo in BPM (e.g. 82, 122)"
+        "minimum": 20,
+        "maximum": 300,
+        "description": "Tempo in BPM (20-300, e.g. 32, 82, 122, 260)"
       },
       "signature": {
         "type": "array",

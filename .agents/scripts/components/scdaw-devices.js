@@ -463,6 +463,33 @@ export class DawDevicesElement extends BaseElement {
           flex-wrap: wrap;
           touch-action: none;
         }
+        @container scdaw-devices (min-width: 640px) {
+          .scdaw-devices__rack,
+          .rack-container {
+            padding: 0.9rem;
+            gap: 0.9rem;
+          }
+          .scdaw-devices__card,
+          .device-card {
+            flex: 1 1 280px;
+          }
+        }
+        @supports not (container-type: inline-size) {
+          @media (min-width: 640px) {
+            .scdaw-devices__rack,
+            .rack-container {
+              padding: 0.9rem;
+              gap: 0.9rem;
+            }
+          }
+        }
+        @media (pointer: coarse) {
+          #reset-device-btn,
+          .scdaw-devices__remove-btn {
+            min-width: 36px;
+            min-height: 36px;
+          }
+        }
       </style>
       <div class="scdaw-devices daw-panel" role="region" aria-label="Track Device Rack">
         <div class="scdaw-devices__header daw-panel-header">
@@ -471,7 +498,7 @@ export class DawDevicesElement extends BaseElement {
             <span class="badge">${chain.length} Devices</span>
           </div>
           <div style="display:flex; gap:4px; flex-shrink:0;">
-            <button id="reset-device-btn" class="btn btn-icon" title="Reset instrument parameters to factory defaults">🔄 Reset Device</button>
+            <button id="reset-device-btn" type="button" class="btn btn-icon" aria-label="Reset track device parameters to factory defaults" title="Reset instrument parameters to factory defaults">🔄 Reset Device</button>
           </div>
         </div>
         <div class="scdaw-devices__rack rack-container">

@@ -467,8 +467,38 @@ export class DawMixerElement extends BaseElement {
             height: 120px;
           }
         }
+
+        @supports not (container-type: inline-size) {
+          @media (min-width: 420px) {
+            .scdaw-mixer__channels,
+            .mixer-container {
+              gap: 0.75rem;
+              padding: 0.75rem;
+            }
+            .scdaw-mixer__strip,
+            .strip {
+              flex: 0 0 105px;
+              width: 105px;
+              min-width: 95px;
+              padding: 0.5rem;
+              gap: 0.4rem;
+            }
+          }
+        }
+
+        @media (pointer: coarse) {
+          .mute-btn,
+          .solo-btn,
+          .reset-track-btn {
+            min-width: 36px;
+            min-height: 36px;
+          }
+          .vol-slider {
+            width: 44px;
+          }
+        }
       </style>
-      <div class="daw-panel">
+      <div class="daw-panel" role="region" aria-label="Mixer Console">
         <div class="daw-panel-header">
           <span>🎛 Mixer Console</span>
           <span class="badge">${p.tracks.length + 1} Channels</span>
@@ -506,7 +536,7 @@ export class DawMixerElement extends BaseElement {
                 );
 
               return `
-            <div class="strip ${isSelected ? "strip--selected" : ""}" data-track="${t.id}">
+            <div class="strip ${isSelected ? "strip--selected" : ""}" role="group" aria-label="${t.name} channel strip" data-track="${t.id}">
               <div class="strip-name" title="${t.name}">${kindIcon} ${t.name}</div>
               <scdaw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></scdaw-knob>
               <div class="meter-fader-row">
@@ -514,13 +544,13 @@ export class DawMixerElement extends BaseElement {
                   <canvas class="meter-canvas" data-track="${t.id}" width="12" height="110"></canvas>
                   ${hasDynamics ? `<canvas class="gr-meter-canvas" data-track="${t.id}" width="5" height="110" title="Gain Reduction"></canvas>` : ""}
                 </div>
-                <input type="range" class="vol-slider track-vol" data-track="${t.id}" min="0" max="150" value="${Math.round(t.volume * 100)}" title="Volume (Double-click to reset)" />
+                <input type="range" class="vol-slider track-vol" aria-label="${t.name} volume" data-track="${t.id}" min="0" max="150" value="${Math.round(t.volume * 100)}" title="Volume (Double-click to reset)" />
               </div>
               ${sendsHtml}
               <div style="display:flex; gap:3px;">
                 <button type="button" class="btn btn-icon ${t.mute ? "btn-danger" : ""} mute-btn" data-track="${t.id}" aria-label="Mute ${t.name}" aria-pressed="${Boolean(t.mute)}">M</button>
                 <button type="button" class="btn btn-icon ${t.solo ? "btn-primary" : ""} solo-btn" data-track="${t.id}" aria-label="Solo ${t.name}" aria-pressed="${Boolean(t.solo)}">S</button>
-                <button type="button" class="btn btn-icon reset-track-btn" data-track="${t.id}" title="Reset Strip">🔄</button>
+                <button type="button" class="btn btn-icon reset-track-btn" data-track="${t.id}" aria-label="Reset ${t.name} channel strip" title="Reset Strip">🔄</button>
               </div>
             </div>
           `;
@@ -528,7 +558,7 @@ export class DawMixerElement extends BaseElement {
             .join("")}
 
           <!-- Master Strip -->
-          <div class="strip" style="border-left: 2px solid var(--accent); margin-left: auto;">
+          <div class="strip" role="group" aria-label="Master channel strip" style="border-left: 2px solid var(--accent); margin-left: auto;">
             <div class="strip-name" style="color:var(--accent);">MASTER</div>
             <div style="height:28px;"></div>
             <div class="meter-fader-row">
@@ -536,7 +566,7 @@ export class DawMixerElement extends BaseElement {
                 <canvas class="meter-canvas" data-track="master" width="12" height="110"></canvas>
                 <canvas class="gr-meter-canvas" data-track="master" width="5" height="110" title="Master Limiter Gain Reduction"></canvas>
               </div>
-              <input type="range" id="master-fader" class="vol-slider" min="0" max="100" value="${Math.round((p.master.volume ?? 0.8) * 100)}" title="Master Volume (Double-click to reset)" />
+              <input type="range" id="master-fader" class="vol-slider" aria-label="Master volume" min="0" max="100" value="${Math.round((p.master.volume ?? 0.8) * 100)}" title="Master Volume (Double-click to reset)" />
             </div>
             <div style="font-size:0.65rem; font-family:var(--mono); color:var(--accent); margin-top:auto;">0 dBFS</div>
           </div>

@@ -7,7 +7,7 @@
  */
 
 import { scdaw } from "./scdaw-engine.js";
-import { projectToScoreView, beatsPerBar } from "./scdaw.js";
+import { MIN_BPM, MAX_BPM, projectToScoreView, beatsPerBar } from "./scdaw.js";
 import { TOOLS_METADATA } from "./scdaw-tools-metadata.js";
 import "./scdaw-element.js";
 
@@ -123,12 +123,16 @@ function broadcastState() {
 export async function handleToolDispatch(name, params) {
   switch (name) {
     case "scdaw_get_status": {
-      return scdaw.getState();
+      const s = scdaw.getState();
+      return {
+        ...s,
+        bpmRange: s.bpmRange || { min: MIN_BPM, max: MAX_BPM },
+      };
     }
 
     case "scdaw_get_project": {
       const p = scdaw.getProject();
-      if (params.view === "score" || params.scoreView) {
+      if (params?.view === "score" || params?.scoreView) {
         return projectToScoreView(p);
       }
       return {

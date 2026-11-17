@@ -105,6 +105,7 @@ export class DawSequencerElement extends BaseElement {
         drumSet.has(`${trackId}:${pitch}:${step}`) ||
         synthStepMap.has(`${trackId}:${step}`);
       cell.classList.toggle("active", isActive);
+      cell.setAttribute?.("aria-pressed", String(isActive));
     }
   }
 
@@ -156,14 +157,16 @@ export class DawSequencerElement extends BaseElement {
           { pitch: 46, name: "Open Hat" },
         ];
         for (const lane of drumLanes) {
+          const barStepCount = stepsPerBar(p.signature || [4, 4]);
           rowsHtml += `
-            <div class="seq-row">
+            <div class="seq-row" role="row" aria-label="${lane.name}">
               <div class="seq-label">${lane.name}</div>
               <div class="seq-cells">
                 ${Array.from({ length: numSteps }, (_, step) => {
                   const hasNote = drumStepSet.has(`${lane.pitch}:${step}`);
+                  const isBarStart = step % barStepCount === 0;
                   const isBeatStart = step % 4 === 0;
-                  return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-track="${track.id}" data-pitch="${lane.pitch}" data-step="${step}"></div>`;
+                  return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBarStart ? "bar-start" : ""} ${isBeatStart ? "beat-start" : ""}" role="button" tabindex="0" aria-pressed="${hasNote}" aria-label="${lane.name} step ${step + 1}" data-track="${track.id}" data-pitch="${lane.pitch}" data-step="${step}"></div>`;
                 }).join("")}
               </div>
             </div>
@@ -176,15 +179,17 @@ export class DawSequencerElement extends BaseElement {
           const st = ppqnToStep(n.position);
           if (!stepNoteMap.has(st)) stepNoteMap.set(st, n);
         }
+        const barStepCount = stepsPerBar(p.signature || [4, 4]);
         rowsHtml += `
-          <div class="seq-row">
+          <div class="seq-row" role="row" aria-label="${track.name}">
             <div class="seq-label">${track.name}</div>
             <div class="seq-cells">
               ${Array.from({ length: numSteps }, (_, step) => {
                 const note = stepNoteMap.get(step);
                 const hasNote = Boolean(note);
+                const isBarStart = step % barStepCount === 0;
                 const isBeatStart = step % 4 === 0;
-                return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-track="${track.id}" data-pitch="${note ? note.pitch : track.defaultPitch || 60}" data-step="${step}" title="${note ? pitchToName(note.pitch) : ""}"></div>`;
+                return `<div class="seq-cell ${hasNote ? "active" : ""} ${isBarStart ? "bar-start" : ""} ${isBeatStart ? "beat-start" : ""}" role="button" tabindex="0" aria-pressed="${hasNote}" aria-label="${track.name} step ${step + 1}${note ? ` (${pitchToName(note.pitch)})` : ""}" data-track="${track.id}" data-pitch="${note ? note.pitch : track.defaultPitch || 60}" data-step="${step}" title="${note ? pitchToName(note.pitch) : ""}"></div>`;
               }).join("")}
             </div>
           </div>
@@ -288,22 +293,50 @@ export class DawSequencerElement extends BaseElement {
             min-height: 30px;
           }
         }
+
+        @supports not (container-type: inline-size) {
+          @media (min-width: 601px) {
+            .scdaw-sequencer__grid,
+            .grid-container {
+              padding: 0.75rem;
+            }
+            .scdaw-sequencer__label,
+            .seq-label {
+              width: 90px;
+              min-width: 90px;
+              font-size: 0.75rem;
+            }
+            .scdaw-sequencer__cell,
+            .seq-cell {
+              width: 30px;
+              height: 30px;
+              min-width: 30px;
+              min-height: 30px;
+            }
+          }
+        }
+
+        @media (pointer: coarse) {
+          .scdaw-sequencer__cell,
+          .seq-cell {
+            min-width: 34px;
+            min-height: 34px;
+          }
+        }
       </style>
-      <div class="daw-panel">
+      <div class="daw-panel" role="region" aria-label="Step Sequencer (16ths)">
         <div class="daw-panel-header">
           <span>🥁 Step Sequencer (16ths)</span>
           <span class="badge">${numSteps} Steps</span>
         </div>
-        <div class="grid-container">
+        <div class="grid-container" role="grid" aria-label="Step Sequencer Grid">
           ${rowsHtml}
         </div>
       </div>
     `;
 
     const gridContainer = this.shadowRoot.querySelector(".grid-container");
-    gridContainer?.addEventListener("click", async (e) => {
-      const cell = e.target?.closest?.(".seq-cell");
-      if (!cell) return;
+    const triggerCell = async (cell) => {
       const trackId = cell.dataset.track;
       const rawPitch = cell.dataset.pitch;
       const pitch =
@@ -326,6 +359,28 @@ export class DawSequencerElement extends BaseElement {
           res.note?.velocity ?? 0.85,
           res.note?.duration ?? 240,
         );
+      }
+    };
+    gridContainer?.addEventListener("click", async (e) => {
+      const cell = e.target?.closest?.(".seq-cell");
+      if (!cell) return;
+      await triggerCell(cell);
+    });
+    gridContainer?.addEventListener("keydown", async (e) => {
+      const cell = e.target?.closest?.(".seq-cell");
+      if (!cell) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault?.();
+        await triggerCell(cell);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault?.();
+        const curStep = Number(cell.dataset.step);
+        const nextStep = curStep + (e.key === "ArrowRight" ? 1 : -1);
+        const row = cell.closest?.(".seq-row");
+        const target = row?.querySelector?.(
+          `.seq-cell[data-step="${nextStep}"]`,
+        );
+        target?.focus?.();
       }
     });
   }

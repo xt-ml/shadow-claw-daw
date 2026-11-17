@@ -11,7 +11,9 @@
       },
       "bpm": {
         "type": "number",
-        "description": "Initial tempo (40-240)"
+        "minimum": 20,
+        "maximum": 300,
+        "description": "Initial tempo (20-300 BPM)"
       },
       "template": {
         "type": "string",

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_list_schemas",
-  "description": "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, and sound presets.",
+  "description": "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, sound presets, and transport controls.",
   "input_schema": {
     "type": "object",
     "properties": {
       "category": {
         "type": "string",
-        "enum": ["all", "instruments", "fx", "presets"],
+        "enum": ["all", "instruments", "fx", "presets", "transport"],
         "description": "Schema category to inspect (default 'all')"
       },
       "name": {

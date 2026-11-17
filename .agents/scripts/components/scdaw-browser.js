@@ -457,13 +457,24 @@ export class DawBrowserElement extends BaseElement {
             }
           }
         }
+
+        @media (pointer: coarse) {
+          .scdaw-browser__tab-btn,
+          .tab-btn,
+          .scdaw-browser__item,
+          .browser-item,
+          .browser-refresh-files-btn,
+          .search-box {
+            min-height: 44px;
+          }
+        }
       </style>
       <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
         <div class="scdaw-browser__header browser-header" role="tablist" aria-label="Library Categories">
-          <button role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
-          <button role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>
-          <button role="tab" aria-selected="${this._activeTab === "files"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "files" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="files">Files</button>
-          <button role="tab" aria-selected="${this._activeTab === "all"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "all" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="all">All</button>
+          <button type="button" role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
+          <button type="button" role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>
+          <button type="button" role="tab" aria-selected="${this._activeTab === "files"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "files" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="files">Files</button>
+          <button type="button" role="tab" aria-selected="${this._activeTab === "all"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "all" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="all">All</button>
         </div>
 
         ${
@@ -472,7 +483,7 @@ export class DawBrowserElement extends BaseElement {
           <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:0.5rem;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <label for="browser-conversation-select" style="font-size:0.72rem; font-weight:600; color:var(--shadow-claw-text-secondary, #94a3b8);">Conversation</label>
-              <button type="button" class="browser-refresh-files-btn btn btn-icon" title="Refresh files" style="padding:1px 5px; font-size:0.7rem;">🔄</button>
+              <button type="button" class="browser-refresh-files-btn btn btn-icon" aria-label="Refresh conversation files" title="Refresh files" style="padding:1px 5px; font-size:0.7rem;">🔄</button>
             </div>
             <select class="browser-conversation-select" id="browser-conversation-select" style="padding:0.35rem; background:var(--bg-elevated); color:inherit; border:1px solid var(--border); border-radius:4px; font-size:0.75rem;">
               ${(this._conversations.length
@@ -490,8 +501,8 @@ export class DawBrowserElement extends BaseElement {
             : ""
         }
 
-        <input type="text" class="search-box" placeholder="${this._activeTab === "files" ? "Search conversation files..." : "Search presets & devices..."}" value="${this._searchQuery}" />
-        <div class="item-list">
+        <input type="text" class="search-box" aria-label="Search presets, devices, and files" placeholder="${this._activeTab === "files" ? "Search conversation files..." : "Search presets & devices..."}" value="${this._searchQuery}" />
+        <div class="item-list" role="region" aria-label="Browser items">
           ${this._renderItemListHtml(filtered)}
         </div>
       </div>

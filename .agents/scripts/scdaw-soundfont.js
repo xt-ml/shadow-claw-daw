@@ -98,6 +98,17 @@ export const GM_INSTRUMENTS = Object.freeze({
   "orchestral-harp": 46,
   timpani: 47,
 
+  // Ensemble / Choir / Vocal (48-55)
+  "string-ensemble-1": 48,
+  "string-ensemble-2": 49,
+  "synth-strings-1": 50,
+  "synth-strings-2": 51,
+  "choir-aahs": 52,
+  choir: 52,
+  "voice-oohs": 53,
+  "synth-voice": 54,
+  "orchestra-hit": 55,
+
   // Brass (56-63)
   trumpet: 56,
   trombone: 57,
@@ -117,6 +128,46 @@ export const GM_INSTRUMENTS = Object.freeze({
   "english-horn": 69,
   bassoon: 70,
   clarinet: 71,
+
+  // Pipes / Woodwinds (72-79)
+  piccolo: 72,
+  flute: 73,
+  recorder: 74,
+  "pan-flute": 75,
+  "blown-bottle": 76,
+  shakuhachi: 77,
+  whistle: 78,
+  ocarina: 79,
+
+  // Synth Leads & Pads (80-95)
+  "lead-square": 80,
+  "lead-sawtooth": 81,
+  "lead-calliope": 82,
+  "lead-chiff": 83,
+  "pad-new-age": 88,
+  "pad-warm": 89,
+  "pad-polysynth": 90,
+  "pad-choir": 91,
+  "pad-halo": 94,
+
+  // Ethnic / World / Folk (104-111)
+  sitar: 104,
+  banjo: 105,
+  shamisen: 106,
+  koto: 107,
+  kalimba: 108,
+  bagpipe: 109,
+  fiddle: 110,
+  shanai: 111,
+
+  // Percussive (112-119)
+  "tinkle-bell": 112,
+  agogo: 113,
+  "steel-drums": 114,
+  woodblock: 115,
+  "taiko-drum": 116,
+  "melodic-tom": 117,
+  "synth-drum": 118,
 });
 
 export const GM_DRUM_MAP = Object.freeze({

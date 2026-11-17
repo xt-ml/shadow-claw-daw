@@ -67,10 +67,21 @@ export const TOOLS = [
   {
     name: "scdaw_get_project",
     description:
-      "Return the complete project JSON graph including all tracks, notes, volume, pan, and synthesis parameters.",
+      "Return the project JSON graph including all tracks, notes, volume, pan, and synthesis parameters, or a compact human-readable score representation when view='score'.",
     input_schema: {
       type: "object",
-      properties: {},
+      properties: {
+        view: {
+          type: "string",
+          enum: ["full", "score"],
+          description:
+            "Output format: 'full' (default raw PPQN JSON graph) or 'score' (compact bar:beat pitch duration readout across all time signatures)",
+        },
+        scoreView: {
+          type: "boolean",
+          description: "Shorthand boolean equivalent to view='score'",
+        },
+      },
       additionalProperties: false,
     },
     annotations: {
@@ -90,7 +101,12 @@ export const TOOLS = [
       type: "object",
       properties: {
         name: { type: "string", description: "Project name" },
-        bpm: { type: "number", description: "Initial tempo (40-240)" },
+        bpm: {
+          type: "number",
+          minimum: 20,
+          maximum: 300,
+          description: "Initial tempo (20-300 BPM)",
+        },
         template: {
           type: "string",
           enum: [
@@ -155,11 +171,16 @@ export const TOOLS = [
   {
     name: "scdaw_set_transport",
     description:
-      "Update transport properties: BPM (40-240), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
+      "Update transport properties: BPM (20-300), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
     input_schema: {
       type: "object",
       properties: {
-        bpm: { type: "number", description: "Beats per minute (40-240)" },
+        bpm: {
+          type: "number",
+          minimum: 20,
+          maximum: 300,
+          description: "Beats per minute (20-300)",
+        },
         signature: {
           type: "array",
           items: { type: "number" },
@@ -1462,7 +1483,12 @@ export const TOOLS = [
       type: "object",
       properties: {
         title: { type: "string", description: "Song title" },
-        bpm: { type: "number", description: "Tempo in BPM (e.g. 82, 122)" },
+        bpm: {
+          type: "number",
+          minimum: 20,
+          maximum: 300,
+          description: "Tempo in BPM (20-300, e.g. 32, 82, 122, 260)",
+        },
         signature: {
           type: "array",
           items: { type: "integer" },
@@ -1623,13 +1649,13 @@ export const TOOLS = [
   {
     name: "scdaw_list_schemas",
     description:
-      "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, and sound presets.",
+      "Return formal parameter schemas, allowed enum values, min/max ranges, and defaults for all instruments, audio/MIDI effects, sound presets, and transport controls.",
     input_schema: {
       type: "object",
       properties: {
         category: {
           type: "string",
-          enum: ["all", "instruments", "fx", "presets"],
+          enum: ["all", "instruments", "fx", "presets", "transport"],
           description: "Schema category to inspect (default 'all')",
         },
         name: {

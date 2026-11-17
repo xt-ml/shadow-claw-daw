@@ -1,13 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_set_transport",
-  "description": "Update transport properties: BPM (40-240), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
+  "description": "Update transport properties: BPM (20-300), signature ([4,4], [3,4], [6,8], etc.), pattern length in bars (1-512), or swing factor (0-0.5).",
   "input_schema": {
     "type": "object",
     "properties": {
       "bpm": {
         "type": "number",
-        "description": "Beats per minute (40-240)"
+        "minimum": 20,
+        "maximum": 300,
+        "description": "Beats per minute (20-300)"
       },
       "signature": {
         "type": "array",

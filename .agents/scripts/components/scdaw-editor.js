@@ -307,7 +307,9 @@ export class DawEditorElement extends BaseElement {
     for (let i = 0; i < cells.length; i++) {
       const cell = cells[i];
       const key = `${cell.dataset.pitch}:${cell.dataset.step}`;
-      cell.classList.toggle("active", activeMap.has(key));
+      const active = activeMap.has(key);
+      cell.classList.toggle("active", active);
+      cell.setAttribute?.("aria-pressed", String(active));
     }
 
     // Pre-index step velocities in O(N) instead of 1,728 x N scans
@@ -334,6 +336,7 @@ export class DawEditorElement extends BaseElement {
       }
       if (stalks[step]) {
         stalks[step].classList.toggle("has-note", hasNote);
+        stalks[step].setAttribute?.("aria-valuenow", String(velPct));
         stalks[step].title = hasNote
           ? `Step ${step + 1}: Velocity ${velPct}% (drag to adjust)`
           : `Step ${step + 1}: Empty`;
@@ -521,6 +524,19 @@ export class DawEditorElement extends BaseElement {
             }
           }
         }
+        @media (pointer: coarse) {
+          .pr-cell {
+            min-width: 28px;
+          }
+          .vel-stalk {
+            min-width: 28px;
+          }
+          #clear-track-notes-btn,
+          #add-chord-select,
+          #track-select {
+            min-height: 44px;
+          }
+        }
         .velocity-stalks {
           display: flex;
           height: 40px;
@@ -572,11 +588,11 @@ export class DawEditorElement extends BaseElement {
           pointer-events: none;
         }
       </style>
-      <div class="daw-panel">
+      <div class="daw-panel" role="region" aria-label="Piano Roll Note Editor">
         <div class="daw-panel-header">
           <div style="display:flex; align-items:center; gap:0.6rem;">
             <span>🎹 Note Editor (Piano Roll)</span>
-            <select id="track-select" style="background:var(--bg-elevated); color:inherit; border:1px solid var(--border); border-radius:4px; font-size:0.75rem; padding:2px 4px;">
+            <select id="track-select" aria-label="Select track for Piano Roll editor" style="background:var(--bg-elevated); color:inherit; border:1px solid var(--border); border-radius:4px; font-size:0.75rem; padding:2px 4px;">
               ${p.tracks
                 .map(
                   (t) =>
@@ -585,7 +601,7 @@ export class DawEditorElement extends BaseElement {
                 .join("")}
             </select>
           </div>
-          <button id="clear-track-notes-btn" class="btn btn-icon btn-danger">Clear Notes</button>
+          <button id="clear-track-notes-btn" type="button" class="btn btn-icon btn-danger" aria-label="Clear all notes on selected track">Clear Notes</button>
         </div>
         <div class="editor-container">
           <div class="inspector">
@@ -614,39 +630,49 @@ export class DawEditorElement extends BaseElement {
             </div>
           </div>
           <div class="grid-area">
-            ${rows
-              .map(
-                (r) => `
-              <div class="pr-row">
-                <div class="pr-key ${r.isBlack ? "black" : ""}" data-pitch="${r.pitch}">${r.name}</div>
+            <div role="grid" aria-label="Piano Roll Grid">
+            ${(() => {
+              const barStepCount = stepsPerBar(p.signature || [4, 4]);
+              return rows
+                .map(
+                  (r) => `
+              <div class="pr-row" role="row">
+                <div class="pr-key ${r.isBlack ? "black" : ""}" role="button" tabindex="0" aria-label="Audition ${r.name}" data-pitch="${r.pitch}">${r.name}</div>
                 <div class="pr-cells">
                   ${Array.from({ length: numSteps }, (_, step) => {
                     const hasNote = activeMap.has(`${r.pitch}:${step}`);
+                    const isBarStart = step % barStepCount === 0;
                     const isBeatStart = step % 4 === 0;
-                    return `<div class="pr-cell ${hasNote ? "active" : ""} ${isBeatStart ? "beat-start" : ""}" data-pitch="${r.pitch}" data-step="${step}"></div>`;
+                    return `<div class="pr-cell ${hasNote ? "active" : ""} ${isBarStart ? "bar-start" : ""} ${isBeatStart ? "beat-start" : ""}" role="button" tabindex="0" aria-pressed="${hasNote}" aria-label="${r.name} step ${step + 1}" data-pitch="${r.pitch}" data-step="${step}"></div>`;
                   }).join("")}
                 </div>
               </div>
             `,
-              )
-              .join("")}
+                )
+                .join("");
+            })()}
+            </div>
             <div class="velocity-stalks" role="group" aria-label="Note Velocity Lane">
               <div class="pr-key vel-key" title="Note Velocity (drag stalks vertically to adjust)">VEL</div>
               <div class="pr-cells vel-cells">
-                ${Array.from({ length: numSteps }, (_, step) => {
-                  const vel = stepVelMap.get(step) ?? 0;
-                  const hasNote = vel > 0;
-                  const velPct = hasNote ? Math.round(vel * 100) : 0;
-                  const isBeatStart = step % 4 === 0;
-                  const title = hasNote
-                    ? `Step ${step + 1}: Velocity ${velPct}% (drag to adjust)`
-                    : `Step ${step + 1}: Empty`;
-                  return `
-                    <div class="vel-stalk ${isBeatStart ? "beat-start" : ""} ${hasNote ? "has-note" : ""}" data-step="${step}" title="${title}">
-                      <div class="vel-bar" style="height:${velPct}%; opacity:${hasNote ? 1 : 0.1};"></div>
-                    </div>
-                  `;
-                }).join("")}
+                ${(() => {
+                  const barStepCount = stepsPerBar(p.signature || [4, 4]);
+                  return Array.from({ length: numSteps }, (_, step) => {
+                    const vel = stepVelMap.get(step) ?? 0;
+                    const hasNote = vel > 0;
+                    const velPct = hasNote ? Math.round(vel * 100) : 0;
+                    const isBarStart = step % barStepCount === 0;
+                    const isBeatStart = step % 4 === 0;
+                    const title = hasNote
+                      ? `Step ${step + 1}: Velocity ${velPct}% (drag to adjust)`
+                      : `Step ${step + 1}: Empty`;
+                    return `
+                      <div class="vel-stalk ${isBarStart ? "bar-start" : ""} ${isBeatStart ? "beat-start" : ""} ${hasNote ? "has-note" : ""}" role="slider" tabindex="0" aria-label="Step ${step + 1} velocity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${velPct}" data-step="${step}" title="${title}">
+                        <div class="vel-bar" style="height:${velPct}%; opacity:${hasNote ? 1 : 0.1};"></div>
+                      </div>
+                    `;
+                  }).join("");
+                })()}
               </div>
             </div>
           </div>
@@ -698,22 +724,28 @@ export class DawEditorElement extends BaseElement {
         e.target.value = "";
       });
 
-    // Piano key clicks -> audition pitch
+    // Piano key clicks & keyboard Enter/Space -> audition pitch
     this.shadowRoot.querySelectorAll(".pr-key[data-pitch]").forEach((keyEl) => {
-      keyEl.addEventListener("click", (e) => {
-        e.preventDefault();
+      const auditionPitch = (e) => {
+        e.preventDefault?.();
         if (!this._selectedTrackId) return;
         const pitch = Number(keyEl.dataset.pitch);
         if (!Number.isNaN(pitch)) {
           scdaw.previewNote?.(this._selectedTrackId, pitch, 0.85, 240);
         }
+      };
+      keyEl.addEventListener("click", auditionPitch);
+      keyEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          auditionPitch(e);
+        }
       });
     });
 
-    // Note cell clicks
+    // Note cell clicks & keyboard Enter/Space/Arrow navigation
     this.shadowRoot.querySelectorAll(".pr-cell").forEach((cell) => {
-      cell.addEventListener("click", async (e) => {
-        e.preventDefault();
+      const toggleCell = async (e) => {
+        e.preventDefault?.();
         if (!this._selectedTrackId) return;
         const trackId = this._selectedTrackId;
         const pitch = Number(cell.dataset.pitch);
@@ -731,10 +763,41 @@ export class DawEditorElement extends BaseElement {
             res.note?.duration ?? 240,
           );
         }
+      };
+      cell.addEventListener("click", toggleCell);
+      cell.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          toggleCell(e);
+        } else if (
+          e.key === "ArrowRight" ||
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowUp" ||
+          e.key === "ArrowDown"
+        ) {
+          e.preventDefault?.();
+          const curPitch = Number(cell.dataset.pitch);
+          const curStep = Number(cell.dataset.step);
+          const nextPitch =
+            e.key === "ArrowUp"
+              ? curPitch + 1
+              : e.key === "ArrowDown"
+                ? curPitch - 1
+                : curPitch;
+          const nextStep =
+            e.key === "ArrowRight"
+              ? curStep + 1
+              : e.key === "ArrowLeft"
+                ? curStep - 1
+                : curStep;
+          const target = this.shadowRoot?.querySelector?.(
+            `.pr-cell[data-pitch="${nextPitch}"][data-step="${nextStep}"]`,
+          );
+          target?.focus?.();
+        }
       });
     });
 
-    // Velocity stalk click / vertical drag
+    // Velocity stalk click / vertical drag / keyboard ArrowUp & ArrowDown
     this.shadowRoot.querySelectorAll(".vel-stalk").forEach((stalk) => {
       const applyVelocityFromEvent = (e) => {
         if (!this._selectedTrackId) return;
@@ -753,6 +816,24 @@ export class DawEditorElement extends BaseElement {
           velocity,
         });
       };
+
+      stalk.addEventListener("keydown", (e) => {
+        if (!this._selectedTrackId) return;
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault?.();
+        const step = Number(stalk.dataset.step);
+        const curPct = Number(stalk.getAttribute("aria-valuenow") || 0);
+        const delta = e.shiftKey ? 10 : 5;
+        const nextPct = Math.max(
+          1,
+          Math.min(100, curPct + (e.key === "ArrowUp" ? delta : -delta)),
+        );
+        scdaw.sendCommand("set_step_velocity", {
+          trackId: this._selectedTrackId,
+          step,
+          velocity: Number((nextPct / 100).toFixed(2)),
+        });
+      });
 
       stalk.addEventListener("pointerdown", (e) => {
         if (typeof e.preventDefault === "function") e.preventDefault();

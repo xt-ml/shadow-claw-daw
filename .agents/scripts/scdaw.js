@@ -8,6 +8,9 @@
  */
 
 import {
+  MIN_BPM,
+  MAX_BPM,
+  TRANSPORT_SCHEMA,
   MASTER_SCHEMA,
   TRACK_MIX_SCHEMA,
   SYNTH_PARAM_SCHEMA,
@@ -29,6 +32,9 @@ import { compileSong } from "./scdaw-compose.js";
 import { analyzeAudioBuffer, processTrackOfflineFx } from "./scdaw-dsp.js";
 
 export {
+  MIN_BPM,
+  MAX_BPM,
+  TRANSPORT_SCHEMA,
   MASTER_SCHEMA,
   TRACK_MIX_SCHEMA,
   SYNTH_PARAM_SCHEMA,
@@ -46,6 +52,17 @@ export const PPQN = Object.freeze({
   Quarter: 960,
   Bar: 3840,
   SemiQuaver: 240,
+  ThirtySecond: 120,
+  Sixteenth: 240,
+  Eighth: 480,
+  DottedEighth: 720,
+  DottedQuarter: 1440,
+  Half: 1920,
+  DottedHalf: 2880,
+  Whole: 3840,
+  TripletSixteenth: 160,
+  TripletEighth: 320,
+  TripletQuarter: 640,
 });
 
 export const GM_DRUMS = Object.freeze({
@@ -170,10 +187,184 @@ export function normalizeSignature(signature) {
   return [num, den];
 }
 
+export function getNormalizedSignatureMap(project) {
+  const baseSig = normalizeSignature(project?.signature || [4, 4]);
+  const rawMap = Array.isArray(project?.signatureMap)
+    ? project.signatureMap
+    : [];
+  if (rawMap.length === 0) {
+    return [{ pulse: 0, signature: baseSig }];
+  }
+
+  const entries = [];
+  let runningPulse = 0;
+  let runningBar = 1;
+  let prevSig = baseSig;
+
+  for (const item of rawMap) {
+    if (!item || !Array.isArray(item.signature)) continue;
+    const sig = normalizeSignature(item.signature);
+    let pulse;
+    if (typeof item.pulse === "number" && Number.isFinite(item.pulse)) {
+      pulse = Math.max(0, Math.round(item.pulse));
+    } else if (typeof item.bar === "number" && Number.isFinite(item.bar)) {
+      const targetBar = Math.max(1, Math.round(item.bar));
+      if (targetBar > runningBar) {
+        runningPulse += (targetBar - runningBar) * barPulses(prevSig);
+        runningBar = targetBar;
+      }
+      pulse = runningPulse;
+    } else {
+      continue;
+    }
+    entries.push({ pulse, signature: sig });
+    runningPulse = pulse;
+    prevSig = sig;
+  }
+
+  if (entries.length === 0) {
+    return [{ pulse: 0, signature: baseSig }];
+  }
+
+  entries.sort((a, b) => a.pulse - b.pulse);
+
+  // Deduplicate identical pulses (keep latest) and ensure pulse 0 exists
+  const deduped = [];
+  for (const entry of entries) {
+    if (
+      deduped.length > 0 &&
+      deduped[deduped.length - 1].pulse === entry.pulse
+    ) {
+      deduped[deduped.length - 1] = entry;
+    } else {
+      deduped.push(entry);
+    }
+  }
+  if (deduped[0].pulse > 0) {
+    deduped.unshift({ pulse: 0, signature: baseSig });
+  }
+  return deduped;
+}
+
+export function getBarTimeline(project, maxBars = null) {
+  const sigMap = getNormalizedSignatureMap(project);
+  const lengthBars = Math.max(
+    1,
+    Math.round(Number(maxBars ?? project?.lengthBars ?? 1)),
+  );
+  const bars = [];
+  let currentPulse = 0;
+  let mapIdx = 0;
+
+  for (let b = 1; b <= lengthBars; b++) {
+    while (
+      mapIdx + 1 < sigMap.length &&
+      currentPulse >= sigMap[mapIdx + 1].pulse
+    ) {
+      mapIdx++;
+    }
+    const sig = sigMap[mapIdx].signature;
+    const lengthPulses = barPulses(sig);
+    bars.push({
+      bar: b,
+      startPulse: currentPulse,
+      endPulse: currentPulse + lengthPulses,
+      lengthPulses,
+      signature: sig,
+      beatsPerBar: beatsPerBar(sig),
+    });
+    currentPulse += lengthPulses;
+  }
+  return bars;
+}
+
+export function computeProjectTotalPulses(project) {
+  const sigMap = getNormalizedSignatureMap(project);
+  const lengthBars = Math.max(1, Math.round(Number(project?.lengthBars || 1)));
+  if (sigMap.length === 1) {
+    return lengthBars * barPulses(sigMap[0].signature);
+  }
+  const bars = getBarTimeline(project, lengthBars);
+  return bars[bars.length - 1].endPulse;
+}
+
+export function pulseToBarBeat(pulse, project) {
+  const pos = Math.max(0, Number(pulse) || 0);
+  const sigMap = getNormalizedSignatureMap(project);
+  if (sigMap.length === 1) {
+    const sig = sigMap[0].signature;
+    const barPulseCount = Math.max(1, barPulses(sig));
+    const bar = Math.floor(pos / barPulseCount) + 1;
+    const barStartPulse = (bar - 1) * barPulseCount;
+    const rem = pos - barStartPulse;
+    const beat = Math.floor(rem / PPQN.Quarter) + 1;
+    const beatOffset = rem % PPQN.Quarter;
+    return {
+      bar,
+      beat,
+      beatOffset,
+      barStartPulse,
+      barPulseCount,
+      signature: sig,
+    };
+  }
+
+  let currentPulse = 0;
+  let barNum = 1;
+  let mapIdx = 0;
+
+  // Walk bars until we find the bar containing `pos`
+  while (true) {
+    while (
+      mapIdx + 1 < sigMap.length &&
+      currentPulse >= sigMap[mapIdx + 1].pulse
+    ) {
+      mapIdx++;
+    }
+    const sig = sigMap[mapIdx].signature;
+    const barPulseCount = Math.max(1, barPulses(sig));
+    const nextSwitch =
+      mapIdx + 1 < sigMap.length ? sigMap[mapIdx + 1].pulse : Infinity;
+    const barEnd = Math.min(currentPulse + barPulseCount, nextSwitch);
+
+    if (pos < barEnd || mapIdx === sigMap.length - 1) {
+      if (mapIdx === sigMap.length - 1 && pos >= currentPulse + barPulseCount) {
+        const extraBars = Math.floor((pos - currentPulse) / barPulseCount);
+        barNum += extraBars;
+        currentPulse += extraBars * barPulseCount;
+      }
+      const rem = pos - currentPulse;
+      const beat = Math.floor(rem / PPQN.Quarter) + 1;
+      const beatOffset = rem % PPQN.Quarter;
+      return {
+        bar: barNum,
+        beat,
+        beatOffset,
+        barStartPulse: currentPulse,
+        barPulseCount,
+        signature: sig,
+      };
+    }
+
+    currentPulse = barEnd;
+    barNum++;
+  }
+}
+
 export function ensureProjectCoversPulses(project, endPulses) {
   if (!project || !Number.isFinite(endPulses) || endPulses <= 0) return;
-  const pulsesPerBar = Math.max(1, barPulses(project.signature || [4, 4]));
-  const neededBars = Math.min(512, Math.ceil(endPulses / pulsesPerBar));
+  const sigMap = getNormalizedSignatureMap(project);
+  if (sigMap.length === 1) {
+    const pulsesPerBar = Math.max(1, barPulses(sigMap[0].signature));
+    const neededBars = Math.min(512, Math.ceil(endPulses / pulsesPerBar));
+    if (neededBars > (project.lengthBars || 1)) {
+      project.lengthBars = neededBars;
+    }
+    return;
+  }
+
+  const endInfo = pulseToBarBeat(Math.max(0, endPulses - 1), project);
+  const neededBars = Math.min(512, endInfo.bar);
   if (neededBars > (project.lengthBars || 1)) {
     project.lengthBars = neededBars;
   }
@@ -183,9 +374,16 @@ export function parseDuration(dur) {
   if (typeof dur === "number") return Math.max(1, Math.round(dur));
   if (typeof dur !== "string") return PPQN.SemiQuaver;
   const s = dur.trim().toLowerCase();
+  if (s === "1/32" || s === "32nd") return PPQN.ThirtySecond; // 120
+  if (s === "1/16t" || s === "16t") return PPQN.TripletSixteenth; // 160
   if (s === "1/16" || s === "16th" || s === "s") return PPQN.SemiQuaver; // 240
-  if (s === "1/8" || s === "8th" || s === "e")
-    return Math.round(PPQN.Quarter / 2); // 480
+  if (s === "1/8t" || s === "8t") return PPQN.TripletEighth; // 320
+  if (s === "1/16." || s === "16." || s === "ds")
+    return Math.round(PPQN.SemiQuaver * 1.5); // 360
+  if (s === "1/8" || s === "8th" || s === "e") return PPQN.Eighth; // 480
+  if (s === "1/4t" || s === "4t") return PPQN.TripletQuarter; // 640
+  if (s === "1/8." || s === "8." || s === "de" || s === "3/16")
+    return PPQN.DottedEighth; // 720
   if (
     s === "1/4" ||
     s === "4th" ||
@@ -194,8 +392,24 @@ export function parseDuration(dur) {
     s === "1 beat"
   )
     return PPQN.Quarter; // 960
+  if (
+    s === "1/4." ||
+    s === "4." ||
+    s === "dq" ||
+    s === "dotted quarter" ||
+    s === "3/8"
+  )
+    return PPQN.DottedQuarter; // 1440
   if (s === "1/2" || s === "half" || s === "h" || s === "2 beats")
-    return PPQN.Quarter * 2; // 1920
+    return PPQN.Half; // 1920
+  if (
+    s === "1/2." ||
+    s === "2." ||
+    s === "dh" ||
+    s === "dotted half" ||
+    s === "3/4"
+  )
+    return PPQN.DottedHalf; // 2880
   if (
     s === "1/1" ||
     s === "whole" ||
@@ -219,8 +433,9 @@ export function parseDuration(dur) {
 
 export function projectToScoreView(project) {
   const signature = project.signature || [4, 4];
+  const sigMap = getNormalizedSignatureMap(project);
   const bpBar = beatsPerBar(signature);
-  const barPulseCount = Math.round(bpBar * PPQN.Quarter);
+  const totalPulses = computeProjectTotalPulses(project);
 
   const timebase = {
     ppqnPerQuarter: PPQN.Quarter,
@@ -228,23 +443,31 @@ export function projectToScoreView(project) {
     stepsPerBar: bpBar * 4,
     lengthBars: project.lengthBars || 1,
     signature,
+    ...(sigMap.length > 1 ? { signatureMap: sigMap } : {}),
+    totalPulses,
     bpm: project.bpm || 120,
   };
 
   const tracks = (project.tracks || []).map((trk) => {
     const score = (trk.notes || []).map((n) => {
       const pos = n.position || 0;
-      const bar = Math.floor(pos / barPulseCount) + 1;
-      const rem = pos % barPulseCount;
-      const beat = Math.floor(rem / PPQN.Quarter) + 1;
-      const beatOffset = rem % PPQN.Quarter;
+      const { bar, beat, beatOffset, barPulseCount } = pulseToBarBeat(
+        pos,
+        project,
+      );
 
       let durLabel = `${n.duration}p`;
-      if (n.duration === PPQN.Quarter) durLabel = "1/4";
-      else if (n.duration === Math.round(PPQN.Quarter / 2)) durLabel = "1/8";
+      if (n.duration === barPulseCount) durLabel = "1 bar";
+      else if (n.duration === PPQN.Quarter) durLabel = "1/4";
+      else if (n.duration === PPQN.DottedQuarter) durLabel = "3/8";
+      else if (n.duration === PPQN.Eighth) durLabel = "1/8";
+      else if (n.duration === PPQN.DottedEighth) durLabel = "1/8.";
       else if (n.duration === PPQN.SemiQuaver) durLabel = "1/16";
-      else if (n.duration === PPQN.Quarter * 2) durLabel = "1/2";
-      else if (n.duration === barPulseCount) durLabel = "1 bar";
+      else if (n.duration === PPQN.ThirtySecond) durLabel = "1/32";
+      else if (n.duration === PPQN.TripletEighth) durLabel = "1/8t";
+      else if (n.duration === PPQN.TripletQuarter) durLabel = "1/4t";
+      else if (n.duration === PPQN.Half) durLabel = "1/2";
+      else if (n.duration === PPQN.DottedHalf) durLabel = "1/2.";
 
       return {
         bar,
@@ -475,10 +698,13 @@ export function validateProject(project) {
   }
   if (
     typeof project.bpm !== "number" ||
-    project.bpm < 40 ||
-    project.bpm > 240
+    !Number.isFinite(project.bpm) ||
+    project.bpm < MIN_BPM ||
+    project.bpm > MAX_BPM
   ) {
-    errors.push(`Invalid bpm: ${project.bpm} (must be between 40 and 240)`);
+    errors.push(
+      `Invalid bpm: ${project.bpm} (must be between ${MIN_BPM} and ${MAX_BPM})`,
+    );
   }
   if (!Array.isArray(project.signature) || project.signature.length !== 2) {
     errors.push("Invalid signature (must be [nominator, denominator])");
@@ -657,7 +883,9 @@ export function applyCommand(project, name, params = {}) {
       const template = params.template || "empty";
       const created = createProject(template);
       if (params.name) created.name = String(params.name);
-      if (params.bpm) created.bpm = Number(params.bpm);
+      if (params.bpm !== undefined && Number.isFinite(Number(params.bpm))) {
+        created.bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, Number(params.bpm)));
+      }
 
       let seededTracks = [];
       let totalNotes = 0;
@@ -787,8 +1015,8 @@ export function applyCommand(project, name, params = {}) {
     }
 
     case "set_transport": {
-      if (params.bpm !== undefined)
-        next.bpm = Math.max(40, Math.min(240, Number(params.bpm)));
+      if (params.bpm !== undefined && Number.isFinite(Number(params.bpm)))
+        next.bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, Number(params.bpm)));
       if (params.signature !== undefined)
         next.signature = normalizeSignature(params.signature);
       if (params.lengthBars !== undefined)
@@ -1138,7 +1366,9 @@ export function applyCommand(project, name, params = {}) {
       const template = params.template || "basic-beat";
       const created = createProject(template);
       if (params.name) created.name = String(params.name);
-      if (params.bpm) created.bpm = Number(params.bpm);
+      if (params.bpm !== undefined && Number.isFinite(Number(params.bpm))) {
+        created.bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, Number(params.bpm)));
+      }
       return { project: created, result: { ok: true, name: created.name } };
     }
 
@@ -1188,6 +1418,11 @@ export function applyCommand(project, name, params = {}) {
       }
       if (category === "all" || category === "presets") {
         res.presets = Object.keys(INSTRUMENT_PRESETS);
+      }
+      if (category === "all" || category === "transport") {
+        res.transport = name
+          ? { [name]: TRANSPORT_SCHEMA[name] || null }
+          : TRANSPORT_SCHEMA;
       }
       return { project: next, result: res };
     }
@@ -2210,8 +2445,7 @@ export function resolveTrackNotes(
 ) {
   const loopCount =
     typeof loops === "number" ? Math.max(1, Math.floor(loops)) : 1;
-  const totalPulses =
-    (project.lengthBars || 1) * barPulses(project.signature || [4, 4]);
+  const totalPulses = computeProjectTotalPulses(project);
   const swing = bakeSwing ? project.swing || 0 : 0;
   let trackNotes = track.notes || [];
 
@@ -2401,8 +2635,7 @@ function getCachedPlaybackNotes(project, track, totalPulses, isLooping) {
 }
 
 export function computeEventsInRange(project, fromPpqn, toPpqn) {
-  const totalPulses =
-    (project.lengthBars || 1) * barPulses(project.signature || [4, 4]);
+  const totalPulses = computeProjectTotalPulses(project);
   const isLooping = project.loop ? project.loop.enabled !== false : true;
   const events = [];
   const hasSolo = project.tracks.some((t) => t.solo);

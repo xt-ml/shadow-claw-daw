@@ -10,7 +10,12 @@
 import { State } from "./scdaw-signals.js";
 import {
   PPQN,
+  MIN_BPM,
+  MAX_BPM,
   barPulses,
+  computeProjectTotalPulses,
+  pulseToBarBeat,
+  getBarTimeline,
   createProject,
   validateProject,
   applyCommand,
@@ -82,6 +87,7 @@ export class DawEngine extends EventTarget {
       beat: 1,
       step: 0,
       bpm: initialProject.bpm,
+      bpmRange: { min: MIN_BPM, max: MAX_BPM },
       trackCount: initialProject.tracks.length,
       selectedTrackId: initialTrackId,
       lastBounce: null,
@@ -491,7 +497,7 @@ export class DawEngine extends EventTarget {
 
   seek(ppqn) {
     const p = this.project.get();
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const totalPulses = computeProjectTotalPulses(p);
     const targetPpqn = Math.max(
       0,
       Math.min(totalPulses - 1, Math.round(Number(ppqn) || 0)),
@@ -515,8 +521,7 @@ export class DawEngine extends EventTarget {
       this._activeVoices.clear();
     }
 
-    const bar = Math.floor(targetPpqn / PPQN.Bar) + 1;
-    const beat = Math.floor((targetPpqn % PPQN.Bar) / PPQN.Quarter) + 1;
+    const { bar, beat } = pulseToBarBeat(targetPpqn, p);
     const step = Math.floor(targetPpqn / PPQN.SemiQuaver);
     this._updateState({
       positionPpqn: targetPpqn,
@@ -606,7 +611,7 @@ export class DawEngine extends EventTarget {
     }
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const totalPulses = computeProjectTotalPulses(p);
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
     const latencySec = compensateOutputLatency
       ? Number(this.ctx?.outputLatency || 0) +
@@ -908,7 +913,7 @@ export class DawEngine extends EventTarget {
 
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const totalPulses = computeProjectTotalPulses(p);
 
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
     const elapsedSec = Math.max(0, nowAudio - this._anchorAudioTime);
@@ -1058,28 +1063,31 @@ export class DawEngine extends EventTarget {
 
         // Schedule Metronome Clicks if enabled
         if (p.metronome && p.metronome.enabled) {
-          const sigBeats = (p.signature && p.signature[0]) || 4;
-          const totalBeats = Math.round(totalPulses / PPQN.Quarter);
-          for (let b = 0; b < totalBeats; b++) {
-            const beatPulse = b * PPQN.Quarter;
-            let inRange = false;
-            if (schedStart <= schedEnd) {
-              inRange = beatPulse >= schedStart && beatPulse < schedEnd;
-            } else {
-              inRange = beatPulse >= schedStart || beatPulse < schedEnd;
-            }
-            if (inRange) {
-              const beatTime = this._resolveEventAudioTime(
-                beatPulse,
-                nextPos,
-                totalPulses,
-                nowAudio,
-                bpm,
-                MAX_LATE_CATCHUP_SEC,
-              );
-              if (beatTime === null) continue;
-              const isAccent = b % sigBeats === 0;
-              this._scheduleMetronomeClick(beatTime, isAccent);
+          const bars = getBarTimeline(p);
+          for (const barInfo of bars) {
+            const count = Math.max(1, barInfo.beatsPerBar || 4);
+            const beatStep = barInfo.lengthPulses / count;
+            for (let b = 0; b < count; b++) {
+              const beatPulse = Math.round(barInfo.startPulse + b * beatStep);
+              let inRange = false;
+              if (schedStart <= schedEnd) {
+                inRange = beatPulse >= schedStart && beatPulse < schedEnd;
+              } else {
+                inRange = beatPulse >= schedStart || beatPulse < schedEnd;
+              }
+              if (inRange) {
+                const beatTime = this._resolveEventAudioTime(
+                  beatPulse,
+                  nextPos,
+                  totalPulses,
+                  nowAudio,
+                  bpm,
+                  MAX_LATE_CATCHUP_SEC,
+                );
+                if (beatTime === null) continue;
+                const isAccent = b === 0;
+                this._scheduleMetronomeClick(beatTime, isAccent);
+              }
             }
           }
         }
@@ -1125,8 +1133,7 @@ export class DawEngine extends EventTarget {
 
     this._lastSchedulePpqn = nextPos;
 
-    const bar = Math.floor(nextPos / PPQN.Bar) + 1;
-    const beat = Math.floor((nextPos % PPQN.Bar) / PPQN.Quarter) + 1;
+    const { bar, beat } = pulseToBarBeat(nextPos, p);
     const step = Math.floor(nextPos / PPQN.SemiQuaver);
 
     this._updateState({
@@ -1222,7 +1229,7 @@ export class DawEngine extends EventTarget {
     } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const totalPulses = computeProjectTotalPulses(p);
     const bouncePulses = loops * totalPulses;
     const durationSec = pulsesToSeconds(bouncePulses, bpm);
     const totalFrames = Math.ceil((durationSec + tailSeconds) * sampleRate);
@@ -1528,7 +1535,7 @@ export class DawEngine extends EventTarget {
     } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature || [4, 4]);
+    const totalPulses = computeProjectTotalPulses(p);
     const bouncePulses = loops * totalPulses;
     const durationSec = pulsesToSeconds(bouncePulses, bpm);
     const totalFrames = Math.ceil((durationSec + tailSeconds) * sampleRate);

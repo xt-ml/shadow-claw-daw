@@ -10,7 +10,49 @@
 import {
   compressToBase64Url,
   decompressFromBase64Url,
+  validateBase64UrlLength,
 } from "./scdaw-compress.js";
+
+/**
+ * Conservative cross-browser URL length thresholds.
+ * Query params (`?file=...`) are typically capped lower by proxies/servers,
+ * while `#file=...` fragments can safely hold larger project JSON payloads.
+ */
+export const MAX_HASH_URL_LENGTH = 65536;
+export const MAX_QUERY_URL_LENGTH = 8192;
+
+/**
+ * Validates the total character length of a constructed URL against browser limits.
+ *
+ * @param {string} urlString - Candidate share URL.
+ * @param {object} [options] - Validation options.
+ * @param {number} [options.maxUrlLength] - Optional explicit character budget.
+ * @returns {{ valid: boolean, length: number, maxLength: number, reason: string|null }}
+ */
+export function validateCompressedUrl(urlString, { maxUrlLength } = {}) {
+  const str = String(urlString || "");
+  const hasHashFile = str.includes("#file=") || str.includes("#");
+  const limit =
+    typeof maxUrlLength === "number" && maxUrlLength > 0
+      ? maxUrlLength
+      : hasHashFile
+        ? MAX_HASH_URL_LENGTH
+        : MAX_QUERY_URL_LENGTH;
+  if (str.length > limit) {
+    return {
+      valid: false,
+      length: str.length,
+      maxLength: limit,
+      reason: `Compressed URL length (${str.length} chars) exceeds safe limit of ${limit} chars. Consider exporting as MIDI or JSON instead.`,
+    };
+  }
+  return {
+    valid: true,
+    length: str.length,
+    maxLength: limit,
+    reason: null,
+  };
+}
 
 /**
  * Resolves the current page's clean base URL (without query parameters or hash),
@@ -171,9 +213,21 @@ export async function createCompressedUrl(
     useHash = true,
     extraParams = {},
     format = "deflate-raw",
+    maxUrlLength = useHash ? MAX_HASH_URL_LENGTH : MAX_QUERY_URL_LENGTH,
+    validateLength = true,
   } = {},
 ) {
   const compressed = await compressToBase64Url(value, format);
+  if (validateLength) {
+    const payloadCheck = validateBase64UrlLength(compressed, {
+      maxLength: maxUrlLength,
+    });
+    if (!payloadCheck.valid) {
+      throw new Error(
+        `URL length pre-validation failed: ${payloadCheck.reason}`,
+      );
+    }
+  }
   const targetUrl = new URL(baseUrl);
 
   if (useHash) {
@@ -192,7 +246,15 @@ export async function createCompressedUrl(
     }
   }
 
-  return targetUrl.toString();
+  const finalUrl = targetUrl.toString();
+  if (validateLength) {
+    const urlCheck = validateCompressedUrl(finalUrl, { maxUrlLength });
+    if (!urlCheck.valid) {
+      throw new Error(urlCheck.reason);
+    }
+  }
+
+  return finalUrl;
 }
 
 /**

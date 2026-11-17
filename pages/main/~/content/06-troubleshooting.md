@@ -38,4 +38,5 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 ### 6. Sharing Songs via Compressed URLs (`#file=`)
 
 - **How it Works**: Clicking **"🔗 Press a URL"** in the Export modal compresses the `.scdaw.json` project using Web Streams (`deflate-raw`) + Base64URL and places it in the URL `#file=` hash fragment by default so large arrangements never trigger HTTP 431 / 414 header size limits. `?file=` query parameters are also supported on load.
+- **Length Pre-Validation**: `validateBase64UrlLength` and `validateCompressedUrl` check candidate share URLs against browser length budgets (`MAX_HASH_URL_LENGTH` = `65536` chars; `MAX_QUERY_URL_LENGTH` = `8192` chars) before presenting a link, displaying an error in the modal recommending `.mid` or `.scdaw.json` export when exceeded.
 - **Autoplay (`?autoplay=true`)**: Append `?autoplay=true` (or `?autoplay=1`, or `#...&autoplay=true`) to start playback automatically once the workbench loads—or immediately after confirming the **"Load Song from URL"** dialog when combined with `#file=` / `?file=`.

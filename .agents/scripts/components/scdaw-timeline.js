@@ -9,7 +9,14 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { PPQN, barPulses, beatsPerBar } from "../scdaw.js";
+import {
+  PPQN,
+  barPulses,
+  beatsPerBar,
+  getNormalizedSignatureMap,
+  getBarTimeline,
+  computeProjectTotalPulses,
+} from "../scdaw.js";
 import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
@@ -24,15 +31,44 @@ export function calculateProjectBarsFromDrag({
   return Math.max(1, Math.min(512, bars));
 }
 
-export function computeTimelineTicks(bars = 2, signature = [4, 4]) {
-  const [numBeats] = signature;
+export function computeTimelineTicks(
+  bars = 2,
+  signature = [4, 4],
+  signatureMap = null,
+) {
+  const safeBars = Math.max(1, Number(bars) || 1);
+  if (Array.isArray(signatureMap) && signatureMap.length > 0) {
+    const timeline = getBarTimeline({
+      lengthBars: safeBars,
+      signature,
+      signatureMap,
+    });
+    const ticks = [];
+    for (const barInfo of timeline) {
+      const [num, den] = barInfo.signature;
+      const beatPulses = Math.round((PPQN.Whole || 3840) / (den || 4));
+      const numBeats = Math.max(1, Number(num) || 4);
+      for (let beat = 1; beat <= numBeats; beat++) {
+        ticks.push({
+          bar: barInfo.bar,
+          beat,
+          posPpqn: barInfo.startPulse + (beat - 1) * beatPulses,
+        });
+      }
+    }
+    return ticks;
+  }
+
+  const [numBeats = 4, den = 4] = Array.isArray(signature) ? signature : [4, 4];
+  const pulsesPerBar = barPulses([numBeats, den]);
+  const beatPulses = Math.round((PPQN.Whole || 3840) / (den || 4));
   const ticks = [];
-  for (let b = 1; b <= bars; b++) {
+  for (let b = 1; b <= safeBars; b++) {
     for (let beat = 1; beat <= numBeats; beat++) {
       ticks.push({
         bar: b,
         beat,
-        posPpqn: (b - 1) * PPQN.Bar + (beat - 1) * PPQN.Quarter,
+        posPpqn: (b - 1) * pulsesPerBar + (beat - 1) * beatPulses,
       });
     }
   }
@@ -45,24 +81,54 @@ export function calculateTimelineSeekPpqn({
   lengthBars = 1,
   snapMode = "beat",
   signature = [4, 4],
+  totalPulses = null,
+  signatureMap = null,
 }) {
-  const beatsPerBar = (signature && signature[0]) || 4;
-  const pulsesPerBar = beatsPerBar * PPQN.Quarter;
-  const totalPulses = Math.max(1, (lengthBars || 1) * pulsesPerBar);
+  const sig = Array.isArray(signature) ? signature : [4, 4];
+  const defaultBarPulses = barPulses(sig);
+  const beatPulses = Math.round((PPQN.Whole || 3840) / (sig[1] || 4));
+  const computedTotalPulses =
+    typeof totalPulses === "number" && totalPulses > 0
+      ? totalPulses
+      : Array.isArray(signatureMap) && signatureMap.length > 0
+        ? computeProjectTotalPulses({
+            lengthBars,
+            signature: sig,
+            signatureMap,
+          })
+        : Math.max(1, (lengthBars || 1) * defaultBarPulses);
   if (!rect || !rect.width) return 0;
 
   const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  let target = ratio * totalPulses;
+  let target = ratio * computedTotalPulses;
 
   if (snapMode === "bar") {
-    target = Math.round(target / pulsesPerBar) * pulsesPerBar;
+    if (Array.isArray(signatureMap) && signatureMap.length > 0) {
+      const timeline = getBarTimeline({
+        lengthBars: Math.max(1, lengthBars || 1),
+        signature: sig,
+        signatureMap,
+      });
+      let bestStart = 0;
+      let bestDist = Infinity;
+      for (const bInfo of timeline) {
+        const d = Math.abs(target - bInfo.startPulse);
+        if (d < bestDist) {
+          bestDist = d;
+          bestStart = bInfo.startPulse;
+        }
+      }
+      target = bestStart;
+    } else {
+      target = Math.round(target / defaultBarPulses) * defaultBarPulses;
+    }
   } else if (snapMode === "beat") {
-    target = Math.round(target / PPQN.Quarter) * PPQN.Quarter;
+    target = Math.round(target / beatPulses) * beatPulses;
   } else {
     target = Math.round(target);
   }
 
-  return Math.max(0, Math.min(totalPulses - 1, target));
+  return Math.max(0, Math.min(computedTotalPulses - 1, target));
 }
 
 /**
@@ -881,7 +947,7 @@ export class DawTimelineElement extends BaseElement {
   _updatePlayhead(posPpqn) {
     if (!this.shadowRoot) return;
     const p = scdaw.project.get();
-    const total = (p.lengthBars || 1) * barPulses(p.signature);
+    const total = Math.max(1, computeProjectTotalPulses(p));
     const pct = (posPpqn / total) * 100;
     const marker = this.shadowRoot.getElementById("playhead-marker");
     if (marker) {
@@ -896,9 +962,13 @@ export class DawTimelineElement extends BaseElement {
       p,
       scdaw.selectedTrackId?.get(),
     );
-    const ticks = computeTimelineTicks(p.lengthBars, p.signature);
-    const totalPulses = (p.lengthBars || 1) * barPulses(p.signature);
-    const totalBeats = (p.lengthBars || 1) * beatsPerBar(p.signature);
+    const ticks = computeTimelineTicks(
+      p.lengthBars,
+      p.signature,
+      p.signatureMap,
+    );
+    const totalPulses = Math.max(1, computeProjectTotalPulses(p));
+    const totalBeats = totalPulses / PPQN.Quarter;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1445,6 +1515,20 @@ export class DawTimelineElement extends BaseElement {
           outline: 2px solid #ffffff;
           outline-offset: -1px;
         }
+
+        @media (pointer: coarse) {
+          .scdaw-timeline__btn,
+          .scdaw-timeline__btn--delete,
+          .scdaw-timeline__nudge-btn,
+          .scdaw-timeline__reorder-handle,
+          .scdaw-timeline__snap-btn {
+            min-width: 36px;
+            min-height: 36px;
+          }
+          .scdaw-timeline__auto-point {
+            r: 7;
+          }
+        }
       </style>
       <div class="scdaw-timeline daw-panel" role="region" aria-label="Arrangement Timeline and Tracks">
         <div class="scdaw-timeline__header timeline-header">
@@ -1470,9 +1554,9 @@ export class DawTimelineElement extends BaseElement {
             </button>
           </div>
           <div class="scdaw-timeline__actions">
-            <button id="add-drums-btn" class="btn btn-icon" aria-label="Add drum track">+ Drums</button>
-            <button id="add-synth-btn" class="btn btn-icon" aria-label="Add synth track">+ Synth</button>
-            <button id="add-audio-btn" class="btn btn-icon" aria-label="Add audio track">+ Audio</button>
+            <button id="add-drums-btn" type="button" class="btn btn-icon" aria-label="Add drum track">+ Drums</button>
+            <button id="add-synth-btn" type="button" class="btn btn-icon" aria-label="Add synth track">+ Synth</button>
+            <button id="add-audio-btn" type="button" class="btn btn-icon" aria-label="Add audio track">+ Audio</button>
           </div>
         </div>
 
@@ -1505,7 +1589,7 @@ export class DawTimelineElement extends BaseElement {
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
             ${(() => {
               const hasSolo = p.tracks.some((trk) => trk.solo);
-              const totalBeats = (p.lengthBars || 1) * beatsPerBar(p.signature);
+              const totalBeats = computeProjectTotalPulses(p) / PPQN.Quarter;
 
               return p.tracks
                 .map((t, idx) => {
@@ -1573,7 +1657,7 @@ export class DawTimelineElement extends BaseElement {
                       ${coords
                         .map(
                           (c) => `
-                        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" class="scdaw-timeline__auto-point auto-point" data-track="${t.id}" data-param="${currentParam}" data-time="${c.pt.time}" />
+                        <circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" class="scdaw-timeline__auto-point auto-point" role="button" tabindex="0" aria-label="${t.name} ${currentParam} automation point at beat ${c.pt.time}: ${c.pt.value}" data-track="${t.id}" data-param="${currentParam}" data-time="${c.pt.time}" />
                       `,
                         )
                         .join("")}
@@ -1973,7 +2057,7 @@ export class DawTimelineElement extends BaseElement {
 
         const currentProj = scdaw.getProject();
         const totalBeats =
-          (currentProj.lengthBars || 1) * beatsPerBar(currentProj.signature);
+          computeProjectTotalPulses(currentProj) / PPQN.Quarter;
         const time = Math.round(xNorm * totalBeats * 4) / 4;
         const param = lane.dataset.param;
 

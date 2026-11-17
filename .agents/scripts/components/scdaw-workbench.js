@@ -134,7 +134,7 @@ export function resolveDropAction({
 
 export function resolveWorkbenchResponsiveLayout({
   containerWidth = 1200,
-  viewMode = "studio", // "studio" | "piano-roll-full" | "sequencer-full" | "synth-full" | "mixer-full"
+  viewMode = "studio", // "studio" | "browser-full" | "piano-roll-full" | "sequencer-full" | "synth-full" | "mixer-full"
   showBrowser = true,
   showMixer = true,
   browserWidth = 220,
@@ -145,13 +145,15 @@ export function resolveWorkbenchResponsiveLayout({
   const isDesktop = containerWidth >= 1024;
 
   const isFullWidth =
+    viewMode === "browser-full" ||
     viewMode === "piano-roll-full" ||
     viewMode === "sequencer-full" ||
     viewMode === "synth-full" ||
     viewMode === "mixer-full";
 
   let activeFocus = "studio";
-  if (viewMode === "piano-roll-full") activeFocus = "piano-roll";
+  if (viewMode === "browser-full") activeFocus = "browser";
+  else if (viewMode === "piano-roll-full") activeFocus = "piano-roll";
   else if (viewMode === "sequencer-full") activeFocus = "sequencer";
   else if (viewMode === "synth-full") activeFocus = "synth";
   else if (viewMode === "mixer-full") activeFocus = "mixer";
@@ -167,7 +169,7 @@ export function resolveWorkbenchResponsiveLayout({
       showBrowserHandle: false,
       showMixerHandle: false,
       gridTemplateColumns: "1fr",
-      showBrowser: false,
+      showBrowser: viewMode === "browser-full",
       showMixer: false,
     };
   }
@@ -254,6 +256,10 @@ export function resolveWorkbenchButtonStates({
     },
     studio: {
       active: isStudio,
+      disabled: false,
+    },
+    browserFull: {
+      active: viewMode === "browser-full",
       disabled: false,
     },
     pianoRollFull: {
@@ -1179,6 +1185,14 @@ export class DawWorkbenchElement extends BaseElement {
           padding: 0 0.85rem;
           font-size: 0.82rem;
         }
+        @media (pointer: coarse) {
+          .scdaw-workbench__toolbar .btn,
+          .scdaw-workbench__editor-bar .btn,
+          .scdaw-dialog__actions .btn,
+          .scdaw-file-item {
+            min-height: 44px;
+          }
+        }
       </style>
       <div class="scdaw-workbench">
         <header class="scdaw-workbench__header" role="banner">
@@ -1228,10 +1242,11 @@ export class DawWorkbenchElement extends BaseElement {
             </div>
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">
-              <button id="mode-mixer-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
-              <button id="mode-piano-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
-              <button id="mode-seq-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
-              <button id="mode-synth-full-btn" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Synthesizer Workbench" aria-pressed="false" aria-selected="false">🎛️ Synth (Full)</button>
+              <button id="mode-browser-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Library Browser" aria-pressed="false" aria-selected="false">📁 Browser (Full)</button>
+              <button id="mode-mixer-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
+              <button id="mode-piano-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
+              <button id="mode-seq-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
+              <button id="mode-synth-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Synthesizer Workbench" aria-pressed="false" aria-selected="false">🎛️ Synth (Full)</button>
             </div>
           </nav>
         </header>
@@ -1492,6 +1507,12 @@ export class DawWorkbenchElement extends BaseElement {
         this._updatePanels();
       });
     this.shadowRoot
+      .getElementById("mode-browser-full-btn")
+      ?.addEventListener("click", () => {
+        this._viewMode = "browser-full";
+        this._updatePanels();
+      });
+    this.shadowRoot
       .getElementById("mode-mixer-full-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "mixer-full";
@@ -1661,21 +1682,38 @@ export class DawWorkbenchElement extends BaseElement {
           )
           .join("");
 
-        importFileList.querySelectorAll(".scdaw-file-item").forEach((item) => {
-          item.addEventListener("click", () => {
-            importFileList
-              .querySelectorAll(".scdaw-file-item")
-              .forEach((el) => {
-                el.setAttribute("aria-selected", "false");
-              });
-            item.setAttribute("aria-selected", "true");
-            this._selectedImportFile = item.dataset.filename;
-            if (importSubmitBtn) importSubmitBtn.disabled = false;
+        const allItems = Array.from(
+          importFileList.querySelectorAll(".scdaw-file-item"),
+        );
+        const selectFileItem = (item) => {
+          allItems.forEach((el) => {
+            el.setAttribute("aria-selected", "false");
           });
-
+          item.setAttribute("aria-selected", "true");
+          this._selectedImportFile = item.dataset.filename;
+          if (importSubmitBtn) importSubmitBtn.disabled = false;
+        };
+        allItems.forEach((item, idx) => {
+          item.addEventListener("click", () => selectFileItem(item));
           item.addEventListener("dblclick", async () => {
             this._selectedImportFile = item.dataset.filename;
             await executeOpenSelectedFile();
+          });
+          item.addEventListener("keydown", async (e) => {
+            if (e.key === " ") {
+              e.preventDefault?.();
+              selectFileItem(item);
+            } else if (e.key === "Enter") {
+              e.preventDefault?.();
+              selectFileItem(item);
+              await executeOpenSelectedFile();
+            } else if (e.key === "ArrowDown" && allItems[idx + 1]) {
+              e.preventDefault?.();
+              allItems[idx + 1].focus?.();
+            } else if (e.key === "ArrowUp" && allItems[idx - 1]) {
+              e.preventDefault?.();
+              allItems[idx - 1].focus?.();
+            }
           });
         });
       } catch (err) {
@@ -1853,15 +1891,33 @@ export class DawWorkbenchElement extends BaseElement {
             pressUrlLink.textContent = compressedUrl;
           }
           if (pressUrlStats) {
+            pressUrlStats.style.color = "";
             const rawBytes = new TextEncoder().encode(jsonStr).byteLength;
             pressUrlStats.textContent = `Compressed .scdaw.json (${formatFileSize(rawBytes)} → ${compressedUrl.length} chars):`;
           }
-          if (pressUrlCopyBtn) pressUrlCopyBtn.textContent = "Copy URL";
+          if (pressUrlCopyBtn) {
+            pressUrlCopyBtn.disabled = false;
+            pressUrlCopyBtn.textContent = "Copy URL";
+          }
 
           exportModal?.close();
           pressUrlModal?.showModal();
         } catch (err) {
           console.error("Press URL error:", err);
+          if (pressUrlInput) pressUrlInput.value = "";
+          if (pressUrlLink) {
+            pressUrlLink.removeAttribute("href");
+            pressUrlLink.textContent = "";
+          }
+          if (pressUrlCopyBtn) pressUrlCopyBtn.disabled = true;
+          if (pressUrlStats) {
+            pressUrlStats.style.color = "#f87171";
+            pressUrlStats.textContent =
+              err?.message ||
+              "Project is too large to encode safely inside a share URL. Export as MIDI or .scdaw.json instead.";
+          }
+          exportModal?.close();
+          pressUrlModal?.showModal?.();
         } finally {
           if (pressBtn) pressBtn.textContent = "🔗 Press a URL";
         }
@@ -2450,6 +2506,13 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(seqCont, false);
       setVisible(synthCont, true);
       setVisible(devCont, false);
+    } else if (this._viewMode === "browser-full") {
+      setVisible(bCont, true, "flex");
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, false);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, false, "flex");
+      setVisible(synthCont, false);
     } else if (this._viewMode === "mixer-full") {
       setVisible(bCont, false);
       setVisible(bHandle, false, "inline-flex");
@@ -2516,12 +2579,39 @@ export class DawWorkbenchElement extends BaseElement {
 
     // Update active button states & ARIA pressed attributes
     const modeStudio = this.shadowRoot.getElementById("mode-studio-btn");
+    const modeBrowserFull = this.shadowRoot.getElementById(
+      "mode-browser-full-btn",
+    );
     const modePiano = this.shadowRoot.getElementById("mode-piano-full-btn");
     const modeSeq = this.shadowRoot.getElementById("mode-seq-full-btn");
     const modeSynth = this.shadowRoot.getElementById("mode-synth-full-btn");
     const modeMixer = this.shadowRoot.getElementById("mode-mixer-full-btn");
     const bBtn = this.shadowRoot.getElementById("toggle-browser-btn");
     const mBtn = this.shadowRoot.getElementById("toggle-mixer-btn");
+
+    if (modeBrowserFull) {
+      modeBrowserFull.disabled = btnStates.browserFull.disabled;
+      modeBrowserFull.setAttribute(
+        "aria-disabled",
+        String(btnStates.browserFull.disabled),
+      );
+      modeBrowserFull.classList.toggle(
+        "btn-primary",
+        btnStates.browserFull.active,
+      );
+      modeBrowserFull.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.browserFull.active,
+      );
+      modeBrowserFull.setAttribute(
+        "aria-pressed",
+        String(btnStates.browserFull.active),
+      );
+      modeBrowserFull.setAttribute(
+        "aria-selected",
+        String(btnStates.browserFull.active),
+      );
+    }
 
     if (modeStudio) {
       modeStudio.disabled = btnStates.studio.disabled;

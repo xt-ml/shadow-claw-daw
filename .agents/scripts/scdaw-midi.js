@@ -17,7 +17,7 @@
  * @license AGPL-3.0-or-later
  */
 
-import { PPQN, createProject, resolveTrackNotes } from "./scdaw.js";
+import { PPQN, barPulses, createProject, resolveTrackNotes } from "./scdaw.js";
 
 export const SMF_FORMAT_SINGLE_TRACK = 0;
 export const SMF_FORMAT_MULTI_TRACK = 1;
@@ -184,8 +184,50 @@ export function encodeMidiFile(project, options = {}) {
     // TRACK 0: Conductor Track
     const conductor = new TrackWriter();
     conductor.addMeta(0, META_TYPE.TRACK_NAME, encodeText(title));
-    conductor.addMeta(0, META_TYPE.TIME_SIGNATURE, timeSigBytes);
-    conductor.addMeta(0, META_TYPE.SET_TEMPO, tempoBytes);
+
+    const conductorEvents = [];
+    const sigEntries =
+      Array.isArray(project.signatureMap) && project.signatureMap.length > 0
+        ? project.signatureMap
+        : [{ pulse: 0, signature: [sigNum, sigDen] }];
+    for (const sEntry of sigEntries) {
+      const s = Array.isArray(sEntry.signature)
+        ? sEntry.signature
+        : [sigNum, sigDen];
+      const num = s[0] || 4;
+      const den = s[1] || 4;
+      const denExp = Math.round(Math.log2(den)) || 2;
+      conductorEvents.push({
+        pulse: Math.max(0, Math.round(Number(sEntry.pulse) || 0)),
+        order: 0,
+        metaType: META_TYPE.TIME_SIGNATURE,
+        bytes: [num, denExp, 24, 8],
+      });
+    }
+
+    const tempoEntries =
+      Array.isArray(project.tempoMap) && project.tempoMap.length > 0
+        ? project.tempoMap
+        : [{ pulse: 0, bpm }];
+    for (const tEntry of tempoEntries) {
+      const tBpm = Number(tEntry.bpm) || bpm;
+      const us = Math.max(1, Math.round(60_000_000 / tBpm));
+      conductorEvents.push({
+        pulse: Math.max(0, Math.round(Number(tEntry.pulse) || 0)),
+        order: 1,
+        metaType: META_TYPE.SET_TEMPO,
+        bytes: [(us >>> 16) & 0xff, (us >>> 8) & 0xff, us & 0xff],
+      });
+    }
+
+    conductorEvents.sort((a, b) => a.pulse - b.pulse || a.order - b.order);
+    let lastConductorTick = 0;
+    for (const ev of conductorEvents) {
+      const delta = Math.max(0, ev.pulse - lastConductorTick);
+      lastConductorTick = ev.pulse;
+      conductor.addMeta(delta, ev.metaType, ev.bytes);
+    }
+
     conductor.endTrack(0);
     trackBuffers.push(conductor.toArray());
 
@@ -313,10 +355,11 @@ export function encodeMidiFile(project, options = {}) {
           Math.floor(note.position + note.duration),
         );
         const pitch = Math.min(127, Math.max(0, Math.floor(note.pitch)));
-        const vel = Math.min(
-          127,
-          Math.max(1, Math.floor(note.velocity ?? 100)),
-        );
+        let rawVel = note.velocity ?? 0.8;
+        if (typeof rawVel === "number" && rawVel <= 1.0) {
+          rawVel = Math.round(rawVel * 127);
+        }
+        const vel = Math.min(127, Math.max(1, Math.floor(rawVel)));
 
         allEvents.push({
           tick: startTick,
@@ -419,8 +462,10 @@ export function decodeMidiFile(input) {
 
   let offset = 8 + headerLength;
   const tracks = [];
-  let detectedBpm = 120;
-  let detectedTimeSig = [4, 4];
+  let detectedBpm = null;
+  let detectedTimeSig = null;
+  const tempoMap = [];
+  const signatureMap = [];
 
   for (let t = 0; t < numTracks && offset < bytes.length; t++) {
     if (offset + 8 > bytes.length) break;
@@ -487,11 +532,14 @@ export function decodeMidiFile(input) {
           const usPerBeat =
             (metaData[0] << 16) | (metaData[1] << 8) | metaData[2];
           if (usPerBeat > 0) {
-            detectedBpm = Math.round(60_000_000 / usPerBeat);
+            const evBpm = Math.round(60_000_000 / usPerBeat);
+            if (detectedBpm === null) detectedBpm = evBpm;
+            tempoMap.push({ pulse: currentTick, bpm: evBpm });
           }
         } else if (metaType === META_TYPE.TIME_SIGNATURE && metaLen >= 2) {
           timeSignature = [metaData[0], 1 << metaData[1]];
-          detectedTimeSig = timeSignature;
+          if (detectedTimeSig === null) detectedTimeSig = timeSignature;
+          signatureMap.push({ pulse: currentTick, signature: timeSignature });
         } else if (
           metaType === META_TYPE.TRACK_NAME ||
           metaType === META_TYPE.TEXT_EVENT
@@ -596,8 +644,10 @@ export function decodeMidiFile(input) {
   return {
     format,
     division,
-    bpm: detectedBpm,
-    timeSignature: detectedTimeSig,
+    bpm: detectedBpm ?? 120,
+    timeSignature: detectedTimeSig ?? [4, 4],
+    tempoMap,
+    signatureMap,
     tracks,
   };
 }
@@ -693,12 +743,19 @@ export function midiToProject(input, options = {}) {
   }
 
   const sig = midi.timeSignature || [4, 4];
-  const pulsesPerBar =
-    (PPQN.Quarter || 960) * (Array.isArray(sig) ? sig[0] : 4);
+  const pulsesPerBar = barPulses(sig);
   const lengthBars = Math.max(1, Math.ceil(maxPulse / pulsesPerBar));
 
   const projectTitle =
     options.title || midi.tracks.find((t) => t.name)?.name || "Imported MIDI";
+
+  const extra = {};
+  if (Array.isArray(midi.signatureMap) && midi.signatureMap.length > 1) {
+    extra.signatureMap = midi.signatureMap;
+  }
+  if (Array.isArray(midi.tempoMap) && midi.tempoMap.length > 1) {
+    extra.tempoMap = midi.tempoMap;
+  }
 
   return createProject({
     title: projectTitle,
@@ -706,6 +763,7 @@ export function midiToProject(input, options = {}) {
     signature: sig,
     lengthBars,
     tracks: newTracks,
+    ...extra,
   });
 }
 

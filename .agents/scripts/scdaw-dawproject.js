@@ -16,7 +16,12 @@
  * @license AGPL-3.0-or-later
  */
 
-import { PPQN, createProject, resolveTrackNotes } from "./scdaw.js";
+import {
+  PPQN,
+  beatsPerBar,
+  createProject,
+  resolveTrackNotes,
+} from "./scdaw.js";
 import { encodeZip, decodeZip } from "./scdaw-zip.js";
 
 /**
@@ -235,7 +240,7 @@ export function encodeDawProject(project, options = {}) {
   const sigNum = project.signature?.[0] || 4;
   const sigDen = project.signature?.[1] || 4;
   const lengthBars = project.lengthBars || 1;
-  const totalBeats = lengthBars * sigNum;
+  const totalBeats = lengthBars * beatsPerBar([sigNum, sigDen]);
   const tracks = project.tracks || [];
 
   // 1. Build metadata.xml
