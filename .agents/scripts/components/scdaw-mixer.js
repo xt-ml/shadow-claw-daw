@@ -180,6 +180,7 @@ export class DawMixerElement extends BaseElement {
     }
     this._rafId = null;
     this._renderedTrackIds = [];
+    this._learnMode = false;
   }
 
   connectedCallback() {
@@ -188,6 +189,8 @@ export class DawMixerElement extends BaseElement {
     this._dispose = effect(() => {
       const p = scdaw.project.get();
       scdaw.selectedTrackId?.get();
+      scdaw.liveRevision?.get?.();
+      scdaw.midi?.state?.get?.();
       const currentTrackIds = p.tracks.map((t) => t.id);
       const hasContainer = Boolean(
         this.shadowRoot && this.shadowRoot.querySelector(".mixer-container"),
@@ -348,12 +351,35 @@ export class DawMixerElement extends BaseElement {
         badge.textContent = expectedBadge;
       }
     }
+
+    this._syncLearnButton();
+  }
+
+  _syncLearnButton() {
+    const learnBtn = this.shadowRoot?.getElementById("mixer-learn-btn");
+    if (!learnBtn) return;
+    const learning = scdaw.midi?.state?.get?.()?.learning;
+    const active = Boolean(this._learnMode || learning?.active);
+    learnBtn.classList?.toggle?.("btn-primary", active);
+    learnBtn.setAttribute?.("aria-pressed", String(active));
+    learnBtn.textContent = learning?.active
+      ? `🎯 Learn: ${learning.target?.param || "CC"}...`
+      : this._learnMode
+        ? "🎯 Click Control..."
+        : "🎯 Learn";
   }
 
   render() {
     if (!this.shadowRoot) return;
     const p = scdaw.getProject();
     this._renderedTrackIds = p.tracks.map((t) => t.id);
+    const learning = scdaw.midi?.state?.get?.()?.learning;
+    const learnActive = Boolean(this._learnMode || learning?.active);
+    const learnLabel = learning?.active
+      ? `🎯 Learn: ${learning.target?.param || "CC"}...`
+      : this._learnMode
+        ? "🎯 Click Control..."
+        : "🎯 Learn";
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -501,7 +527,10 @@ export class DawMixerElement extends BaseElement {
       <div class="daw-panel" role="region" aria-label="Mixer Console">
         <div class="daw-panel-header">
           <span>🎛 Mixer Console</span>
-          <span class="badge">${p.tracks.length + 1} Channels</span>
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <button id="mixer-learn-btn" type="button" class="btn btn-icon ${learnActive ? "btn-primary" : ""}" aria-pressed="${learnActive}" aria-label="Toggle MIDI Learn mode" title="Click then touch any mixer control (or right-click any control) to map a MIDI CC">${learnLabel}</button>
+            <span class="badge">${p.tracks.length + 1} Channels</span>
+          </div>
         </div>
         <div class="mixer-container">
           ${p.tracks
@@ -574,6 +603,29 @@ export class DawMixerElement extends BaseElement {
       </div>
     `;
 
+    const armLearn = (target) => {
+      this._learnMode = false;
+      scdaw.midi?.startMidiLearn?.({
+        channel: "omni",
+        ...target,
+      });
+      this._syncLearnButton();
+    };
+
+    const learnBtn = this.shadowRoot.getElementById("mixer-learn-btn");
+    if (learnBtn) {
+      learnBtn.addEventListener("click", (e) => {
+        e.stopPropagation?.();
+        if (scdaw.midi?.state?.get?.()?.learning?.active) {
+          scdaw.midi.cancelMidiLearn();
+          this._learnMode = false;
+        } else {
+          this._learnMode = !this._learnMode;
+        }
+        this._syncLearnButton();
+      });
+    }
+
     // Selecting a channel strip updates global selectedTrackId
     this.shadowRoot.querySelectorAll(".strip[data-track]").forEach((strip) => {
       strip.addEventListener("click", (e) => {
@@ -588,8 +640,28 @@ export class DawMixerElement extends BaseElement {
     // Sliders & Knobs
     this.shadowRoot.querySelectorAll(".track-vol").forEach((s) => {
       const id = s.dataset.track;
+      const learnTarget = {
+        trackId: id,
+        param: "volume",
+        min: 0,
+        max: 1.5,
+        scaling: "linear",
+        mode: "continuous",
+      };
+      s.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(learnTarget);
+      });
+      s.addEventListener("click", (e) => {
+        if (!this._learnMode) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(learnTarget);
+      });
       setupVolumeSlider(s, {
         onVolumeChange: (val) => {
+          if (this._learnMode) return;
           if (typeof scdaw.setLiveTrackParam === "function") {
             scdaw.setLiveTrackParam(id, { volume: val / 100 });
           } else {
@@ -597,6 +669,7 @@ export class DawMixerElement extends BaseElement {
           }
         },
         onVolumeCommit: (val) => {
+          if (this._learnMode) return;
           if (typeof scdaw.commitLiveTrackParam === "function") {
             scdaw.commitLiveTrackParam(id);
           } else {
@@ -614,13 +687,34 @@ export class DawMixerElement extends BaseElement {
     });
 
     this.shadowRoot.querySelectorAll("scdaw-knob").forEach((k) => {
+      const learnTarget = () => ({
+        trackId: k.dataset.track,
+        param: "pan",
+        min: -1,
+        max: 1,
+        scaling: "linear",
+        mode: "continuous",
+      });
+      k.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(learnTarget());
+      });
+      k.addEventListener("click", (e) => {
+        if (!this._learnMode) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(learnTarget());
+      });
       k.addEventListener("input", (e) => {
+        if (this._learnMode) return;
         const id = k.dataset.track;
         if (typeof scdaw.setLiveTrackParam === "function") {
           scdaw.setLiveTrackParam(id, { pan: e.detail.value });
         }
       });
       k.addEventListener("change", (e) => {
+        if (this._learnMode) return;
         const id = k.dataset.track;
         if (typeof scdaw.commitLiveTrackParam === "function") {
           scdaw.setLiveTrackParam?.(id, { pan: e.detail.value });
@@ -641,9 +735,32 @@ export class DawMixerElement extends BaseElement {
 
     // Mute/Solo/Reset
     this.shadowRoot.querySelectorAll(".mute-btn").forEach((b) => {
+      const getTarget = (e) => ({
+        trackId: b.dataset.track || e?.target?.dataset?.track,
+        param: "mute",
+        min: 0,
+        max: 1,
+        mode: "toggle",
+      });
+      b.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(getTarget(e));
+      });
       b.addEventListener("click", (e) => {
         e.stopPropagation?.();
         const id = b.dataset.track || e.target?.dataset?.track;
+        if (this._learnMode) {
+          e.preventDefault?.();
+          armLearn({
+            trackId: id,
+            param: "mute",
+            min: 0,
+            max: 1,
+            mode: "toggle",
+          });
+          return;
+        }
         const currentProj = scdaw.getProject();
         const trk = currentProj.tracks.find((t) => t.id === id);
         if (trk)
@@ -652,9 +769,32 @@ export class DawMixerElement extends BaseElement {
     });
 
     this.shadowRoot.querySelectorAll(".solo-btn").forEach((b) => {
+      const getTarget = (e) => ({
+        trackId: b.dataset.track || e?.target?.dataset?.track,
+        param: "solo",
+        min: 0,
+        max: 1,
+        mode: "toggle",
+      });
+      b.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(getTarget(e));
+      });
       b.addEventListener("click", (e) => {
         e.stopPropagation?.();
         const id = b.dataset.track || e.target?.dataset?.track;
+        if (this._learnMode) {
+          e.preventDefault?.();
+          armLearn({
+            trackId: id,
+            param: "solo",
+            min: 0,
+            max: 1,
+            mode: "toggle",
+          });
+          return;
+        }
         const currentProj = scdaw.getProject();
         const trk = currentProj.tracks.find((t) => t.id === id);
         if (trk)
@@ -673,8 +813,28 @@ export class DawMixerElement extends BaseElement {
     // Master fader
     const masterFader = this.shadowRoot.getElementById("master-fader");
     if (masterFader) {
+      const masterTarget = {
+        trackId: "master",
+        param: "volume",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "continuous",
+      };
+      masterFader.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(masterTarget);
+      });
+      masterFader.addEventListener("click", (e) => {
+        if (!this._learnMode) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        armLearn(masterTarget);
+      });
       setupVolumeSlider(masterFader, {
         onVolumeChange: (val) => {
+          if (this._learnMode) return;
           if (typeof scdaw.setLiveMasterParam === "function") {
             scdaw.setLiveMasterParam({ volume: val / 100 });
           } else {
@@ -682,6 +842,7 @@ export class DawMixerElement extends BaseElement {
           }
         },
         onVolumeCommit: (val) => {
+          if (this._learnMode) return;
           if (typeof scdaw.commitLiveMasterParam === "function") {
             scdaw.commitLiveMasterParam();
           } else {

@@ -348,6 +348,7 @@ export class DawSynthElement extends BaseElement {
 
     this._dispose = effect(() => {
       const p = scdaw.project.get();
+      scdaw.liveRevision?.get?.();
       const track = this._resolveActiveTrack(p);
       const inst = this._resolveInstrument(track);
       const hasContainer = Boolean(
@@ -1326,6 +1327,21 @@ export class DawSynthElement extends BaseElement {
           scope: "synth",
           trackId,
           param,
+        });
+      });
+      knob.addEventListener("contextmenu", (e) => {
+        if (!trackId) return;
+        const param = knob.dataset.param;
+        if (!param) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        scdaw.midi?.startMidiLearn?.({
+          trackId,
+          param,
+          min: Number(knob.min ?? 0),
+          max: Number(knob.max ?? 1),
+          scaling: knob.scaling || "linear",
+          channel: "omni",
         });
       });
     });

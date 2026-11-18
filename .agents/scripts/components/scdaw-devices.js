@@ -302,6 +302,7 @@ export class DawDevicesElement extends BaseElement {
     this.render();
     this._dispose = effect(() => {
       const p = scdaw.project.get();
+      scdaw.liveRevision?.get?.();
       const sharedTrackId = scdaw.selectedTrackId?.get();
       const activeTrackId =
         sharedTrackId && p.tracks.some((t) => t.id === sharedTrackId)
@@ -593,6 +594,21 @@ export class DawDevicesElement extends BaseElement {
           scope: "synth",
           trackId: this._selectedTrackId,
           param,
+        });
+      });
+      knob.addEventListener("contextmenu", (e) => {
+        if (!this._selectedTrackId) return;
+        const param = knob.dataset.param;
+        if (!param) return;
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        scdaw.midi?.startMidiLearn?.({
+          trackId: this._selectedTrackId,
+          param,
+          min: Number(knob.min ?? 0),
+          max: Number(knob.max ?? 1),
+          scaling: knob.scaling || "linear",
+          channel: "omni",
         });
       });
     });

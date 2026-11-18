@@ -12,6 +12,9 @@ import {
   applyCommand,
   migrateProject,
   PPQN,
+  RESERVED_MIDI_CCS,
+  MIDI_CONTROLLER_PRESETS,
+  resolveMidiMappingDefaults,
 } from "../.agents/scripts/scdaw.js";
 
 test("parseMidiMessage: decodes NoteOn, NoteOn vel=0 -> NoteOff, and NoteOff", () => {
@@ -250,4 +253,227 @@ test("resolveCapturedMidiNotes: stopped mode tracks timeline seek (ppqn changes 
     `Expected B6 at beat 2 (>=960), got ${notes[3].position}`,
   );
   assert.equal(notes[3].pitch, 95);
+});
+
+test("resolveMidiMappingDefaults & RESERVED_MIDI_CCS & MIDI_CONTROLLER_PRESETS: resolve parameter ranges, modes, and SMC-Mixer preset", () => {
+  assert.equal(RESERVED_MIDI_CCS[64], "Sustain Pedal");
+  assert.equal(RESERVED_MIDI_CCS[120], "All Sound Off");
+  assert.equal(RESERVED_MIDI_CCS[123], "All Notes Off");
+  assert.ok(MIDI_CONTROLLER_PRESETS["smc-mixer"]);
+
+  const p0 = createProject("basic-beat");
+  const trackId = p0.tracks[0].id;
+
+  // Gap 7: Track volume defaults to 0..1.5 even when max is omitted
+  const volDef = resolveMidiMappingDefaults({ trackId, param: "volume" }, p0);
+  assert.equal(volDef.min, 0);
+  assert.equal(volDef.max, 1.5);
+  assert.equal(volDef.mode, "continuous");
+
+  // Gap 5: Master volume defaults to 0..1
+  const masterVol = resolveMidiMappingDefaults(
+    { trackId: "master", param: "volume" },
+    p0,
+  );
+  assert.equal(masterVol.trackId, "master");
+  assert.equal(masterVol.min, 0);
+  assert.equal(masterVol.max, 1);
+  assert.equal(masterVol.mode, "continuous");
+
+  // Pan defaults to -1..1
+  const panDef = resolveMidiMappingDefaults({ trackId, param: "pan" }, p0);
+  assert.equal(panDef.min, -1);
+  assert.equal(panDef.max, 1);
+  assert.equal(panDef.mode, "continuous");
+
+  // Gap 2 & 3: Mute, solo, recordArm/armed default to toggle mode
+  for (const param of ["mute", "solo", "recordArm"]) {
+    const def = resolveMidiMappingDefaults({ trackId, param }, p0);
+    assert.equal(def.param, param);
+    assert.equal(def.mode, "toggle");
+    assert.equal(def.min, 0);
+    assert.equal(def.max, 1);
+  }
+  const armedAlias = resolveMidiMappingDefaults(
+    { trackId, param: "armed", min: 0, max: 1 },
+    p0,
+  );
+  assert.equal(armedAlias.param, "recordArm");
+  assert.equal(armedAlias.mode, "toggle");
+
+  // Gap 6: Transport targets
+  for (const param of ["play", "stop", "pause", "panic"]) {
+    const tDef = resolveMidiMappingDefaults({ param }, p0);
+    assert.equal(tDef.trackId, "transport");
+    assert.equal(tDef.mode, "trigger");
+  }
+  for (const param of ["toggle_play", "record", "metronome"]) {
+    const tDef = resolveMidiMappingDefaults({ param }, p0);
+    assert.equal(tDef.trackId, "transport");
+    assert.equal(tDef.mode, "toggle");
+  }
+  const bpmDef = resolveMidiMappingDefaults({ param: "bpm" }, p0);
+  assert.equal(bpmDef.trackId, "transport");
+  assert.equal(bpmDef.min, 20);
+  assert.equal(bpmDef.max, 300);
+  assert.equal(bpmDef.mode, "continuous");
+
+  const swingDef = resolveMidiMappingDefaults({ param: "swing" }, p0);
+  assert.equal(swingDef.trackId, "transport");
+  assert.equal(swingDef.min, 0);
+  assert.equal(swingDef.max, 0.5);
+
+  // Synth param schema fallback (cutoff -> 20..20000 exponential)
+  const cutoffDef = resolveMidiMappingDefaults(
+    { trackId: p0.tracks[1].id, param: "cutoff" },
+    p0,
+  );
+  assert.equal(cutoffDef.min, 20);
+  assert.equal(cutoffDef.max, 20000);
+  assert.equal(cutoffDef.scaling, "exponential");
+  assert.equal(cutoffDef.mode, "continuous");
+});
+
+test("applyCommand: set_midi_learn_mapping deduplicates, warns on reserved/conflicting CCs, clears, and applies smc-mixer preset", () => {
+  const p0 = createProject("basic-beat");
+  const trk0 = p0.tracks[0].id;
+  const trk1 = p0.tracks[1].id;
+
+  // 1. Track volume defaults to max 1.5 when omitted
+  const res1 = applyCommand(p0, "set_midi_learn_mapping", {
+    deviceId: "dev-1",
+    channel: 0,
+    cc: 40,
+    trackId: trk0,
+    param: "volume",
+  });
+  assert.equal(res1.result.mapping.max, 1.5);
+  assert.equal(res1.result.mapping.mode, "continuous");
+  assert.equal(res1.project.midiMappings.length, 1);
+
+  // 2. Gap 8: Re-running same (cc, channel, deviceId, trackId, param) updates in place (no duplicate)
+  const res2 = applyCommand(res1.project, "set_midi_learn_mapping", {
+    deviceId: "dev-1",
+    channel: 0,
+    cc: 40,
+    trackId: trk0,
+    param: "volume",
+  });
+  assert.equal(res2.project.midiMappings.length, 1);
+  assert.equal(res2.result.mapping.id, res1.result.mapping.id);
+
+  // 3. Reserved CC warning (CC 64) + duplicate CC/channel warning
+  const resReserved = applyCommand(res2.project, "set_midi_learn_mapping", {
+    deviceId: "dev-1",
+    channel: 0,
+    cc: 64,
+    trackId: trk0,
+    param: "mute",
+  });
+  assert.ok(
+    resReserved.result.warnings.some((w) => /64|Sustain/i.test(w)),
+    "Expected reserved CC 64 warning",
+  );
+
+  const resConflict = applyCommand(
+    resReserved.project,
+    "set_midi_learn_mapping",
+    {
+      deviceId: "dev-1",
+      channel: "omni",
+      cc: 40,
+      trackId: trk1,
+      param: "pan",
+    },
+  );
+  assert.ok(
+    resConflict.result.warnings.some((w) => /40|duplicate|conflict/i.test(w)),
+    "Expected duplicate CC/channel conflict warning",
+  );
+
+  // 4. apply_midi_controller_preset: smc-mixer creates 2*4 + 1 master + 2 transport = 11 mappings for 2-track project
+  const presetRes = applyCommand(
+    resConflict.project,
+    "apply_midi_controller_preset",
+    { preset: "smc-mixer" },
+  );
+  assert.equal(presetRes.result.preset, "smc-mixer");
+  assert.equal(presetRes.result.addedCount, 11);
+  assert.equal(presetRes.project.midiMappings.length, 11);
+
+  const fader1 = presetRes.project.midiMappings.find(
+    (m) => m.cc === 40 && m.trackId === trk0,
+  );
+  assert.equal(fader1.max, 1.5);
+  const masterFader = presetRes.project.midiMappings.find(
+    (m) => m.cc === 47 && m.trackId === "master",
+  );
+  assert.equal(masterFader.param, "volume");
+  assert.equal(masterFader.max, 1);
+  const playBtn = presetRes.project.midiMappings.find(
+    (m) => m.cc === 102 && m.trackId === "transport",
+  );
+  assert.equal(playBtn.param, "play");
+  assert.equal(playBtn.mode, "trigger");
+
+  // 5. clear_midi_learn_mappings
+  const clearedTrack = applyCommand(
+    presetRes.project,
+    "clear_midi_learn_mappings",
+    { trackId: trk0 },
+  );
+  assert.equal(clearedTrack.result.removed, 4);
+  const clearedAll = applyCommand(
+    clearedTrack.project,
+    "clear_midi_learn_mappings",
+    {},
+  );
+  assert.equal(clearedAll.project.midiMappings.length, 0);
+
+  // 6. Bank paging (bankOffset: 1 shifts SMC-Mixer Fader 1 to track index 1)
+  const bankRes = applyCommand(
+    clearedAll.project,
+    "apply_midi_controller_preset",
+    { preset: "smc-mixer", bankOffset: 1 },
+  );
+  const bankFader1 = bankRes.project.midiMappings.find((m) => m.cc === 40);
+  assert.equal(bankFader1.trackId, trk1);
+
+  // 7. import_midi_learn_mappings with trackIndex portable remapping + JSON string input
+  const exportedPayload = JSON.stringify({
+    version: 2,
+    midiMappings: [
+      {
+        cc: 40,
+        channel: "omni",
+        trackId: "stale_old_track_id",
+        trackIndex: 0,
+        param: "volume",
+      },
+      {
+        cc: 47,
+        channel: "omni",
+        trackId: "master",
+        param: "volume",
+      },
+      {
+        cc: 64,
+        channel: 0,
+        trackId: "transport",
+        param: "play",
+      },
+    ],
+  });
+  const importRes = applyCommand(p0, "import_midi_learn_mappings", {
+    mappings: exportedPayload,
+  });
+  assert.equal(importRes.result.importedCount, 3);
+  assert.equal(importRes.project.midiMappings[0].trackId, trk0);
+  assert.equal(importRes.project.midiMappings[0].max, 1.5);
+  assert.equal(importRes.project.midiMappings[1].trackId, "master");
+  assert.equal(importRes.project.midiMappings[2].trackId, "transport");
+  assert.ok(
+    importRes.result.warnings.some((w) => /64|Sustain/i.test(w)),
+    "Import should propagate reserved CC warnings",
+  );
 });

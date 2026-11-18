@@ -77,6 +77,7 @@ export class DawEngine extends EventTarget {
     const initialTrackId = initialProject.tracks[0]?.id || null;
 
     this.project = new State(initialProject);
+    this.liveRevision = new State(0);
     this.selectedTrackId = new State(initialTrackId);
     this.state = new State({
       audio: "locked",
@@ -2414,12 +2415,23 @@ export class DawEngine extends EventTarget {
     }
     if (patch.mute !== undefined) track.mute = Boolean(patch.mute);
     if (patch.solo !== undefined) track.solo = Boolean(patch.solo);
+    if (patch.recordArm !== undefined)
+      track.recordArm = Boolean(patch.recordArm);
+    if (patch.armed !== undefined) track.recordArm = Boolean(patch.armed);
 
     if (this.ctx && this.graph) {
       const now = this.ctx.currentTime;
+      const hasSolo = p.tracks.some((t) => t.solo);
+      if (patch.solo !== undefined) {
+        for (const t of p.tracks) {
+          const tNodes = this.graph.tracks.get(t.id);
+          if (!tNodes) continue;
+          const vol = t.mute || (hasSolo && !t.solo) ? 0 : (t.volume ?? 0.8);
+          this._rampAudioParam(tNodes.gain?.gain, vol, now, 0.012);
+        }
+      }
       const nodes = this.graph.tracks.get(trackId);
       if (nodes) {
-        const hasSolo = p.tracks.some((t) => t.solo);
         const effectiveVol =
           track.mute || (hasSolo && !track.solo) ? 0 : (track.volume ?? 0.8);
         this._rampAudioParam(nodes.gain?.gain, effectiveVol, now, 0.012);
@@ -2437,6 +2449,8 @@ export class DawEngine extends EventTarget {
         }
       }
     }
+
+    this.liveRevision.set((this.liveRevision.get() || 0) + 1);
   }
 
   commitLiveTrackParam(trackId) {
@@ -2466,6 +2480,7 @@ export class DawEngine extends EventTarget {
         0.012,
       );
     }
+    this.liveRevision.set((this.liveRevision.get() || 0) + 1);
   }
 
   commitLiveMasterParam() {
@@ -2495,8 +2510,11 @@ export class DawEngine extends EventTarget {
       this._updateState({ bpm: nextBpm });
     }
     if (patch.swing !== undefined) {
-      p.swing = Math.max(0, Math.min(100, Number(patch.swing)));
+      const rawSwing = Number(patch.swing);
+      const normalized = rawSwing > 1 ? rawSwing / 100 : rawSwing;
+      p.swing = Math.max(0, Math.min(0.5, normalized));
     }
+    this.liveRevision.set((this.liveRevision.get() || 0) + 1);
   }
 
   commitLiveTransportParam() {

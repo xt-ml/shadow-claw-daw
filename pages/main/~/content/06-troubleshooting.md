@@ -34,6 +34,17 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 
 - **Browser Support & Permissions**: Hardware MIDI via `navigator.requestMIDIAccess()` requires a Chromium-based or Web MIDI-enabled browser served over HTTPS (or `localhost`).
 - **Fallback**: When Web MIDI is unavailable or permission is denied, Daw gracefully degrades to the on-screen `<scdaw-midi-keyboard>` and QWERTY keyboard input without disrupting audio playback or editing.
+- **MIDI Learn & Right-Click Mapping**: Click **🎹 MIDI** in the transport bar to open the MIDI Devices & Routing dialog, use the **🎯 Learn** toggle in `<scdaw-mixer>`, or right-click any mixer fader, pan knob, M/S/R button, synth/device knob, or transport control to arm MIDI Learn for the next incoming CC.
+- **Channel Numbering & `omni`**: Internal MIDI channels are 0-based (`0–15`, shown as `Ch 1–16` in the UI). Setting `channel: "omni"` (or omitting it in `set_midi_learn_mapping` / `scdaw_configure_midi`) matches messages on any MIDI channel; `"omni"` is the default for UI Learn and controller presets.
+- **Default Parameter Ranges & Control Modes**:
+  - Track `volume`: `0.0–1.5` (where `1.0` = `100` unity and `1.5` = `150` top of mixer fader)
+  - Master `volume` (`trackId: "master"`): `0.0–1.0` (`0–100`)
+  - Track `pan`: `-1.0–1.0`
+  - Transport (`trackId: "transport"`): `play`, `stop`, `pause`, `panic` (`trigger` mode on press `>= 64`); `toggle_play`, `record`, `metronome` (`toggle` mode); `bpm` (`20–300`); `swing` (`0–0.5`)
+  - Track buttons (`mute`, `solo`, `recordArm`): default to `toggle` mode (latches on CC value `>= 64` and ignores release `< 64`), with `momentary` and `trigger` modes also selectable.
+- **Twin-Port De-duplication & Soft Takeover**: Controllers that expose paired USB inputs (such as `SINCO SMC-Mixer-Master` and `SINCO SMC-Mixer-Private`) are automatically de-duplicated within an 80 ms cross-port window, and individual input ports can be enabled or disabled in the MIDI dialog. Enable **Soft Takeover** to ignore hardware fader moves until they cross the current parameter value.
+- **Reserved CCs, Presets & JSON Export/Import**: `CC 64` (Sustain Pedal), `CC 120` (All Sound Off), and `CC 123` (All Notes Off) trigger built-in DAW behavior and show a warning if mapped. Mappings persist with the project, can be exported/imported as portable JSON (`midi-mappings.json`), or populated in one click via the **M-VAVE SMC-Mixer** preset with 8-channel bank paging (`Tracks 1–7`, `8–14`, etc.).
+- **Console / WebMCP Access**: Programmatic control is exposed on `window.__scdaw` (`sendCommand("set_midi_learn_mapping", ...)`, `sendCommand("apply_midi_controller_preset", ...)`) and via the `scdaw_configure_midi` and `scdaw_get_midi_status` tools.
 
 ### 6. Sharing Songs via Compressed URLs (`#file=`)
 

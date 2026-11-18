@@ -82,6 +82,244 @@ export const GM_DRUM_NAMES = Object.freeze({
   46: "openhat",
 });
 
+export const RESERVED_MIDI_CCS = Object.freeze({
+  64: "Sustain Pedal",
+  120: "All Sound Off",
+  123: "All Notes Off",
+});
+
+export const MIDI_CONTROLLER_PRESETS = Object.freeze({
+  "smc-mixer": Object.freeze({
+    id: "smc-mixer",
+    name: "M-VAVE SMC-Mixer (8-Ch + Master + Transport)",
+    channel: "omni",
+    strips: 7,
+    trackMappings: Object.freeze([
+      Object.freeze({
+        offset: 40,
+        param: "volume",
+        min: 0,
+        max: 1.5,
+        scaling: "linear",
+        mode: "continuous",
+      }),
+      Object.freeze({
+        offset: 30,
+        param: "pan",
+        min: -1,
+        max: 1,
+        scaling: "linear",
+        mode: "continuous",
+      }),
+      Object.freeze({
+        offset: 70,
+        param: "mute",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "toggle",
+      }),
+      Object.freeze({
+        offset: 78,
+        param: "solo",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "toggle",
+      }),
+    ]),
+    globalMappings: Object.freeze([
+      Object.freeze({
+        cc: 47,
+        trackId: "master",
+        param: "volume",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "continuous",
+      }),
+      Object.freeze({
+        cc: 102,
+        trackId: "transport",
+        param: "play",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "trigger",
+      }),
+      Object.freeze({
+        cc: 103,
+        trackId: "transport",
+        param: "stop",
+        min: 0,
+        max: 1,
+        scaling: "linear",
+        mode: "trigger",
+      }),
+    ]),
+  }),
+});
+
+const TRANSPORT_TRIGGER_PARAMS = new Set(["play", "stop", "pause", "panic"]);
+const TRANSPORT_TOGGLE_PARAMS = new Set(["toggle_play", "record", "metronome"]);
+const TRACK_TOGGLE_PARAMS = new Set(["mute", "solo", "recordArm"]);
+
+/**
+ * Resolves canonical trackId, parameter name, min/max bounds, scaling curve,
+ * and button/fader mode for a MIDI Learn mapping target.
+ */
+export function resolveMidiMappingDefaults(params = {}, project = null) {
+  const rawParam = String(params.param || "");
+  const param = rawParam === "armed" ? "recordArm" : rawParam;
+  let trackId = params.trackId;
+
+  let defaultMin = 0;
+  let defaultMax = 1;
+  let defaultScaling = "linear";
+  let defaultMode = "continuous";
+
+  if (TRANSPORT_TRIGGER_PARAMS.has(param)) {
+    if (!trackId || trackId === "transport") trackId = "transport";
+    defaultMode = "trigger";
+  } else if (TRANSPORT_TOGGLE_PARAMS.has(param)) {
+    if (!trackId || trackId === "transport") trackId = "transport";
+    defaultMode = "toggle";
+  } else if (param === "bpm") {
+    if (!trackId || trackId === "transport") trackId = "transport";
+    defaultMin = MIN_BPM;
+    defaultMax = MAX_BPM;
+  } else if (param === "swing") {
+    if (!trackId || trackId === "transport") trackId = "transport";
+    defaultMin = 0;
+    defaultMax = 0.5;
+  } else if (trackId === "master" && param === "volume") {
+    defaultMin = 0;
+    defaultMax = 1;
+  } else if (TRACK_TOGGLE_PARAMS.has(param)) {
+    defaultMode = "toggle";
+  } else if (param === "volume" && trackId !== "master") {
+    defaultMin = 0;
+    defaultMax = 1.5;
+  } else if (param === "pan") {
+    defaultMin = -1;
+    defaultMax = 1;
+  } else {
+    const track = project?.tracks?.find?.((t) => t.id === trackId);
+    const inst = String(
+      track?.instrument || (track?.kind === "drums" ? "drums" : "synth"),
+    ).toLowerCase();
+    const spec = INSTRUMENT_SCHEMAS[inst]?.[param] || SYNTH_PARAM_SCHEMA[param];
+    if (spec) {
+      defaultMin = spec.min ?? 0;
+      defaultMax = spec.max ?? 1;
+      defaultScaling = spec.scaling || "linear";
+      defaultMode = spec.type === "boolean" ? "toggle" : "continuous";
+    }
+  }
+
+  const min =
+    params.min !== undefined && params.min !== null
+      ? Number(params.min)
+      : defaultMin;
+  const max =
+    params.max !== undefined && params.max !== null
+      ? Number(params.max)
+      : defaultMax;
+  const scaling = params.scaling || defaultScaling;
+  const mode = params.mode || defaultMode;
+
+  return {
+    trackId,
+    param,
+    min,
+    max,
+    scaling,
+    mode,
+  };
+}
+
+function channelsOverlap(a, b) {
+  const ca = a === undefined || a === null || a === "" ? "omni" : a;
+  const cb = b === undefined || b === null || b === "" ? "omni" : b;
+  return ca === "omni" || cb === "omni" || Number(ca) === Number(cb);
+}
+
+function upsertMidiLearnMapping(project, params = {}) {
+  if (!Array.isArray(project.midiMappings)) project.midiMappings = [];
+  const resolved = resolveMidiMappingDefaults(params, project);
+  const deviceId = params.deviceId ?? null;
+  const channel =
+    params.channel === undefined ||
+    params.channel === null ||
+    params.channel === ""
+      ? 0
+      : params.channel;
+  const cc = Number(params.cc ?? 0);
+
+  let existingIdx = -1;
+  if (params.id) {
+    existingIdx = project.midiMappings.findIndex((m) => m.id === params.id);
+  }
+  if (existingIdx === -1) {
+    existingIdx = project.midiMappings.findIndex(
+      (m) =>
+        Number(m.cc) === cc &&
+        String(m.channel ?? "omni") === String(channel ?? "omni") &&
+        (m.deviceId || null) === (deviceId || null) &&
+        m.trackId === resolved.trackId &&
+        m.param === resolved.param,
+    );
+  }
+  if (existingIdx === -1 && params.replaceTarget) {
+    existingIdx = project.midiMappings.findIndex(
+      (m) => m.trackId === resolved.trackId && m.param === resolved.param,
+    );
+  }
+
+  const id =
+    params.id ||
+    (existingIdx >= 0
+      ? project.midiMappings[existingIdx].id
+      : `map_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`);
+
+  const mapping = {
+    id,
+    deviceId,
+    channel,
+    cc,
+    trackId: resolved.trackId,
+    param: resolved.param,
+    min: resolved.min,
+    max: resolved.max,
+    scaling: resolved.scaling,
+    mode: resolved.mode,
+  };
+
+  if (existingIdx >= 0) {
+    project.midiMappings[existingIdx] = mapping;
+  } else {
+    project.midiMappings.push(mapping);
+  }
+
+  const warnings = [];
+  if (RESERVED_MIDI_CCS[cc]) {
+    warnings.push(
+      `CC ${cc} is reserved for ${RESERVED_MIDI_CCS[cc]} and may trigger built-in MIDI behavior.`,
+    );
+  }
+  const conflicts = project.midiMappings.filter(
+    (m) =>
+      m.id !== id && Number(m.cc) === cc && channelsOverlap(m.channel, channel),
+  );
+  if (conflicts.length > 0) {
+    warnings.push(
+      `CC ${cc} (${channel === "omni" ? "omni" : `ch ${channel}`}) conflicts with ${conflicts.length} existing mapping(s).`,
+    );
+  }
+
+  return { mapping, warnings };
+}
+
 const NOTE_NAMES = [
   "C",
   "C#",
@@ -2183,30 +2421,10 @@ export function applyCommand(project, name, params = {}) {
     }
 
     case "set_midi_learn_mapping": {
-      if (!Array.isArray(next.midiMappings)) next.midiMappings = [];
-      const id =
-        params.id ||
-        `map_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      const mapping = {
-        id,
-        deviceId: params.deviceId ?? null,
-        channel: params.channel ?? 0,
-        cc: Number(params.cc ?? 0),
-        trackId: params.trackId,
-        param: params.param,
-        min: params.min ?? 0,
-        max: params.max ?? 1,
-        scaling: params.scaling || "linear",
-      };
-      const existingIdx = next.midiMappings.findIndex((m) => m.id === id);
-      if (existingIdx >= 0) {
-        next.midiMappings[existingIdx] = mapping;
-      } else {
-        next.midiMappings.push(mapping);
-      }
+      const { mapping, warnings } = upsertMidiLearnMapping(next, params);
       return {
         project: next,
-        result: { mapping },
+        result: { mapping, warnings },
       };
     }
 
@@ -2219,6 +2437,134 @@ export function applyCommand(project, name, params = {}) {
         result: {
           removed: before - next.midiMappings.length,
           id: params.id,
+        },
+      };
+    }
+
+    case "clear_midi_learn_mappings": {
+      if (!Array.isArray(next.midiMappings)) next.midiMappings = [];
+      const before = next.midiMappings.length;
+      next.midiMappings = next.midiMappings.filter((m) => {
+        if (params.trackId && m.trackId !== params.trackId) return true;
+        if (
+          params.deviceId !== undefined &&
+          params.deviceId !== null &&
+          (m.deviceId || null) !== (params.deviceId || null)
+        ) {
+          return true;
+        }
+        return false;
+      });
+      return {
+        project: next,
+        result: { removed: before - next.midiMappings.length },
+      };
+    }
+
+    case "apply_midi_controller_preset": {
+      const presetId = String(params.preset || "smc-mixer");
+      const preset = MIDI_CONTROLLER_PRESETS[presetId];
+      if (!preset) {
+        throw new Error(`Unknown MIDI controller preset: ${presetId}`);
+      }
+      if (!Array.isArray(next.midiMappings) || params.clearExisting !== false) {
+        next.midiMappings = [];
+      }
+      const bankOffset = Math.max(
+        0,
+        Math.floor(Number(params.bankOffset || 0)),
+      );
+      const channel = params.channel ?? preset.channel ?? "omni";
+      const deviceId = params.deviceId ?? null;
+      const tracks = (next.tracks || []).slice(
+        bankOffset,
+        bankOffset + (preset.strips || 7),
+      );
+      const created = [];
+
+      tracks.forEach((track, idx) => {
+        for (const spec of preset.trackMappings || []) {
+          const { mapping } = upsertMidiLearnMapping(next, {
+            cc: spec.offset + idx,
+            deviceId,
+            channel,
+            trackId: track.id,
+            param: spec.param,
+            min: spec.min,
+            max: spec.max,
+            scaling: spec.scaling,
+            mode: spec.mode,
+          });
+          created.push(mapping);
+        }
+      });
+
+      for (const globalSpec of preset.globalMappings || []) {
+        const { mapping } = upsertMidiLearnMapping(next, {
+          cc: globalSpec.cc,
+          deviceId,
+          channel,
+          trackId: globalSpec.trackId,
+          param: globalSpec.param,
+          min: globalSpec.min,
+          max: globalSpec.max,
+          scaling: globalSpec.scaling,
+          mode: globalSpec.mode,
+        });
+        created.push(mapping);
+      }
+
+      return {
+        project: next,
+        result: {
+          preset: presetId,
+          addedCount: created.length,
+          mappings: next.midiMappings,
+        },
+      };
+    }
+
+    case "import_midi_learn_mappings": {
+      let raw = params.mappings;
+      if (typeof raw === "string") {
+        raw = JSON.parse(raw);
+      }
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.midiMappings)
+          ? raw.midiMappings
+          : [];
+      if (!Array.isArray(next.midiMappings) || params.clearExisting !== false) {
+        next.midiMappings = [];
+      }
+      const imported = [];
+      const warningSet = new Set();
+      for (const entry of list) {
+        if (!entry || typeof entry !== "object") continue;
+        let trackId = entry.trackId;
+        if (
+          entry.trackIndex !== undefined &&
+          trackId !== "master" &&
+          trackId !== "transport" &&
+          trackId !== "selected" &&
+          !next.tracks.some((t) => t.id === trackId) &&
+          next.tracks[entry.trackIndex]
+        ) {
+          trackId = next.tracks[entry.trackIndex].id;
+        }
+        const { mapping, warnings } = upsertMidiLearnMapping(next, {
+          ...entry,
+          trackId,
+        });
+        imported.push(mapping);
+        for (const w of warnings) warningSet.add(w);
+      }
+      return {
+        project: next,
+        result: {
+          importedCount: imported.length,
+          mappings: next.midiMappings,
+          warnings: [...warningSet],
         },
       };
     }

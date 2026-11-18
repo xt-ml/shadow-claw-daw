@@ -880,6 +880,7 @@ export class DawTimelineElement extends BaseElement {
     this._dispose = effect(() => {
       const p = scdaw.project.get();
       const sel = scdaw.selectedTrackId?.get();
+      scdaw.liveRevision?.get?.();
       const sig = this._computeRenderSignature(p, sel);
       if (sig !== this._lastRenderSignature) {
         this.render();
@@ -920,7 +921,7 @@ export class DawTimelineElement extends BaseElement {
               .map(([k, v]) => `${k}:${Array.isArray(v) ? v.length : 0}`)
               .join(",")
           : "";
-        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
+        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.recordArm || t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
       })
       .join(";");
     return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${trackSigs}`;
@@ -1888,6 +1889,18 @@ export class DawTimelineElement extends BaseElement {
           });
         }
       });
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        scdaw.midi?.startMidiLearn?.({
+          trackId: btn.dataset.track,
+          param: "recordArm",
+          min: 0,
+          max: 1,
+          mode: "toggle",
+          channel: "omni",
+        });
+      });
     });
 
     this.shadowRoot.querySelectorAll(".import-audio-btn").forEach((btn) => {
@@ -1958,6 +1971,18 @@ export class DawTimelineElement extends BaseElement {
         const t = currentProj.tracks.find((x) => x.id === id);
         if (t) scdaw.sendCommand("set_track", { trackId: id, mute: !t.mute });
       });
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        scdaw.midi?.startMidiLearn?.({
+          trackId: btn.dataset.track,
+          param: "mute",
+          min: 0,
+          max: 1,
+          mode: "toggle",
+          channel: "omni",
+        });
+      });
     });
 
     this.shadowRoot.querySelectorAll(".solo-btn").forEach((btn) => {
@@ -1967,6 +1992,18 @@ export class DawTimelineElement extends BaseElement {
         const currentProj = scdaw.getProject();
         const t = currentProj.tracks.find((x) => x.id === id);
         if (t) scdaw.sendCommand("set_track", { trackId: id, solo: !t.solo });
+      });
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        scdaw.midi?.startMidiLearn?.({
+          trackId: btn.dataset.track,
+          param: "solo",
+          min: 0,
+          max: 1,
+          mode: "toggle",
+          channel: "omni",
+        });
       });
     });
 

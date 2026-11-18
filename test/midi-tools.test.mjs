@@ -62,4 +62,42 @@ test("scdaw-adapter: handleToolDispatch supports scdaw_get_midi_status, scdaw_co
     pitch: 62,
   });
   assert.equal(trigOff.ok, true);
+
+  // start_learn / cancel_learn / apply_preset / clear_learn
+  const startLearnRes = await handleToolDispatch("scdaw_configure_midi", {
+    action: "start_learn",
+    trackId,
+    param: "volume",
+  });
+  assert.equal(startLearnRes.ok, true);
+  assert.equal(scdaw.midi.state.get().learning.active, true);
+  assert.equal(scdaw.midi.state.get().learning.target.max, 1.5);
+
+  const cancelLearnRes = await handleToolDispatch("scdaw_configure_midi", {
+    action: "cancel_learn",
+  });
+  assert.equal(cancelLearnRes.ok, true);
+  assert.equal(scdaw.midi.state.get().learning.active, false);
+
+  const presetRes = await handleToolDispatch("scdaw_configure_midi", {
+    action: "apply_preset",
+    preset: "smc-mixer",
+  });
+  assert.equal(presetRes.preset, "smc-mixer");
+  assert.ok(presetRes.addedCount > 0);
+
+  const clearRes = await handleToolDispatch("scdaw_configure_midi", {
+    action: "clear_learn",
+  });
+  assert.ok(clearRes.removed >= presetRes.addedCount);
+
+  const importRes = await handleToolDispatch("scdaw_configure_midi", {
+    action: "import_learn",
+    mappings: [
+      { cc: 40, channel: "omni", trackId, param: "volume" },
+      { cc: 102, channel: "omni", trackId: "transport", param: "play" },
+    ],
+  });
+  assert.equal(importRes.importedCount, 2);
+  assert.equal(importRes.mappings.length, 2);
 });

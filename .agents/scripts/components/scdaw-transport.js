@@ -9,7 +9,15 @@
 import { SHARED_STYLES } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { PPQN } from "../scdaw.js";
+import { PPQN, RESERVED_MIDI_CCS, MIDI_CONTROLLER_PRESETS } from "../scdaw.js";
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -313,6 +321,15 @@ export class DawTransportElement extends BaseElement {
     this._rafId = null;
     this._captureFeedbackCount = 0;
     this._captureFeedbackUntil = 0;
+    this._midiDialogOpen = false;
+    this._renderMidiDialogBody = null;
+    this._learnForm = {
+      trackId: "selected",
+      param: "volume",
+      mode: "",
+      preset: "smc-mixer",
+      bankOffset: 0,
+    };
   }
 
   connectedCallback() {
@@ -320,7 +337,12 @@ export class DawTransportElement extends BaseElement {
     this._startLoop();
     this._dispose = effect(() => {
       const p = scdaw.project.get();
+      scdaw.liveRevision?.get?.();
+      scdaw.midi?.state?.get?.();
       this._syncProject(p);
+      if (this._midiDialogOpen) {
+        this._renderMidiDialogBody?.();
+      }
     });
   }
 
@@ -1117,6 +1139,18 @@ export class DawTransportElement extends BaseElement {
 
     const midiDialog = this.shadowRoot.getElementById("scdaw-midi-dialog");
     const midiDialogBody = this.shadowRoot.getElementById("midi-dialog-body");
+    const transportParams = new Set([
+      "play",
+      "stop",
+      "pause",
+      "toggle_play",
+      "record",
+      "metronome",
+      "bpm",
+      "swing",
+      "panic",
+    ]);
+
     const renderMidiDialogBody = () => {
       if (!midiDialogBody) return;
       const m = scdaw.midi?.state?.get?.() || {
@@ -1129,6 +1163,15 @@ export class DawTransportElement extends BaseElement {
       const track = proj.tracks?.find((t) => t.id === selId);
       const mappings = proj.midiMappings || [];
 
+      if (
+        this._learnForm.trackId !== "selected" &&
+        this._learnForm.trackId !== "master" &&
+        this._learnForm.trackId !== "transport" &&
+        !proj.tracks?.some((t) => t.id === this._learnForm.trackId)
+      ) {
+        this._learnForm.trackId = selId || "selected";
+      }
+
       const statusMsg =
         m.status === "ready"
           ? `Web MIDI Connected (${m.inputs.length} in, ${m.outputs.length} out)`
@@ -1136,43 +1179,199 @@ export class DawTransportElement extends BaseElement {
             ? "Web MIDI permission denied. Use the Software MIDI Keyboard (⌨ Keys) as fallback."
             : "Web MIDI API is unavailable in this browser. Use the Software MIDI Keyboard (⌨ Keys) as fallback.";
 
+      const lastMsg = m.lastMessage;
+      const monitorHtml = lastMsg
+        ? `<strong>${escapeHtml(lastMsg.portName)}</strong> · Ch ${Number(lastMsg.channel ?? 0) + 1} (0-idx ${lastMsg.channel ?? 0}) · ${
+            lastMsg.type === "cc"
+              ? `CC ${lastMsg.controller}`
+              : lastMsg.type === "pitch-bend"
+                ? "Pitch Bend"
+                : `Note ${lastMsg.pitch}`
+          } = <strong>${lastMsg.value}</strong>`
+        : "Move any control on your MIDI controller to inspect incoming messages.";
+
       const inputsHtml =
         m.inputs.length > 0
           ? m.inputs
-              .map((p) => `<li>${p.name} (${p.manufacturer || "MIDI"})</li>`)
+              .map(
+                (p) => `
+              <li style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="checkbox" class="midi-port-toggle" data-port-id="${escapeHtml(p.id)}" aria-label="Enable MIDI input ${escapeHtml(p.name)}" ${p.enabled !== false ? "checked" : ""} />
+                  <span>${escapeHtml(p.name)} (${escapeHtml(p.manufacturer || "MIDI")})</span>
+                </label>
+              </li>`,
+              )
               .join("")
           : "<li>No MIDI inputs detected</li>";
       const outputsHtml =
         m.outputs.length > 0
           ? m.outputs
-              .map((p) => `<li>${p.name} (${p.manufacturer || "MIDI"})</li>`)
+              .map(
+                (p) =>
+                  `<li>${escapeHtml(p.name)} (${escapeHtml(p.manufacturer || "MIDI")})</li>`,
+              )
               .join("")
           : "<li>No MIDI outputs detected</li>";
+
+      const presetOptionsHtml = Object.values(MIDI_CONTROLLER_PRESETS)
+        .map(
+          (preset) =>
+            `<option value="${escapeHtml(preset.id)}" ${this._learnForm.preset === preset.id ? "selected" : ""}>${escapeHtml(preset.name)}</option>`,
+        )
+        .join("");
+
+      const trackOptionsHtml = [
+        `<option value="selected" ${this._learnForm.trackId === "selected" ? "selected" : ""}>Selected Track${track ? ` (${escapeHtml(track.name)})` : ""}</option>`,
+        ...(proj.tracks || []).map(
+          (t) =>
+            `<option value="${escapeHtml(t.id)}" ${this._learnForm.trackId === t.id ? "selected" : ""}>${escapeHtml(t.name)}</option>`,
+        ),
+        `<option value="master" ${this._learnForm.trackId === "master" ? "selected" : ""}>Master Bus</option>`,
+        `<option value="transport" ${this._learnForm.trackId === "transport" ? "selected" : ""}>Transport</option>`,
+      ].join("");
+
+      const learnParamOptions = [
+        { value: "volume", label: "Volume (Track 0–1.5 / Master 0–1)" },
+        { value: "pan", label: "Pan (-1..1)" },
+        { value: "mute", label: "Mute [Toggle]" },
+        { value: "solo", label: "Solo [Toggle]" },
+        { value: "recordArm", label: "Record Arm [Toggle]" },
+        { value: "play", label: "Transport: Play [Trigger]" },
+        { value: "stop", label: "Transport: Stop [Trigger]" },
+        { value: "toggle_play", label: "Transport: Play/Pause [Toggle]" },
+        { value: "metronome", label: "Transport: Metronome [Toggle]" },
+        { value: "bpm", label: "Transport: BPM (20–300)" },
+        { value: "swing", label: "Transport: Swing (0–50%)" },
+        { value: "cutoff", label: "Synth: Filter Cutoff (Hz)" },
+        { value: "resonance", label: "Synth: Resonance (Q)" },
+        { value: "drive", label: "Synth: Drive" },
+        { value: "attack", label: "Synth: Attack (s)" },
+        { value: "decay", label: "Synth: Decay (s)" },
+        { value: "sustain", label: "Synth: Sustain" },
+        { value: "release", label: "Synth: Release (s)" },
+        { value: "lfoRate", label: "Synth: LFO Rate (Hz)" },
+      ];
+      const paramOptionsHtml = learnParamOptions
+        .map(
+          (opt) =>
+            `<option value="${opt.value}" ${this._learnForm.param === opt.value ? "selected" : ""}>${opt.label}</option>`,
+        )
+        .join("");
+
+      const channelsOverlap = (a, b) => {
+        const ca = a === undefined || a === null || a === "" ? "omni" : a;
+        const cb = b === undefined || b === null || b === "" ? "omni" : b;
+        return ca === "omni" || cb === "omni" || Number(ca) === Number(cb);
+      };
 
       const mappingsHtml =
         mappings.length > 0
           ? mappings
-              .map(
-                (map) =>
-                  `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;">
-                    <span>CC ${map.cc} → ${map.param}</span>
-                    <button type="button" class="btn btn-icon midi-del-map" data-id="${map.id}" aria-label="Remove mapping CC ${map.cc}">✕</button>
-                  </div>`,
-              )
+              .map((map) => {
+                const targetLabel =
+                  map.trackId === "master"
+                    ? "Master"
+                    : map.trackId === "transport"
+                      ? "Transport"
+                      : proj.tracks?.find((t) => t.id === map.trackId)?.name ||
+                        map.trackId ||
+                        "Selected";
+                const chLabel =
+                  map.channel === undefined ||
+                  map.channel === null ||
+                  map.channel === "" ||
+                  map.channel === "omni"
+                    ? "Omni"
+                    : `Ch ${Number(map.channel) + 1}`;
+                const modeLabel = map.mode ? ` [${map.mode}]` : "";
+                const rangeLabel =
+                  map.mode === "toggle" ||
+                  map.mode === "trigger" ||
+                  map.mode === "momentary"
+                    ? ""
+                    : ` (${map.min ?? 0}..${map.max ?? 1})`;
+                const reservedName = RESERVED_MIDI_CCS[map.cc];
+                const hasConflict = mappings.some(
+                  (other) =>
+                    other.id !== map.id &&
+                    Number(other.cc) === Number(map.cc) &&
+                    channelsOverlap(other.channel, map.channel),
+                );
+                const warnParts = [];
+                if (reservedName) warnParts.push(`Reserved: ${reservedName}`);
+                if (hasConflict) warnParts.push("Duplicate CC/Channel");
+                const warnHtml =
+                  warnParts.length > 0
+                    ? `<span style="color:var(--warning);font-size:0.72rem;margin-left:4px;">⚠ ${escapeHtml(warnParts.join(", "))}</span>`
+                    : "";
+                return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;padding:4px 6px;border-radius:4px;background:var(--bg-elevated);border:1px solid var(--border);">
+                    <span style="font-size:0.78rem;">CC ${map.cc} (${chLabel}) → <strong>${escapeHtml(targetLabel)}</strong>.${escapeHtml(map.param)}${escapeHtml(modeLabel)}${escapeHtml(rangeLabel)}${warnHtml}</span>
+                    <button type="button" class="btn btn-icon midi-del-map" data-id="${escapeHtml(map.id)}" aria-label="Remove mapping CC ${map.cc}">✕</button>
+                  </div>`;
+              })
               .join("")
           : "<p>No MIDI Learn mappings yet.</p>";
 
+      const isLearning = Boolean(m.learning?.active);
+      const learningInfo = isLearning
+        ? `<p style="color:var(--accent);font-size:0.78rem;margin:4px 0 0 0;">Waiting for CC for <strong>${escapeHtml(m.learning?.target?.trackId || "selected")}.${escapeHtml(m.learning?.target?.param || "param")}</strong> — move a fader, knob, or button on your controller.</p>`
+        : "";
+
       midiDialogBody.innerHTML = `
         <p>${statusMsg}</p>
-        <h4>Inputs</h4>
-        <ul>${inputsHtml}</ul>
+        <div style="padding:6px 8px;border-radius:4px;background:var(--bg-elevated);border:1px solid var(--border);font-size:0.78rem;margin-bottom:8px;">
+          <div style="font-weight:700;margin-bottom:2px;">Live MIDI Monitor</div>
+          <div id="midi-live-monitor" role="status" aria-live="polite">${monitorHtml}</div>
+        </div>
+        <h4>Inputs <span class="badge" style="font-size:0.68rem;">Twin-port dedup: 80ms</span></h4>
+        <ul style="list-style:none;padding-left:0;margin:4px 0 8px 0;">${inputsHtml}</ul>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;cursor:pointer;margin-bottom:8px;">
+          <input type="checkbox" id="midi-soft-takeover" aria-label="Enable Soft Takeover pick-up mode" ${m.softTakeover ? "checked" : ""} />
+          <span>Soft Takeover (pick-up mode prevents fader jumps)</span>
+        </label>
         <h4>Outputs</h4>
         <ul>${outputsHtml}</ul>
-        ${track ? `<h4>Selected Track: ${track.name}</h4><p>Input: ${track.midiInput?.deviceId || "All / Selected"} (Ch: ${track.midiInput?.channel ?? "omni"})</p>` : ""}
-        <h4>MIDI Learn Mappings</h4>
-        <div>${mappingsHtml}</div>
+        ${track ? `<h4>Selected Track: ${escapeHtml(track.name)}</h4><p>Input: ${escapeHtml(track.midiInput?.deviceId || "All / Selected")} (Ch: ${escapeHtml(track.midiInput?.channel ?? "omni")})</p>` : ""}
+        <h4>Controller Presets</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;">
+          <select id="midi-preset-select" aria-label="MIDI controller preset" style="flex:1 1 160px;background:var(--bg-elevated);color:var(--shadow-claw-text-primary);border:1px solid var(--border);border-radius:4px;padding:4px 6px;">${presetOptionsHtml}</select>
+          <select id="midi-preset-bank" aria-label="Controller preset track bank" style="flex:0 1 135px;background:var(--bg-elevated);color:var(--shadow-claw-text-primary);border:1px solid var(--border);border-radius:4px;padding:4px 6px;">
+            <option value="0" ${Number(this._learnForm.bankOffset || 0) === 0 ? "selected" : ""}>Bank 1 (Tracks 1–7)</option>
+            <option value="7" ${Number(this._learnForm.bankOffset || 0) === 7 ? "selected" : ""}>Bank 2 (Tracks 8–14)</option>
+            <option value="14" ${Number(this._learnForm.bankOffset || 0) === 14 ? "selected" : ""}>Bank 3 (Tracks 15–21)</option>
+            <option value="21" ${Number(this._learnForm.bankOffset || 0) === 21 ? "selected" : ""}>Bank 4 (Tracks 22–28)</option>
+          </select>
+          <button type="button" id="midi-apply-preset-btn" class="btn btn-primary">⚡ Apply Preset</button>
+          <button type="button" id="midi-clear-mappings-btn" class="btn">🗑 Clear All</button>
+        </div>
+        <h4>MIDI Learn</h4>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px;">
+          <select id="midi-learn-track" aria-label="MIDI Learn target track or bus" style="flex:1 1 130px;background:var(--bg-elevated);color:var(--shadow-claw-text-primary);border:1px solid var(--border);border-radius:4px;padding:4px 6px;">${trackOptionsHtml}</select>
+          <select id="midi-learn-param" aria-label="MIDI Learn target parameter" style="flex:1 1 150px;background:var(--bg-elevated);color:var(--shadow-claw-text-primary);border:1px solid var(--border);border-radius:4px;padding:4px 6px;">${paramOptionsHtml}</select>
+          <select id="midi-learn-mode" aria-label="MIDI Learn control mode" style="flex:0 1 110px;background:var(--bg-elevated);color:var(--shadow-claw-text-primary);border:1px solid var(--border);border-radius:4px;padding:4px 6px;">
+            <option value="" ${this._learnForm.mode === "" ? "selected" : ""}>Auto Mode</option>
+            <option value="continuous" ${this._learnForm.mode === "continuous" ? "selected" : ""}>Continuous</option>
+            <option value="toggle" ${this._learnForm.mode === "toggle" ? "selected" : ""}>Toggle (Latch)</option>
+            <option value="momentary" ${this._learnForm.mode === "momentary" ? "selected" : ""}>Momentary</option>
+            <option value="trigger" ${this._learnForm.mode === "trigger" ? "selected" : ""}>Trigger</option>
+          </select>
+          <button type="button" id="midi-learn-btn" class="btn ${isLearning ? "btn-danger" : "btn-primary"}" aria-pressed="${isLearning}">${isLearning ? "⏹ Cancel Learn" : "🎯 Learn CC"}</button>
+        </div>
+        ${learningInfo}
+        <p style="font-size:0.72rem;color:var(--shadow-claw-text-secondary);margin:4px 0 8px 0;">Tip: You can also right-click any mixer fader, pan knob, M/S button, synth knob, or transport control to arm MIDI Learn. Mappings persist with the project.</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin:8px 0 4px 0;">
+          <h4 style="margin:0;">MIDI Learn Mappings (${mappings.length})</h4>
+          <div style="display:flex;gap:4px;">
+            <button type="button" id="midi-export-mappings-btn" class="btn btn-icon" aria-label="Export MIDI Learn mappings as JSON">💾 Export JSON</button>
+            <button type="button" id="midi-import-mappings-btn" class="btn btn-icon" aria-label="Import MIDI Learn mappings from JSON">📂 Import JSON</button>
+            <input type="file" id="midi-import-mappings-input" accept=".json,application/json" style="display:none;" aria-hidden="true" />
+          </div>
+        </div>
+        <div style="max-height:180px;overflow-y:auto;">${mappingsHtml}</div>
       `;
     };
+    this._renderMidiDialogBody = renderMidiDialogBody;
 
     this.shadowRoot
       .getElementById("midi-btn")
@@ -1180,22 +1379,184 @@ export class DawTransportElement extends BaseElement {
         if (scdaw.midi?.state?.get?.().status === "idle") {
           await scdaw.midi.init();
         }
+        this._midiDialogOpen = true;
         renderMidiDialogBody();
         midiDialog?.showModal?.();
       });
+    const closeMidiDialog = () => {
+      this._midiDialogOpen = false;
+      midiDialog?.close?.();
+    };
     this.shadowRoot
       .getElementById("midi-dialog-close")
-      ?.addEventListener("click", () => midiDialog?.close());
+      ?.addEventListener("click", closeMidiDialog);
     this.shadowRoot
       .getElementById("midi-dialog-done")
-      ?.addEventListener("click", () => midiDialog?.close());
+      ?.addEventListener("click", closeMidiDialog);
+    midiDialog?.addEventListener?.("close", () => {
+      this._midiDialogOpen = false;
+    });
+    midiDialogBody?.addEventListener("change", async (e) => {
+      const target = e.target;
+      if (!target) return;
+      if (target.id === "midi-learn-track") {
+        this._learnForm.trackId = target.value;
+        if (target.value === "master" && this._learnForm.param !== "volume") {
+          this._learnForm.param = "volume";
+          renderMidiDialogBody();
+        } else if (
+          target.value === "transport" &&
+          !transportParams.has(this._learnForm.param)
+        ) {
+          this._learnForm.param = "play";
+          renderMidiDialogBody();
+        }
+        return;
+      }
+      if (target.id === "midi-learn-param") {
+        this._learnForm.param = target.value;
+        if (transportParams.has(target.value)) {
+          this._learnForm.trackId = "transport";
+          renderMidiDialogBody();
+        }
+        return;
+      }
+      if (target.id === "midi-learn-mode") {
+        this._learnForm.mode = target.value;
+        return;
+      }
+      if (target.id === "midi-preset-select") {
+        this._learnForm.preset = target.value;
+        return;
+      }
+      if (target.id === "midi-preset-bank") {
+        this._learnForm.bankOffset = Math.max(0, Number(target.value) || 0);
+        return;
+      }
+      if (target.id === "midi-soft-takeover") {
+        scdaw.midi?.setSoftTakeover?.(Boolean(target.checked));
+        return;
+      }
+      if (target.id === "midi-import-mappings-input") {
+        const file = target.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          await scdaw.sendCommand("import_midi_learn_mappings", {
+            mappings: parsed.midiMappings || parsed,
+          });
+          renderMidiDialogBody();
+        } catch (err) {
+          console.error("Failed to import MIDI mappings:", err);
+        } finally {
+          target.value = "";
+        }
+        return;
+      }
+      if (target.classList?.contains("midi-port-toggle")) {
+        const portId = target.dataset?.portId;
+        if (portId) {
+          scdaw.midi?.setInputPortEnabled?.(portId, Boolean(target.checked));
+        }
+      }
+    });
     midiDialogBody?.addEventListener("click", async (e) => {
-      const del = e.target.closest(".midi-del-map");
-      if (!del) return;
-      await scdaw.sendCommand("remove_midi_learn_mapping", {
-        id: del.dataset.id,
-      });
-      renderMidiDialogBody();
+      const del = e.target.closest?.(".midi-del-map");
+      if (del) {
+        await scdaw.sendCommand("remove_midi_learn_mapping", {
+          id: del.dataset.id,
+        });
+        renderMidiDialogBody();
+        return;
+      }
+      if (e.target.closest?.("#midi-learn-btn")) {
+        const isLearning = Boolean(
+          scdaw.midi?.state?.get?.()?.learning?.active,
+        );
+        if (isLearning) {
+          scdaw.midi?.cancelMidiLearn?.();
+        } else {
+          const trackVal =
+            this.shadowRoot?.getElementById?.("midi-learn-track")?.value ||
+            this._learnForm.trackId;
+          const paramVal =
+            this.shadowRoot?.getElementById?.("midi-learn-param")?.value ||
+            this._learnForm.param;
+          const modeVal =
+            this.shadowRoot?.getElementById?.("midi-learn-mode")?.value ??
+            this._learnForm.mode;
+          const resolvedTrackId =
+            trackVal === "selected"
+              ? scdaw.selectedTrackId?.get?.() ||
+                scdaw.getProject().tracks?.[0]?.id
+              : trackVal;
+          scdaw.midi?.startMidiLearn?.({
+            trackId: resolvedTrackId,
+            param: paramVal,
+            channel: "omni",
+            ...(modeVal ? { mode: modeVal } : {}),
+          });
+        }
+        renderMidiDialogBody();
+        return;
+      }
+      if (e.target.closest?.("#midi-apply-preset-btn")) {
+        const presetId =
+          this.shadowRoot?.getElementById?.("midi-preset-select")?.value ||
+          this._learnForm.preset ||
+          "smc-mixer";
+        const bankOffset = Number(
+          this.shadowRoot?.getElementById?.("midi-preset-bank")?.value ??
+            this._learnForm.bankOffset ??
+            0,
+        );
+        await scdaw.sendCommand("apply_midi_controller_preset", {
+          preset: presetId,
+          bankOffset,
+        });
+        renderMidiDialogBody();
+        return;
+      }
+      if (e.target.closest?.("#midi-export-mappings-btn")) {
+        const proj = scdaw.getProject();
+        const payload = {
+          version: 2,
+          midiMappings: (proj.midiMappings || []).map((map) => ({
+            ...map,
+            trackIndex: proj.tracks.findIndex((t) => t.id === map.trackId),
+          })),
+        };
+        if (
+          typeof Blob !== "undefined" &&
+          typeof URL !== "undefined" &&
+          typeof URL.createObjectURL === "function" &&
+          typeof document !== "undefined"
+        ) {
+          const blob = new Blob([JSON.stringify(payload, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "midi-mappings.json";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        return;
+      }
+      if (e.target.closest?.("#midi-import-mappings-btn")) {
+        this.shadowRoot
+          ?.getElementById?.("midi-import-mappings-input")
+          ?.click?.();
+        return;
+      }
+      if (e.target.closest?.("#midi-clear-mappings-btn")) {
+        await scdaw.sendCommand("clear_midi_learn_mappings", {});
+        renderMidiDialogBody();
+      }
     });
 
     const captureDialog = this.shadowRoot.getElementById(
@@ -1310,85 +1671,105 @@ export class DawTransportElement extends BaseElement {
         }
       });
 
-    this.shadowRoot
-      .getElementById("play-btn")
-      ?.addEventListener("click", () => {
-        const state = scdaw.getState();
-        if (state.playing) scdaw.pause();
-        else scdaw.play();
+    const bindTransportContextLearn = (el, target) => {
+      el?.addEventListener("contextmenu", (e) => {
+        e.preventDefault?.();
+        scdaw.midi?.startMidiLearn?.({
+          ...target,
+          channel: "omni",
+        });
       });
+    };
 
-    this.shadowRoot
-      .getElementById("stop-btn")
-      ?.addEventListener("click", () => {
-        scdaw.stop();
-      });
+    const playBtnEl = this.shadowRoot.getElementById("play-btn");
+    playBtnEl?.addEventListener("click", () => {
+      const state = scdaw.getState();
+      if (state.playing) scdaw.pause();
+      else scdaw.play();
+    });
+    bindTransportContextLearn(playBtnEl, {
+      trackId: "transport",
+      param: "play",
+    });
 
-    this.shadowRoot
-      .getElementById("rec-btn")
-      ?.addEventListener("click", async () => {
-        const state = scdaw.getState();
-        if (state.recording) {
-          const res = await scdaw.stopRecording();
-          if (!res.ok && res.message) {
-            console.warn(res.message);
-          }
-        } else {
-          const p = scdaw.getProject();
-          let targetTrack = null;
-          const selId = scdaw.selectedTrackId?.get();
-          if (selId) {
-            targetTrack = p.tracks.find(
-              (t) => t.id === selId && t.kind === "audio",
-            );
-          }
-          if (!targetTrack) {
-            targetTrack = p.tracks.find(
-              (t) => t.recordArm && t.kind === "audio",
-            );
-          }
-          if (!targetTrack) {
-            targetTrack = p.tracks.find((t) => t.kind === "audio");
-          }
+    const stopBtnEl = this.shadowRoot.getElementById("stop-btn");
+    stopBtnEl?.addEventListener("click", () => {
+      scdaw.stop();
+    });
+    bindTransportContextLearn(stopBtnEl, {
+      trackId: "transport",
+      param: "stop",
+    });
 
-          const currentBeat = Math.floor(
-            (scdaw.state.get().positionPpqn || 0) / PPQN.Quarter,
+    const recBtnEl = this.shadowRoot.getElementById("rec-btn");
+    recBtnEl?.addEventListener("click", async () => {
+      const state = scdaw.getState();
+      if (state.recording) {
+        const res = await scdaw.stopRecording();
+        if (!res.ok && res.message) {
+          console.warn(res.message);
+        }
+      } else {
+        const p = scdaw.getProject();
+        let targetTrack = null;
+        const selId = scdaw.selectedTrackId?.get();
+        if (selId) {
+          targetTrack = p.tracks.find(
+            (t) => t.id === selId && t.kind === "audio",
           );
-
-          if (shouldPromptRecordOptions({ targetTrack, currentBeat })) {
-            openRecordDialog(targetTrack, currentBeat);
-          } else {
-            try {
-              await scdaw.startRecording(targetTrack?.id);
-            } catch (err) {
-              console.error("Recording error:", err);
-              scdaw.requestDialog?.({
-                title: "Recording Error",
-                body: err.message || "Failed to start audio recording",
-              });
-            }
-          }
         }
-      });
+        if (!targetTrack) {
+          targetTrack = p.tracks.find((t) => t.recordArm && t.kind === "audio");
+        }
+        if (!targetTrack) {
+          targetTrack = p.tracks.find((t) => t.kind === "audio");
+        }
 
-    this.shadowRoot
-      .getElementById("metro-btn")
-      ?.addEventListener("click", async () => {
-        const currentP = scdaw.getProject();
-        const nextEnabled = !currentP.metronome?.enabled;
-        if (nextEnabled) {
+        const currentBeat = Math.floor(
+          (scdaw.state.get().positionPpqn || 0) / PPQN.Quarter,
+        );
+
+        if (shouldPromptRecordOptions({ targetTrack, currentBeat })) {
+          openRecordDialog(targetTrack, currentBeat);
+        } else {
           try {
-            await scdaw.unlockAudio?.();
-          } catch (_) {}
-        }
-        await scdaw.sendCommand("set_metronome", { enabled: nextEnabled });
-        if (nextEnabled) {
-          const s = scdaw.getState();
-          if (!s.playing) {
-            scdaw.previewMetronomeClick?.(true);
+            await scdaw.startRecording(targetTrack?.id);
+          } catch (err) {
+            console.error("Recording error:", err);
+            scdaw.requestDialog?.({
+              title: "Recording Error",
+              body: err.message || "Failed to start audio recording",
+            });
           }
         }
-      });
+      }
+    });
+
+    const metroBtnEl = this.shadowRoot.getElementById("metro-btn");
+    metroBtnEl?.addEventListener("click", async () => {
+      const currentP = scdaw.getProject();
+      const nextEnabled = !currentP.metronome?.enabled;
+      if (nextEnabled) {
+        try {
+          await scdaw.unlockAudio?.();
+        } catch (_) {}
+      }
+      await scdaw.sendCommand("set_metronome", { enabled: nextEnabled });
+      if (nextEnabled) {
+        const s = scdaw.getState();
+        if (!s.playing) {
+          scdaw.previewMetronomeClick?.(true);
+        }
+      }
+    });
+    bindTransportContextLearn(recBtnEl, {
+      trackId: "transport",
+      param: "record",
+    });
+    bindTransportContextLearn(metroBtnEl, {
+      trackId: "transport",
+      param: "metronome",
+    });
 
     this.shadowRoot
       .getElementById("audio-btn")
@@ -1404,6 +1785,12 @@ export class DawTransportElement extends BaseElement {
       });
       bpmInput.addEventListener("dblclick", () => {
         scdaw.sendCommand("set_transport", { bpm: 120 });
+      });
+      bindTransportContextLearn(bpmInput, {
+        trackId: "transport",
+        param: "bpm",
+        min: 20,
+        max: 300,
       });
     }
 
@@ -1429,6 +1816,12 @@ export class DawTransportElement extends BaseElement {
       });
       swingInput.addEventListener("dblclick", () => {
         scdaw.sendCommand("set_transport", { swing: 0 });
+      });
+      bindTransportContextLearn(swingInput, {
+        trackId: "transport",
+        param: "swing",
+        min: 0,
+        max: 0.5,
       });
     }
 

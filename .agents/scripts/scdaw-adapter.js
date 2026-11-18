@@ -246,6 +246,36 @@ export async function handleToolDispatch(name, params) {
       if (action === "remove_learn") {
         return await scdaw.sendCommand("remove_midi_learn_mapping", params);
       }
+      if (action === "clear_learn") {
+        return await scdaw.sendCommand("clear_midi_learn_mappings", params);
+      }
+      if (action === "import_learn") {
+        return await scdaw.sendCommand("import_midi_learn_mappings", params);
+      }
+      if (action === "start_learn") {
+        const target = scdaw.midi?.startMidiLearn?.(params);
+        return {
+          ok: true,
+          learning: scdaw.midi?.state?.get?.()?.learning || {
+            active: false,
+            target: null,
+          },
+          target,
+        };
+      }
+      if (action === "cancel_learn") {
+        scdaw.midi?.cancelMidiLearn?.();
+        return {
+          ok: true,
+          learning: scdaw.midi?.state?.get?.()?.learning || {
+            active: false,
+            target: null,
+          },
+        };
+      }
+      if (action === "apply_preset") {
+        return await scdaw.sendCommand("apply_midi_controller_preset", params);
+      }
       if (action === "commit_captured") {
         return await scdaw.commitCapturedMidi(params.trackId);
       }

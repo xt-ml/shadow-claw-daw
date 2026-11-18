@@ -184,3 +184,195 @@ test("SoftwareMidiInput: QWERTY key mapping with octave shift and repeat guard",
   sw.releaseAll();
   assert.equal(engine._liveVoices.has(`${trackId}:72`), false);
 });
+
+test("MidiIoManager: Gap 2 & 3 - mute/solo/recordArm toggle cleanly on press (127), ignore release (0), deduplicate twin ports, and support momentary mode + port disable", async () => {
+  const { engine, trackId } = createTestSetup();
+  const masterPort = new FakeMIDIPort({
+    id: "smc-master",
+    name: "SINCO SMC-Mixer-Master",
+    type: "input",
+  });
+  const privatePort = new FakeMIDIPort({
+    id: "smc-private",
+    name: "SINCO SMC-Mixer-Private",
+    type: "input",
+  });
+  const access = new FakeMIDIAccess({ inputs: [masterPort, privatePort] });
+  const midi = createMidiIo(engine, {
+    navigatorObj: { requestMIDIAccess: async () => access },
+    crossPortDedupWindowMs: 80,
+  });
+  await midi.init();
+
+  await engine.sendCommand("set_midi_learn_mapping", {
+    cc: 70,
+    channel: "omni",
+    trackId,
+    param: "mute",
+  });
+  await engine.sendCommand("set_midi_learn_mapping", {
+    cc: 78,
+    channel: "omni",
+    trackId,
+    param: "solo",
+  });
+  await engine.sendCommand("set_midi_learn_mapping", {
+    cc: 85,
+    channel: "omni",
+    trackId,
+    param: "recordArm",
+    mode: "momentary",
+  });
+
+  // Press Mute (127) arriving simultaneously on twin ports -> latches ONCE to true
+  masterPort.emitMessage([0xb0, 70, 127]);
+  privatePort.emitMessage([0xb0, 70, 127]);
+  let trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.mute, true);
+  assert.equal(trk.params?.mute, undefined);
+
+  // Release Mute (0) arriving on both twin ports -> ignored in toggle mode
+  masterPort.emitMessage([0xb0, 70, 0]);
+  privatePort.emitMessage([0xb0, 70, 0]);
+  trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.mute, true);
+
+  // Press Solo (127) -> latches to true, release (0) ignored
+  masterPort.emitMessage([0xb0, 78, 127]);
+  privatePort.emitMessage([0xb0, 78, 127]);
+  masterPort.emitMessage([0xb0, 78, 0]);
+  trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.solo, true);
+  assert.equal(trk.params?.solo, undefined);
+
+  // Momentary recordArm: 127 -> armed true, 0 -> armed false
+  masterPort.emitMessage([0xb0, 85, 127]);
+  trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.recordArm, true);
+  masterPort.emitMessage([0xb0, 85, 0]);
+  trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.recordArm, false);
+
+  // Disabling a port ignores incoming messages from that port
+  midi.setInputPortEnabled("smc-private", false);
+  assert.equal(
+    midi.state.get().inputs.find((p) => p.id === "smc-private").enabled,
+    false,
+  );
+  privatePort.emitMessage([0xb0, 85, 127]);
+  trk = engine.project.get().tracks.find((t) => t.id === trackId);
+  assert.equal(trk.recordArm, false);
+});
+
+test("MidiIoManager: Gap 4, 5, 6, 7 - liveRevision updates during sweeps without undo flooding, track volume reaches 1.5, master & transport targets work, and soft takeover / monitor work", async () => {
+  const { engine, trackId } = createTestSetup();
+  try {
+    const inPort = new FakeMIDIPort({
+      id: "smc-in",
+      name: "SMC-Mixer",
+      type: "input",
+    });
+    const access = new FakeMIDIAccess({ inputs: [inPort] });
+    const midi = createMidiIo(engine, {
+      navigatorObj: { requestMIDIAccess: async () => access },
+    });
+    await midi.init();
+
+    // Learn track volume without explicit max -> defaults to 0..1.5 (Gap 7)
+    midi.startMidiLearn({ trackId, param: "volume" });
+    inPort.emitMessage([0xb0, 40, 64]);
+    await new Promise((r) => setTimeout(r, 10));
+    const volMap = engine.project.get().midiMappings.find((m) => m.cc === 40);
+    assert.equal(volMap.max, 1.5);
+
+    // Add master & transport mappings (Gaps 5 & 6)
+    await engine.sendCommand("set_midi_learn_mapping", {
+      cc: 47,
+      channel: "omni",
+      trackId: "master",
+      param: "volume",
+    });
+    await engine.sendCommand("set_midi_learn_mapping", {
+      cc: 102,
+      channel: "omni",
+      trackId: "transport",
+      param: "play",
+    });
+    await engine.sendCommand("set_midi_learn_mapping", {
+      cc: 103,
+      channel: "omni",
+      trackId: "transport",
+      param: "stop",
+    });
+
+    // Track undo history pushes during rapid continuous CC sweep (Gap 4)
+    let historyPushes = 0;
+    const origPush = engine.history.push.bind(engine.history);
+    engine.history.push = (...args) => {
+      historyPushes++;
+      return origPush(...args);
+    };
+    const revBefore = engine.liveRevision.get();
+
+    inPort.emitMessage([0xb0, 40, 64]);
+    inPort.emitMessage([0xb0, 40, 96]);
+    inPort.emitMessage([0xb0, 40, 127]);
+
+    assert.ok(
+      engine.liveRevision.get() >= revBefore + 3,
+      "liveRevision must increment on each live CC update for smooth UI redraw",
+    );
+    assert.equal(
+      historyPushes,
+      0,
+      "Continuous CC sweep must not flood undo history before commit debounce",
+    );
+    assert.equal(
+      engine.project.get().tracks.find((t) => t.id === trackId).volume,
+      1.5,
+    );
+
+    // Master volume fader (CC 47 = 127 -> master.volume = 1.0)
+    inPort.emitMessage([0xb0, 47, 127]);
+    assert.equal(engine.project.get().master.volume, 1);
+
+    // Live MIDI monitor captures latest message details
+    const mon = midi.state.get().lastMessage;
+    assert.equal(mon.portName, "SMC-Mixer");
+    assert.equal(mon.controller, 47);
+    assert.equal(mon.value, 127);
+
+    // Wait for 150ms commit debounce -> commits cleanly
+    await new Promise((r) => setTimeout(r, 200));
+    assert.ok(
+      historyPushes >= 1 && historyPushes <= 2,
+      `Expected debounced commit to push minimal history entries, got ${historyPushes}`,
+    );
+
+    // Soft takeover: set volume to 0.75 (mid), send CC 40 = 0 (mismatch) -> ignored until crossed
+    engine.setLiveTrackParam(trackId, { volume: 0.75 });
+    midi.setSoftTakeover(true);
+    inPort.emitMessage([0xb0, 40, 10]); // ~0.118, well below 0.75 -> ignored
+    assert.equal(
+      engine.project.get().tracks.find((t) => t.id === trackId).volume,
+      0.75,
+    );
+    inPort.emitMessage([0xb0, 40, 90]); // ~1.06, crosses 0.75 -> engages!
+    assert.ok(
+      engine.project.get().tracks.find((t) => t.id === trackId).volume > 1.0,
+    );
+
+    // Transport Play / Stop (Gap 6)
+    inPort.emitMessage([0xb0, 102, 127]);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(engine.state.get().playing, true);
+    inPort.emitMessage([0xb0, 102, 0]); // release ignored
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(engine.state.get().playing, true);
+    inPort.emitMessage([0xb0, 103, 127]);
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(engine.state.get().playing, false);
+  } finally {
+    await engine.stop();
+  }
+});

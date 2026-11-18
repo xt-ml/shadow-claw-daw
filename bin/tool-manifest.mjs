@@ -653,7 +653,7 @@ export const TOOLS = [
   {
     name: "scdaw_configure_midi",
     description:
-      "Configures Web MIDI initialization, track MIDI input/output routing, MIDI Learn mappings, or commits captured live MIDI notes.",
+      "Configures Web MIDI initialization, track MIDI input/output routing, MIDI Learn mappings, controller presets, or commits captured live MIDI notes.",
     input_schema: {
       type: "object",
       properties: {
@@ -664,11 +664,19 @@ export const TOOLS = [
             "set_routing",
             "set_learn",
             "remove_learn",
+            "clear_learn",
+            "import_learn",
+            "start_learn",
+            "cancel_learn",
+            "apply_preset",
             "commit_captured",
           ],
           description: "MIDI configuration action to perform",
         },
-        trackId: { type: "string", description: "Target track ID" },
+        trackId: {
+          type: "string",
+          description: "Target track ID, 'master', or 'transport'",
+        },
         midiInput: { type: "object", description: "Track MIDI input config" },
         midiOutput: { type: "object", description: "Track MIDI output config" },
         id: {
@@ -682,6 +690,24 @@ export const TOOLS = [
         min: { type: "number" },
         max: { type: "number" },
         scaling: { type: "string", enum: ["linear", "exponential"] },
+        mode: {
+          type: "string",
+          enum: ["continuous", "toggle", "momentary", "trigger"],
+          description:
+            "Control mapping mode (continuous fader, toggle latch, momentary, or trigger)",
+        },
+        preset: {
+          type: "string",
+          description: "Controller preset profile ID (e.g. 'smc-mixer')",
+        },
+        bankOffset: {
+          type: "integer",
+          description: "Starting track index offset for controller presets",
+        },
+        mappings: {
+          type: "array",
+          description: "Array of MIDI Learn mapping objects for import_learn",
+        },
         sysex: { type: "boolean" },
       },
       required: ["action"],

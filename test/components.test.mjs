@@ -4666,3 +4666,268 @@ test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG
   });
   assert.equal(psgChain[0].type, "psg");
 });
+
+test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Learn toggle & contextmenu, synth/devices contextmenu, and immediate liveRevision redraw", async () => {
+  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { DawTransportElement } =
+    await import("../.agents/scripts/components/scdaw-transport.js");
+  const { DawMixerElement } =
+    await import("../.agents/scripts/components/scdaw-mixer.js");
+  const { DawSynthElement } =
+    await import("../.agents/scripts/components/scdaw-synth.js");
+  const { DawDevicesElement } =
+    await import("../.agents/scripts/components/scdaw-devices.js");
+
+  await scdaw.resetProject({ template: "basic-beat" });
+  const tracks = scdaw.getProject().tracks;
+  const trk0 = tracks[0];
+
+  const origRaf = globalThis.requestAnimationFrame;
+  const origCaf = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = () => 1;
+  globalThis.cancelAnimationFrame = () => {};
+
+  try {
+    // 1. <scdaw-transport> MIDI dialog exposes Learn UI, live monitor, port filter, soft takeover, and SMC-Mixer preset
+    const transportSrc = await fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-transport.js",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    assert.match(transportSrc, /id=["']midi-learn-btn["']/);
+    assert.match(transportSrc, /id=["']midi-learn-track["']/);
+    assert.match(transportSrc, /id=["']midi-learn-param["']/);
+    assert.match(transportSrc, /id=["']midi-learn-mode["']/);
+    assert.match(transportSrc, /id=["']midi-preset-select["']/);
+    assert.match(transportSrc, /id=["']midi-preset-bank["']/);
+    assert.match(transportSrc, /id=["']midi-apply-preset-btn["']/);
+    assert.match(transportSrc, /id=["']midi-clear-mappings-btn["']/);
+    assert.match(transportSrc, /id=["']midi-export-mappings-btn["']/);
+    assert.match(transportSrc, /id=["']midi-import-mappings-btn["']/);
+    assert.match(transportSrc, /id=["']midi-soft-takeover["']/);
+    assert.match(transportSrc, /midi-port-toggle/);
+    assert.match(transportSrc, /startMidiLearn/);
+
+    // Verify transport right-click contextmenu on #play-btn arms transport play learn
+    const tListeners = new Map();
+    const makeTEl = (id) => ({
+      id,
+      style: {},
+      classList: { toggle() {} },
+      setAttribute() {},
+      getAttribute() {
+        return "false";
+      },
+      addEventListener(type, fn) {
+        if (!tListeners.has(id)) tListeners.set(id, {});
+        tListeners.get(id)[type] = fn;
+      },
+      showModal() {},
+      close() {},
+      innerHTML: "",
+    });
+    const transport = new DawTransportElement();
+    transport.shadowRoot = {
+      innerHTML: "",
+      getElementById: (id) => makeTEl(id),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    transport.render();
+    const playCtx = tListeners.get("play-btn")?.contextmenu;
+    assert.ok(
+      typeof playCtx === "function",
+      "Transport #play-btn must support contextmenu MIDI Learn",
+    );
+    playCtx({ preventDefault() {} });
+    assert.equal(scdaw.midi.state.get().learning.active, true);
+    assert.equal(scdaw.midi.state.get().learning.target.trackId, "transport");
+    assert.equal(scdaw.midi.state.get().learning.target.param, "play");
+    scdaw.midi.cancelMidiLearn();
+
+    const bpmCtx = tListeners.get("bpm-input")?.contextmenu;
+    assert.ok(
+      typeof bpmCtx === "function",
+      "Transport #bpm-input must support contextmenu MIDI Learn",
+    );
+    bpmCtx({ preventDefault() {} });
+    assert.equal(scdaw.midi.state.get().learning.target.trackId, "transport");
+    assert.equal(scdaw.midi.state.get().learning.target.param, "bpm");
+    assert.equal(scdaw.midi.state.get().learning.target.min, 20);
+    assert.equal(scdaw.midi.state.get().learning.target.max, 300);
+    scdaw.midi.cancelMidiLearn();
+
+    const swingCtx = tListeners.get("swing-input")?.contextmenu;
+    assert.ok(
+      typeof swingCtx === "function",
+      "Transport #swing-input must support contextmenu MIDI Learn",
+    );
+    swingCtx({ preventDefault() {} });
+    assert.equal(scdaw.midi.state.get().learning.target.trackId, "transport");
+    assert.equal(scdaw.midi.state.get().learning.target.param, "swing");
+    assert.equal(scdaw.midi.state.get().learning.target.max, 0.5);
+    scdaw.midi.cancelMidiLearn();
+
+    // 2. <scdaw-mixer> Learn mode (#mixer-learn-btn), contextmenu Learn, and immediate liveRevision redraw
+    const mixer = new DawMixerElement();
+    const mockVolSlider = {
+      dataset: { track: trk0.id },
+      value: String(Math.round(trk0.volume * 100)),
+      min: "0",
+      max: "150",
+      _isDragging: false,
+      _listeners: {},
+      addEventListener(evt, fn) {
+        this._listeners[evt] = fn;
+      },
+    };
+    const mockMasterFader = {
+      id: "master-fader",
+      dataset: {},
+      value: String(
+        Math.round((scdaw.getProject().master?.volume ?? 0.8) * 100),
+      ),
+      min: "0",
+      max: "100",
+      _isDragging: false,
+      _listeners: {},
+      addEventListener(evt, fn) {
+        this._listeners[evt] = fn;
+      },
+    };
+    const mockMuteBtn = {
+      dataset: { track: trk0.id },
+      classList: { toggle() {} },
+      setAttribute() {},
+      _listeners: {},
+      addEventListener(evt, fn) {
+        this._listeners[evt] = fn;
+      },
+    };
+    const mockLearnBtn = {
+      classList: { toggle() {} },
+      setAttribute() {},
+      textContent: "",
+      _listeners: {},
+      addEventListener(evt, fn) {
+        this._listeners[evt] = fn;
+      },
+    };
+    const mockMixerContainer = { dataset: {} };
+    const mockStrip = {
+      dataset: { track: trk0.id },
+      classList: { toggle() {} },
+      addEventListener() {},
+      querySelector: (sel) => {
+        if (sel === ".track-vol") return mockVolSlider;
+        if (sel === ".mute-btn") return mockMuteBtn;
+        return null;
+      },
+    };
+
+    mixer.shadowRoot = {
+      innerHTML: "",
+      getElementById: (id) => {
+        if (id === "master-fader") return mockMasterFader;
+        if (id === "mixer-learn-btn") return mockLearnBtn;
+        return null;
+      },
+      querySelector: (sel) => {
+        if (sel === ".mixer-container") return mockMixerContainer;
+        if (sel === `.strip[data-track="${trk0.id}"]`) return mockStrip;
+        return null;
+      },
+      querySelectorAll: (sel) => {
+        if (sel === ".track-vol") return [mockVolSlider];
+        if (sel === ".mute-btn") return [mockMuteBtn];
+        return [];
+      },
+    };
+
+    mixer.connectedCallback();
+    assert.match(mixer.shadowRoot.innerHTML, /id=["']mixer-learn-btn["']/);
+
+    // Live track volume & master volume update immediately without commitLiveTrackParam
+    scdaw.setLiveTrackParam(trk0.id, { volume: 1.5 });
+    scdaw.setLiveMasterParam({ volume: 0.42 });
+    await new Promise((r) => setTimeout(r, 10));
+
+    assert.equal(
+      mockVolSlider.value,
+      "150",
+      "Mixer track volume slider must redraw immediately to 150 from setLiveTrackParam",
+    );
+    assert.equal(
+      mockMasterFader.value,
+      "42",
+      "Mixer master fader must redraw immediately to 42 from setLiveMasterParam",
+    );
+    // Reset live gesture state cleanly
+    scdaw._liveGestureBaseProject = null;
+
+    // Contextmenu on track volume arms MIDI Learn with 0..1.5
+    mockVolSlider._listeners.contextmenu?.({ preventDefault() {} });
+    assert.equal(scdaw.midi.state.get().learning.active, true);
+    assert.equal(scdaw.midi.state.get().learning.target.param, "volume");
+    assert.equal(scdaw.midi.state.get().learning.target.max, 1.5);
+    scdaw.midi.cancelMidiLearn();
+
+    // Contextmenu on master fader arms MIDI Learn for master volume 0..1
+    mockMasterFader._listeners.contextmenu?.({ preventDefault() {} });
+    assert.equal(scdaw.midi.state.get().learning.target.trackId, "master");
+    assert.equal(scdaw.midi.state.get().learning.target.max, 1);
+    scdaw.midi.cancelMidiLearn();
+
+    // Toggling #mixer-learn-btn and clicking Mute arms toggle learn without toggling mute
+    const prevMute = scdaw.getProject().tracks[0].mute;
+    mockLearnBtn._listeners.click?.({ stopPropagation() {} });
+    mockMuteBtn._listeners.click?.({
+      stopPropagation() {},
+      preventDefault() {},
+      target: mockMuteBtn,
+    });
+    assert.equal(scdaw.midi.state.get().learning.active, true);
+    assert.equal(scdaw.midi.state.get().learning.target.param, "mute");
+    assert.equal(scdaw.midi.state.get().learning.target.mode, "toggle");
+    assert.equal(scdaw.getProject().tracks[0].mute, prevMute);
+    scdaw.midi.cancelMidiLearn();
+
+    mixer.disconnectedCallback();
+
+    // 3. <scdaw-synth> & <scdaw-devices> support contextmenu MIDI Learn and liveRevision redraw
+    const synthSrc = await fs.readFile(
+      new URL("../.agents/scripts/components/scdaw-synth.js", import.meta.url),
+      "utf8",
+    );
+    const devicesSrc = await fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-devices.js",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    assert.match(synthSrc, /liveRevision/);
+    assert.match(synthSrc, /contextmenu/);
+    assert.match(synthSrc, /startMidiLearn/);
+    assert.match(devicesSrc, /liveRevision/);
+    assert.match(devicesSrc, /contextmenu/);
+    assert.match(devicesSrc, /startMidiLearn/);
+
+    // 4. <scdaw-timeline> supports contextmenu MIDI Learn on record-arm, mute, and solo buttons
+    const timelineSrc = await fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-timeline.js",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    assert.match(timelineSrc, /contextmenu/);
+    assert.match(timelineSrc, /startMidiLearn/);
+  } finally {
+    globalThis.requestAnimationFrame = origRaf;
+    globalThis.cancelAnimationFrame = origCaf;
+    scdaw.midi.cancelMidiLearn();
+  }
+});
