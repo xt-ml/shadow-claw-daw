@@ -6,6 +6,24 @@
 
 import { PPQN, stepToPpqn } from "./scdaw.js";
 
+const TECHNO_BASS_SYNTH_PARAMS = Object.freeze({
+  waveform: "sawtooth",
+  osc2Waveform: "square",
+  osc2Octave: -1,
+  osc2Detune: 8,
+  osc2Mix: 0.45,
+  subMix: 0.35,
+  cutoff: 350,
+  resonance: 6.0,
+  filterEnvAmount: 3200,
+  filterDecay: 0.12,
+  attack: 0.008,
+  decay: 0.16,
+  sustain: 0.25,
+  release: 0.08,
+  drive: 0.35,
+});
+
 export const INSTRUMENT_PRESETS = Object.freeze({
   "init-saw": {
     waveform: "sawtooth",
@@ -17,23 +35,6 @@ export const INSTRUMENT_PRESETS = Object.freeze({
     decay: 0.2,
     sustain: 0.5,
     release: 0.15,
-  },
-  "techno-bass": {
-    waveform: "sawtooth",
-    osc2Waveform: "square",
-    osc2Octave: -1,
-    osc2Detune: 8,
-    osc2Mix: 0.45,
-    subMix: 0.35,
-    cutoff: 350,
-    resonance: 6.0,
-    filterEnvAmount: 3200,
-    filterDecay: 0.12,
-    attack: 0.008,
-    decay: 0.16,
-    sustain: 0.25,
-    release: 0.08,
-    drive: 0.35,
   },
   "acid-303": {
     waveform: "sawtooth",
@@ -685,7 +686,7 @@ export function generateGenrePattern(genre = "techno-bass") {
         : genre === "ambient"
           ? "noise-air-pad"
           : genre === "techno-bass"
-            ? "techno-bass"
+            ? null
             : "init-saw";
 
   const melodicInstrument =
@@ -719,8 +720,9 @@ export function generateGenrePattern(genre = "techno-bass") {
     mute: false,
     solo: false,
     params: {
-      ...(INSTRUMENT_PRESETS[bassPresetKey] ||
-        INSTRUMENT_PRESETS["techno-bass"]),
+      ...(bassPresetKey
+        ? INSTRUMENT_PRESETS[bassPresetKey] || TECHNO_BASS_SYNTH_PARAMS
+        : TECHNO_BASS_SYNTH_PARAMS),
     },
     notes: [],
   };

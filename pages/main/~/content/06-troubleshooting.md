@@ -11,14 +11,14 @@ slug: "troubleshooting"
 
 Modern browsers prevent Web Audio contexts from producing sound without a user interaction.
 
-- **Solution**: Open the workbench page at [`/main/`](/main/) and click the **"🔊 Start Audio"** button in the transport bar.
+- **Solution**: Open the workbench page at [`/main/`](http://xt-ml.github.io/shadow-claw-daw/main/) and click the **"🔊 Start Audio"** button in the transport bar.
 - Note: Background tools (`scdaw_set_track`, `scdaw_write_notes`, `scdaw_bounce`) continue to function even while real-time audio playback is locked.
 
 ### 2. Tool Timed Out Awaiting DAW Response
 
 Worker tools dispatch commands via `BroadcastChannel("scdaw-commands")`. If no browser tab has the workbench open, commands will time out after 5 seconds (or 30 seconds for `scdaw_bounce`).
 
-- **Solution**: Navigate to [`/main/`](/main/) in an active browser tab.
+- **Solution**: Navigate to [`/main/`](http://xt-ml.github.io/shadow-claw-daw/main/) in an active browser tab.
 
 ### 3. Multiple Tabs & Leader Election
 
@@ -51,3 +51,4 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 - **How it Works**: Clicking **"🔗 Press a URL"** in the Export modal compresses the `.scdaw.json` project using Web Streams (`deflate-raw`) + Base64URL and places it in the URL `#file=` hash fragment by default so large arrangements never trigger HTTP 431 / 414 header size limits. `?file=` query parameters are also supported on load.
 - **Length Pre-Validation**: `validateBase64UrlLength` and `validateCompressedUrl` check candidate share URLs against browser length budgets (`MAX_HASH_URL_LENGTH` = `65536` chars; `MAX_QUERY_URL_LENGTH` = `8192` chars) before presenting a link, displaying an error in the modal recommending `.mid` or `.scdaw.json` export when exceeded.
 - **Autoplay (`?autoplay=true`)**: Append `?autoplay=true` (or `?autoplay=1`, or `#...&autoplay=true`) to start playback automatically once the workbench loads—or immediately after confirming the **"Load Song from URL"** dialog when combined with `#file=` / `?file=`.
+- **Examples & Headless Python Generator**: See [Song Showcase & Programmatic Examples](07-examples.md) (`/main/examples/`) for live public-domain demos (`Happy Birthday`, `Twinkle, Twinkle, Little Star`, `Silent Night`) and a zero-dependency Python template (`zlib` raw DEFLATE `wbits=-15` + Base64URL) for generating shareable `#file=` URLs directly.

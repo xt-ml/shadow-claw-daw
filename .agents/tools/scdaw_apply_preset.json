@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "scdaw_apply_preset",
-  "description": "Apply a curated synthesizer or SFX preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
+  "description": "Apply a curated synthesizer or SFX preset ('init-saw', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
   "input_schema": {
     "type": "object",
     "properties": {
@@ -13,7 +13,6 @@
         "type": "string",
         "enum": [
           "init-saw",
-          "techno-bass",
           "acid-303",
           "pop-pluck",
           "warm-pad",

@@ -104,10 +104,10 @@ test("scdaw-dsp: generateReverbImpulse generates decaying stereo impulse respons
   assert.ok(initialEnergy > tailEnergy);
 });
 
-test("scdaw-presets: provides rich synth presets and genre templates", () => {
-  assert.ok(INSTRUMENT_PRESETS["techno-bass"]);
-  assert.equal(INSTRUMENT_PRESETS["techno-bass"].waveform, "sawtooth");
-  assert.ok(INSTRUMENT_PRESETS["techno-bass"].filterEnvAmount > 0);
+test("scdaw-presets: provides rich synth presets and genre templates without duplicating techno-bass", () => {
+  assert.equal(INSTRUMENT_PRESETS["techno-bass"], undefined);
+  assert.ok(GENRE_TEMPLATES["techno-bass"]);
+  assert.equal(GENRE_TEMPLATES["techno-bass"].bpm, 132);
 
   assert.ok(INSTRUMENT_PRESETS["pop-pluck"]);
   assert.ok(INSTRUMENT_PRESETS["warm-pad"]);
@@ -116,7 +116,11 @@ test("scdaw-presets: provides rich synth presets and genre templates", () => {
   const technoProject = generateGenrePattern("techno-bass");
   assert.equal(technoProject.bpm, 132);
   assert.ok(technoProject.tracks.some((t) => t.kind === "drums"));
-  assert.ok(technoProject.tracks.some((t) => t.kind === "synth"));
+  const technoBass = technoProject.tracks.find((t) => t.id === "trk_bass");
+  assert.ok(technoBass);
+  assert.equal(technoBass.kind, "synth");
+  assert.equal(technoBass.params.waveform, "sawtooth");
+  assert.ok(technoBass.params.filterEnvAmount > 0);
 
   const popProject = generateGenrePattern("pop");
   assert.equal(popProject.bpm, 118);

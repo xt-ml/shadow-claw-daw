@@ -14,7 +14,7 @@ Generates and programs production-ready drum patterns, basslines, and presets in
 
 ## Capabilities & Styles
 
-- **techno-bass**: 132 BPM, 2 bars. 4-on-the-floor kick, off-beat open hat (steps 2, 6, 10, 14), 16th closed hats, claps on 4 & 12, paired with a rolling 16th synth bassline using the `techno-bass` preset (punchy filter envelope, sub-oscillator, and drive).
+- **techno-bass**: 132 BPM, 2 bars. 4-on-the-floor kick, off-beat open hat (steps 2, 6, 10, 14), 16th closed hats, claps on 4 & 12, paired with a rolling 16th synth bassline (punchy filter envelope, sub-oscillator, and drive) when loaded via `scdaw_new_project` (`template: "techno-bass"`).
 - **pop**: 118 BPM, 2 bars, 8% swing. Modern radio pop groove with kick on 0, 8, 10, snappy snare on 4 and 12, 8th closed hats, syncopated bass, and `pop-pluck` melodic counter-rhythm.
 - **house**: 124 BPM, 2 bars, 15% swing. Four-on-the-floor kick, clap on 4 & 12, open hat on 2, 6, 10, 14, and rolling 16th shaker with deep bass.
 - **trap**: 140 BPM, 2 bars. Booming sub bass (`sub-808` preset), half-time snare on beats 2 & 4 (steps 8 & 24), and rapid hi-hat rolls.
@@ -30,7 +30,7 @@ Generates and programs production-ready drum patterns, basslines, and presets in
      - Ensure a `drums` track exists (`scdaw_add_track` `{ kind: "drums", name: "Drums" }`).
      - Write drum notes using 16th step indices with velocity dynamics (`scdaw_write_notes` with `units: "steps"`).
      - Ensure a bass track exists (`scdaw_add_track` `{ kind: "synth", name: "Bass" }`).
-     - Apply appropriate preset via `scdaw_apply_preset` (e.g. `{ trackId, preset: "techno-bass" }`).
+     - Apply appropriate preset via `scdaw_apply_preset` (e.g. `{ trackId, preset: "acid-303" }` or `{ trackId, preset: "sub-808" }`).
      - Write complementary bass notes (`C2` = 36, `D2` = 38, `Eb2` = 39, `F2` = 41).
 3. If requested to reset, call `scdaw_reset` with `{ scope: "project", template: "basic-beat" }` or `{ scope: "pattern", trackId }`.
 4. Offer to display the live sequencer or workbench via `scdaw_render_surface` (`element: "workbench"` or `"sequencer"`).

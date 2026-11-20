@@ -21,6 +21,9 @@
     "/pages/main/~/content/06-troubleshooting.md": {
       "prettyPath": "/main/troubleshooting/"
     },
+    "/pages/main/~/content/07-examples.md": {
+      "prettyPath": "/main/examples/"
+    },
     "/pages/main/MEMORY.md": {
       "prettyPath": "/main/memory/"
     }

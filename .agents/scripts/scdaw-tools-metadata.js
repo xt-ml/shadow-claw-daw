@@ -891,7 +891,7 @@ export const TOOLS_METADATA = [
   {
     name: "scdaw_apply_preset",
     description:
-      "Apply a curated synthesizer or SFX preset ('init-saw', 'techno-bass', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
+      "Apply a curated synthesizer or SFX preset ('init-saw', 'acid-303', 'pop-pluck', 'warm-pad', 'sub-808', 'supersaw-lead', 'dj-airhorn', 'reggae-siren', 'brass-stab', 'hoover-rave') to a track.",
     inputSchema: {
       type: "object",
       properties: {
@@ -903,7 +903,6 @@ export const TOOLS_METADATA = [
           type: "string",
           enum: [
             "init-saw",
-            "techno-bass",
             "acid-303",
             "pop-pluck",
             "warm-pad",
@@ -1646,7 +1645,6 @@ export const TOOLS_METADATA = [
             "brass-stab",
             "hoover-rave",
             "init-saw",
-            "techno-bass",
             "acid-303",
             "supersaw-lead",
           ],

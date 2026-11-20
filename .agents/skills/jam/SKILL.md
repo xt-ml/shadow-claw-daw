@@ -17,7 +17,7 @@ Composes melodic synth lines, bass riffs, and arpeggios synchronized with the ac
 1. Check active tracks via `scdaw_get_project`.
 2. Find or add a synthesizer track using `scdaw_add_track` (`kind: "synth"`).
 3. Apply a tailored synthesizer preset via `scdaw_apply_preset`:
-   - Bass riffs: `"techno-bass"`, `"acid-303"`, `"sub-808"`
+   - Bass riffs: `"acid-303"`, `"sub-808"`
    - Melodic hooks & plucks: `"pop-pluck"`, `"supersaw-lead"`
    - Atmospheric chords: `"warm-pad"`
 4. Choose musical key (default: C minor or A minor) and compose 16th-note melodies or bass grooves.

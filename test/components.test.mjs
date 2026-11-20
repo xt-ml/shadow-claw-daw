@@ -324,6 +324,27 @@ test("scdaw-browser: filters presets, instruments, and FX items by category tab 
   assert.equal(queryMatch[0].name, "Techno Bass");
 });
 
+test("scdaw-browser: exposes Techno-Bass (Groove) Genre Template without duplicate Techno Bass Synth Preset", () => {
+  const browserItems = DawBrowserElement.prototype._getItems.call({
+    _activeTab: "presets",
+    _conversationFiles: [],
+  });
+
+  const synthTechno = browserItems.find(
+    (item) =>
+      item.id === "preset_techno-bass" ||
+      (item.name === "TECHNO BASS" && item.category === "Synth Preset"),
+  );
+  assert.equal(synthTechno, undefined);
+
+  const genreTechno = browserItems.find(
+    (item) => item.id === "genre_techno-bass",
+  );
+  assert.ok(genreTechno);
+  assert.equal(genreTechno.name, "TECHNO-BASS (Groove)");
+  assert.equal(genreTechno.category, "Genre Template");
+});
+
 test("scdaw-timeline: computes timeline bars and beat ticks based on signature", () => {
   const ticks = computeTimelineTicks(2, [4, 4]);
   assert.equal(ticks.length, 8); // 2 bars * 4 quarter beats = 8 ticks

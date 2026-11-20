@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { decompressFromBase64Url } from "../.agents/scripts/scdaw-compress.js";
+import { deserializeProject } from "../.agents/scripts/scdaw.js";
 
 const SHADOW_CLAW_LOBSTER_HASHES = new Set([
   "33a5914fdb9b42c622ceb4bdfd421d7c8792ce3809a10acc83dd356a975c1f66", // 48.png
@@ -200,6 +203,84 @@ test("Documentation: README.md, AGENTS.md, and pages/main docs are up to date an
     false,
     "Boilerplate 01-about.md should be removed",
   );
+});
+
+test("Examples page: 07-examples.md maps to /main/examples/, embeds valid public-domain song links, and includes runnable Python generator", async () => {
+  const routesPath = resolve(ROOT, "pages/resources/routes.json");
+  const routesData = JSON.parse(readFileSync(routesPath, "utf8"));
+  assert.deepEqual(
+    routesData.routes?.["/pages/main/~/content/07-examples.md"],
+    {
+      prettyPath: "/main/examples/",
+    },
+  );
+
+  const examplesPath = resolve(ROOT, "pages/main/~/content/07-examples.md");
+  assert.ok(existsSync(examplesPath), "07-examples.md must exist");
+
+  const md = readFileSync(examplesPath, "utf8");
+  assert.ok(md.startsWith("---"), "07-examples.md must have YAML frontmatter");
+  assert.match(md, /slug:\s*["']examples["']/);
+  assert.match(md, /Happy Birthday/i);
+  assert.match(md, /Twinkle,\s*Twinkle,\s*Little Star/i);
+  assert.match(md, /Silent Night/i);
+  assert.doesNotMatch(md, /Starlight Sketch/i);
+
+  const fileMatches = [...md.matchAll(/#file=([A-Za-z0-9_-]+)/g)];
+  assert.ok(
+    fileMatches.length >= 3,
+    "07-examples.md must embed at least 3 #file= song links",
+  );
+
+  const decodedNames = [];
+  for (const [, encoded] of fileMatches) {
+    const jsonStr = await decompressFromBase64Url(encoded);
+    const project = deserializeProject(jsonStr);
+    decodedNames.push(project.name);
+  }
+  assert.ok(decodedNames.includes("Happy Birthday!"));
+  assert.ok(decodedNames.includes("Twinkle, Twinkle, Little Star"));
+  assert.ok(decodedNames.includes("Silent Night"));
+
+  const pyMatch = md.match(/```python\n([\s\S]*?)\n```/);
+  assert.ok(pyMatch, "07-examples.md must contain a fenced python code block");
+  const pyCode = pyMatch[1];
+
+  assert.ok(
+    pyCode.includes("zlib.compressobj(level=9, wbits=-15)"),
+    "Python snippet must use raw DEFLATE (wbits=-15)",
+  );
+  assert.ok(
+    pyCode.includes(
+      "base64.urlsafe_b64encode(compressed).decode('ascii').rstrip('=')",
+    ),
+    "Python snippet must use unpadded URL-safe base64 encoding",
+  );
+  assert.doesNotMatch(pyCode, /Twinkle,\s*Twinkle,\s*Little Star/i);
+  assert.doesNotMatch(pyCode, /Silent Night/i);
+  assert.doesNotMatch(pyCode, /Starlight Sketch/i);
+
+  const stdout = execFileSync("python3", ["-c", pyCode], {
+    encoding: "utf8",
+  }).trim();
+  assert.match(
+    stdout,
+    /^https:\/\/xt-ml\.github\.io\/shadow-claw-daw\/#file=[A-Za-z0-9_-]+&autoplay=true$/,
+  );
+
+  const genEncoded = stdout.split("#file=")[1].split("&")[0];
+  const genProject = deserializeProject(
+    await decompressFromBase64Url(genEncoded),
+  );
+  assert.equal(genProject.name, "Mary Had a Little Lamb");
+  assert.equal(genProject.meta?.title, "Mary Had a Little Lamb");
+  assert.ok(genProject.tracks.length >= 2);
+  assert.ok(genProject.tracks[0].notes.length > 0);
+  assert.ok(genProject.tracks[1].notes.length > 0);
+
+  const readme = readFileSync(resolve(ROOT, "README.md"), "utf8");
+  assert.match(readme, /07-examples\.md/);
+  assert.match(readme, /main\/examples\//);
 });
 
 test("Iconography & PWA Manifest: all icons and screenshots are template-specific (no ShadowClaw lobster defaults) and appleTouchIconPath points to raster PNG", () => {
