@@ -992,7 +992,7 @@
       "name": "scdaw-editor",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-editor.",
       "url": "../../.agents/scripts/components/scdaw-editor.js",
-      "digest": "sha256:b70f8028d3ab09d93d1973181d98f4cd2071c38dba3611ff501509cfbf20cb40"
+      "digest": "sha256:a3b318aa44a833b8ca691b09e88401ac41e42b9226a04a89c83ba7396807f63f"
     },
     {
       "name": "scdaw-knob",
@@ -1004,7 +1004,7 @@
       "name": "scdaw-midi-keyboard",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-midi-keyboard.",
       "url": "../../.agents/scripts/components/scdaw-midi-keyboard.js",
-      "digest": "sha256:f6b013aff6233be9fe7a1f691cc1138453dcec477853d5f3615c3babd08ad193"
+      "digest": "sha256:e8f2d9a13e7c87c706ae6ccadaaa8b468b45c2d2075b36c213b493515cf48f3a"
     },
     {
       "name": "scdaw-mixer",
@@ -1058,7 +1058,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:a2a801ec8e295060feb5ba9802c68c9c757c57ea1909be90252543d1227974cf"
+      "digest": "sha256:ba20bbc54de8d3ee23a2e9f398dbd33f53f50c47deee9fd4b6849445b28d3583"
     },
     {
       "name": "scdaw-adapter",
@@ -1118,7 +1118,7 @@
       "name": "scdaw-midi-io",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-midi-io.",
       "url": "../../.agents/scripts/scdaw-midi-io.js",
-      "digest": "sha256:1912bd1f87cabb1d4578c0fa539e5f6463bf428709ced68c09a1e1901a3751c3"
+      "digest": "sha256:2c9065b2eec724aea14b596aa1838c6c7c9edce4ae85c437a6abb22bd7765c97"
     },
     {
       "name": "scdaw-midi",

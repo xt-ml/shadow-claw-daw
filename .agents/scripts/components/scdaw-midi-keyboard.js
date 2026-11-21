@@ -2,12 +2,13 @@
  * .agents/scripts/components/scdaw-midi-keyboard.js
  *
  * Accessible, mobile-first, responsive Software MIDI Keyboard (<scdaw-midi-keyboard>).
- * Supports multi-touch pointer play, Hold (latch) mode, Sustain toggle,
- * QWERTY shortcut playback, and real-time 3D depressed key feedback.
+ * Supports multi-touch pointer play, drag glissando, Hold (latch) mode,
+ * Sustain toggle, QWERTY shortcut playback, and real-time 3D depressed key feedback.
  */
 
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
+import { QWERTY_LAYOUTS, getQwertyKeyMapForLayout } from "../scdaw-midi-io.js";
 import { SHARED_STYLES } from "./scdaw-styles.js";
 
 const NOTE_NAMES = [
@@ -35,10 +36,15 @@ export function pitchToNoteName(pitch) {
   return `${name}${octave}`;
 }
 
-export function buildPianoKeys(startOctave = 4, octaveCount = 2) {
+export function buildPianoKeys(
+  startOctave = 4,
+  octaveCount = 2,
+  keyLayout = "ableton",
+) {
   const keys = [];
   const startPitch = Math.max(0, (Math.round(startOctave) + 1) * 12);
   const count = Math.max(1, Math.round(octaveCount) * 12);
+  const shortcutMap = getQwertyKeyMapForLayout(keyLayout);
   for (let i = 0; i < count; i++) {
     const pitch = startPitch + i;
     if (pitch > 127) break;
@@ -48,9 +54,34 @@ export function buildPianoKeys(startOctave = 4, octaveCount = 2) {
       name: pitchToNoteName(pitch),
       isBlack: BLACK_SEMITONES.has(semitone),
       isC: semitone === 0,
+      shortcut: shortcutMap.get(i) || null,
     });
   }
   return keys;
+}
+
+export function resolveKeyElementFromPoint(
+  root,
+  clientX,
+  clientY,
+  selector = ".piano-key",
+) {
+  if (!root || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+    return null;
+  }
+  const el =
+    typeof root.elementFromPoint === "function"
+      ? root.elementFromPoint(clientX, clientY)
+      : typeof document !== "undefined" &&
+          typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(clientX, clientY)
+        : null;
+  const keyEl = el?.closest?.(selector) || null;
+  if (!keyEl) return null;
+  if (typeof root.contains === "function" && !root.contains(keyEl)) {
+    return null;
+  }
+  return keyEl;
 }
 
 export class DawMidiKeyboardElement extends BaseElement {
@@ -59,21 +90,45 @@ export class DawMidiKeyboardElement extends BaseElement {
     this.attachShadow?.({ mode: "open" });
     this._octave = 4;
     this._octaveCount = 2;
+    this._keyLayout = "ableton";
     this._sustain = false;
     this._holdMode = false;
     this._activePointers = new Map();
     this._latchedPitches = new Set();
     this._pressedPitches = new Set();
+    this._boundRoot = null;
     this._dispose = null;
+    this._disposeSoftwareState = null;
   }
 
   connectedCallback() {
+    const sw = scdaw.midi?.software;
+    if (sw) {
+      if (Number.isFinite(sw.octave)) this._octave = sw.octave;
+      if (sw.keyLayout) this._keyLayout = sw.keyLayout;
+    }
     this.render();
     this._bindEvents();
     this._dispose = effect(() => {
       const live = scdaw.activeLivePitches?.get?.() || [];
       this._syncPressedStates(live);
     });
+    if (sw?.state?.get) {
+      this._disposeSoftwareState = effect(() => {
+        const next = sw.state.get();
+        if (!next) return;
+        let changed = false;
+        if (Number.isFinite(next.octave) && next.octave !== this._octave) {
+          this._octave = next.octave;
+          changed = true;
+        }
+        if (next.keyLayout && next.keyLayout !== this._keyLayout) {
+          this._keyLayout = next.keyLayout;
+          changed = true;
+        }
+        if (changed) this.render();
+      });
+    }
   }
 
   disconnectedCallback() {
@@ -81,14 +136,129 @@ export class DawMidiKeyboardElement extends BaseElement {
       this._dispose();
       this._dispose = null;
     }
+    if (this._disposeSoftwareState) {
+      this._disposeSoftwareState();
+      this._disposeSoftwareState = null;
+    }
     this._releaseAllPointers();
+    scdaw.midi?.software?.releaseAll?.();
+  }
+
+  _isPitchHeldByActivePointer(pitch) {
+    for (const activePitch of this._activePointers.values()) {
+      if (activePitch === pitch) return true;
+    }
+    return false;
+  }
+
+  _isPitchHeldByQwerty(pitch) {
+    return Boolean(scdaw.midi?.software?.isPitchHeldByKey?.(pitch));
+  }
+
+  _releaseActivePointers() {
+    const activePitches = new Set();
+    for (const pitch of this._activePointers.values()) {
+      if (Number.isFinite(pitch)) activePitches.add(pitch);
+    }
+    this._activePointers.clear();
+    for (const pitch of activePitches) {
+      if (
+        !this._latchedPitches.has(pitch) &&
+        !this._isPitchHeldByQwerty(pitch)
+      ) {
+        scdaw.midi?.software?.noteOff?.(pitch);
+      }
+    }
+  }
+
+  releaseTransientNotes() {
+    this._releaseActivePointers();
+    scdaw.midi?.software?.releaseHeldKeys?.({
+      shouldReleasePitch: (pitch) => !this._latchedPitches.has(pitch),
+    });
+    this._syncPressedStates();
+  }
+
+  _shiftOctave(delta) {
+    const nextOctave = Math.max(0, Math.min(7, this._octave + delta));
+    if (nextOctave === this._octave) return;
+    this._releaseActivePointers();
+    this._octave = nextOctave;
+    scdaw.midi?.software?.setOctave?.(nextOctave);
+    this.render();
+  }
+
+  _toggleKeyLayout() {
+    const nextLayout =
+      this._keyLayout === "two-octave" ? "ableton" : "two-octave";
+    this._keyLayout = nextLayout;
+    scdaw.midi?.software?.setKeyLayout?.(nextLayout);
+    this.render();
+  }
+
+  handleQwertyKeyDown(e) {
+    const sw = scdaw.midi?.software;
+    if (!sw || !e) return false;
+
+    const delta = sw.resolveOctaveDelta?.(e.key, { code: e.code }) || 0;
+    if (delta !== 0) {
+      if (!e.repeat) {
+        this._shiftOctave(delta);
+      }
+      e.preventDefault?.();
+      return true;
+    }
+
+    const resolved = sw.resolveNotePitch?.(e.key, { code: e.code });
+    if (!resolved) return false;
+
+    e.preventDefault?.();
+    if (e.repeat) return true;
+
+    if (this._holdMode) {
+      const pitch = resolved.pitch;
+      if (this._latchedPitches.has(pitch)) {
+        this._latchedPitches.delete(pitch);
+        if (
+          !this._isPitchHeldByActivePointer(pitch) &&
+          !this._isPitchHeldByQwerty(pitch)
+        ) {
+          sw.noteOff?.(pitch);
+        }
+      } else {
+        this._latchedPitches.add(pitch);
+        sw.noteOn?.(pitch, 0.8);
+      }
+      this._syncPressedStates();
+      return true;
+    }
+
+    sw.keyDown?.(e.key, { code: e.code, repeat: e.repeat });
+    this._syncPressedStates();
+    return true;
+  }
+
+  handleQwertyKeyUp(e) {
+    const sw = scdaw.midi?.software;
+    if (!sw || !e) return;
+    sw.keyUp?.(e.key, {
+      code: e.code,
+      shouldReleasePitch: (pitch) =>
+        !this._latchedPitches.has(pitch) &&
+        !this._isPitchHeldByActivePointer(pitch),
+    });
+    this._syncPressedStates();
   }
 
   _syncPressedStates(livePitches = scdaw.activeLivePitches?.get?.() || []) {
+    const activePointerPitches = [];
+    for (const pitch of this._activePointers.values()) {
+      if (Number.isFinite(pitch)) activePointerPitches.push(pitch);
+    }
     const next = new Set([
       ...livePitches,
       ...this._latchedPitches,
-      ...this._activePointers.values(),
+      ...activePointerPitches,
     ]);
     this._pressedPitches = next;
     if (!this.shadowRoot) return;
@@ -104,12 +274,11 @@ export class DawMidiKeyboardElement extends BaseElement {
   }
 
   _releaseAllPointers() {
-    for (const pitch of this._activePointers.values()) {
-      scdaw.midi?.software?.noteOff?.(pitch);
-    }
-    this._activePointers.clear();
+    this._releaseActivePointers();
     for (const pitch of this._latchedPitches) {
-      scdaw.midi?.software?.noteOff?.(pitch);
+      if (Number.isFinite(pitch)) {
+        scdaw.midi?.software?.noteOff?.(pitch);
+      }
     }
     this._latchedPitches.clear();
     this._pressedPitches.clear();
@@ -118,24 +287,26 @@ export class DawMidiKeyboardElement extends BaseElement {
 
   _bindEvents() {
     const root = this.shadowRoot;
-    if (!root) return;
+    if (!root || this._boundRoot === root) return;
+    this._boundRoot = root;
 
     root.addEventListener("click", (e) => {
-      const btn = e.target.closest("button");
+      const btn = e.target?.closest?.("button");
       if (!btn) return;
       if (btn.id === "oct-down") {
-        this._octave = Math.max(0, this._octave - 1);
-        scdaw.midi?.software?.setOctave?.(this._octave);
-        this.render();
+        this._shiftOctave(-1);
       } else if (btn.id === "oct-up") {
-        this._octave = Math.min(7, this._octave + 1);
-        scdaw.midi?.software?.setOctave?.(this._octave);
-        this.render();
+        this._shiftOctave(1);
       } else if (btn.id === "hold-btn") {
         this._holdMode = !this._holdMode;
         if (!this._holdMode) {
           for (const pitch of this._latchedPitches) {
-            scdaw.midi?.software?.noteOff?.(pitch);
+            if (
+              !this._isPitchHeldByActivePointer(pitch) &&
+              !this._isPitchHeldByQwerty(pitch)
+            ) {
+              scdaw.midi?.software?.noteOff?.(pitch);
+            }
           }
           this._latchedPitches.clear();
         }
@@ -145,18 +316,23 @@ export class DawMidiKeyboardElement extends BaseElement {
         const trackId = scdaw.selectedTrackId.get();
         if (trackId) scdaw.setSustainPedal?.(trackId, this._sustain);
         this.render();
+      } else if (btn.id === "layout-btn") {
+        this._toggleKeyLayout();
       } else if (btn.id === "panic-btn") {
         this._releaseAllPointers();
+        scdaw.midi?.software?.releaseAll?.();
         scdaw.panic?.();
         this.render();
       } else if (btn.id === "close-btn") {
+        this.releaseTransientNotes();
         this.hidden = true;
         this.dispatchEvent(new CustomEvent("close", { bubbles: true }));
       }
     });
 
     root.addEventListener("pointerdown", (e) => {
-      const keyBtn = e.target.closest(".piano-key");
+      if (e.button !== undefined && e.button !== 0) return;
+      const keyBtn = e.target?.closest?.(".piano-key");
       if (!keyBtn) return;
       const pitch = Number(keyBtn.dataset.pitch);
       if (!Number.isFinite(pitch)) return;
@@ -164,7 +340,12 @@ export class DawMidiKeyboardElement extends BaseElement {
       if (this._holdMode) {
         if (this._latchedPitches.has(pitch)) {
           this._latchedPitches.delete(pitch);
-          scdaw.midi?.software?.noteOff?.(pitch);
+          if (
+            !this._isPitchHeldByActivePointer(pitch) &&
+            !this._isPitchHeldByQwerty(pitch)
+          ) {
+            scdaw.midi?.software?.noteOff?.(pitch);
+          }
         } else {
           this._latchedPitches.add(pitch);
           scdaw.midi?.software?.noteOn?.(pitch, 0.8);
@@ -187,14 +368,59 @@ export class DawMidiKeyboardElement extends BaseElement {
       if (!this._activePointers.has(e.pointerId)) return;
       const pitch = this._activePointers.get(e.pointerId);
       this._activePointers.delete(e.pointerId);
-      if (!this._latchedPitches.has(pitch)) {
+      if (
+        Number.isFinite(pitch) &&
+        !this._latchedPitches.has(pitch) &&
+        !this._isPitchHeldByActivePointer(pitch) &&
+        !this._isPitchHeldByQwerty(pitch)
+      ) {
         scdaw.midi?.software?.noteOff?.(pitch);
       }
       this._syncPressedStates();
     };
 
+    root.addEventListener("pointermove", (e) => {
+      if (!this._activePointers.has(e.pointerId)) return;
+      if (this._holdMode) return;
+      if (
+        e.pointerType === "mouse" &&
+        typeof e.buttons === "number" &&
+        e.buttons === 0
+      ) {
+        endPointer(e);
+        return;
+      }
+      if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+
+      const keyBtn = resolveKeyElementFromPoint(
+        root,
+        e.clientX,
+        e.clientY,
+        ".piano-key",
+      );
+      const rawPitch = keyBtn ? Number(keyBtn.dataset.pitch) : null;
+      const newPitch = Number.isFinite(rawPitch) ? rawPitch : null;
+      const oldPitch = this._activePointers.get(e.pointerId);
+      if (newPitch === oldPitch) return;
+
+      this._activePointers.set(e.pointerId, newPitch);
+      if (
+        Number.isFinite(oldPitch) &&
+        !this._latchedPitches.has(oldPitch) &&
+        !this._isPitchHeldByActivePointer(oldPitch) &&
+        !this._isPitchHeldByQwerty(oldPitch)
+      ) {
+        scdaw.midi?.software?.noteOff?.(oldPitch);
+      }
+      if (newPitch !== null) {
+        scdaw.midi?.software?.noteOn?.(newPitch, 0.8);
+      }
+      this._syncPressedStates();
+    });
+
     root.addEventListener("pointerup", endPointer);
     root.addEventListener("pointercancel", endPointer);
+    root.addEventListener("lostpointercapture", endPointer);
 
     root.addEventListener("keydown", (e) => {
       const keyBtn = e.target.closest(".piano-key");
@@ -241,7 +467,8 @@ export class DawMidiKeyboardElement extends BaseElement {
 
   render() {
     if (!this.shadowRoot) return;
-    const keys = buildPianoKeys(this._octave, this._octaveCount);
+    const layout = QWERTY_LAYOUTS[this._keyLayout] || QWERTY_LAYOUTS.ableton;
+    const keys = buildPianoKeys(this._octave, this._octaveCount, layout.id);
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -255,6 +482,7 @@ export class DawMidiKeyboardElement extends BaseElement {
           container-name: scdaw-midi-keyboard;
           background: var(--bg-card, rgb(26, 33, 33));
           border-top: 1px solid var(--border, rgb(63, 72, 73));
+          -webkit-user-select: none;
           user-select: none;
         }
         :host([hidden]) {
@@ -318,8 +546,10 @@ export class DawMidiKeyboardElement extends BaseElement {
           min-width: 28px;
           height: 84px;
           display: flex;
-          align-items: flex-end;
-          justify-content: center;
+          flex-direction: column;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 2px;
           padding-bottom: 5px;
           border-radius: 0 0 5px 5px;
           border: 1px solid #1e2326;
@@ -342,15 +572,35 @@ export class DawMidiKeyboardElement extends BaseElement {
           margin: 0 -11px;
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.7), inset 0 -3px 0 #090b0e;
         }
-        .piano-key[aria-pressed="true"],
-        .piano-key:active {
+        .piano-key__shortcut {
+          pointer-events: none;
+          font-family: var(--mono, monospace);
+          font-size: 8px;
+          line-height: 1;
+          padding: 1px 3px;
+          border-radius: 3px;
+          background: rgba(15, 23, 26, 0.12);
+          color: #334145;
+        }
+        .piano-key--black .piano-key__shortcut {
+          background: rgba(255, 255, 255, 0.14);
+          color: #e2e8f0;
+        }
+        .piano-key[aria-pressed="true"] .piano-key__shortcut {
+          background: rgba(0, 54, 58, 0.2);
+          color: var(--on-accent, rgb(0, 54, 58));
+        }
+        .piano-key__note {
+          pointer-events: none;
+          line-height: 1;
+        }
+        .piano-key[aria-pressed="true"] {
           transform: translateY(2px);
           background: linear-gradient(180deg, rgba(128, 212, 219, 0.9) 0%, var(--accent, rgb(128, 212, 219)) 100%);
           color: var(--on-accent, rgb(0, 54, 58));
           box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.45), inset 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 10px rgba(128, 212, 219, 0.45);
         }
-        .piano-key--black[aria-pressed="true"],
-        .piano-key--black:active {
+        .piano-key--black[aria-pressed="true"] {
           transform: translateY(2px);
           background: linear-gradient(180deg, rgb(92, 184, 194) 0%, var(--accent, rgb(128, 212, 219)) 100%);
           color: var(--on-accent, rgb(0, 54, 58));
@@ -400,7 +650,15 @@ export class DawMidiKeyboardElement extends BaseElement {
             <button id="panic-btn" class="kbd-btn" type="button" aria-label="All Notes Off">Panic</button>
           </div>
           <div class="kbd-controls">
-            <span class="kbd-hint">QWERTY: A-K</span>
+            <button
+              id="layout-btn"
+              class="kbd-btn"
+              type="button"
+              aria-pressed="${layout.id === "two-octave" ? "true" : "false"}"
+              aria-label="Toggle QWERTY keyboard layout (current: ${layout.label})"
+              title="Switch between Ableton (A–', Z/X octave) and 2-Octave (Z–M / Q–U, -/= octave) layouts"
+            >Keys: ${layout.label}</button>
+            <span class="kbd-hint">${layout.hint}</span>
             <button id="close-btn" class="kbd-btn" type="button" aria-label="Hide MIDI Keyboard">Hide</button>
           </div>
         </div>
@@ -411,9 +669,10 @@ export class DawMidiKeyboardElement extends BaseElement {
                 type="button"
                 class="piano-key ${k.isBlack ? "piano-key--black" : ""}"
                 data-pitch="${k.pitch}"
+                ${k.shortcut ? `aria-keyshortcuts="${k.shortcut}"` : ""}
                 aria-label="${k.name} (MIDI ${k.pitch})"
                 aria-pressed="${this._pressedPitches.has(k.pitch) ? "true" : "false"}"
-              >${k.isC ? k.name : ""}</button>`,
+              >${k.shortcut ? `<span class="piano-key__shortcut" aria-hidden="true">${k.shortcut}</span>` : ""}${k.isC ? `<span class="piano-key__note" aria-hidden="true">${k.name}</span>` : ""}</button>`,
             )
             .join("")}
         </div>

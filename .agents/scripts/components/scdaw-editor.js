@@ -157,6 +157,151 @@ export function resolveEditorScrollPosition({
   return Math.max(0, centered);
 }
 
+export function resolvePianoRollKeyFromPoint(root, clientX, clientY) {
+  if (!root || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
+    return null;
+  }
+  const el =
+    typeof root.elementFromPoint === "function"
+      ? root.elementFromPoint(clientX, clientY)
+      : typeof document !== "undefined" &&
+          typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(clientX, clientY)
+        : null;
+  const keyEl = el?.closest?.(".pr-key[data-pitch]") || null;
+  if (!keyEl) return null;
+  if (typeof root.contains === "function" && !root.contains(keyEl)) {
+    return null;
+  }
+  return keyEl;
+}
+
+export function setupPianoRollKeyAudition(
+  gridArea,
+  { root, getTrackId, previewNote } = {},
+) {
+  if (!gridArea) return;
+  const activePointers = new Map();
+  let suppressClickKey = null;
+
+  const setKeyPressed = (keyEl, pressed) => {
+    keyEl?.setAttribute?.("aria-pressed", pressed ? "true" : "false");
+  };
+
+  const isKeyHeldByAnyPointer = (targetKeyEl) => {
+    if (!targetKeyEl) return false;
+    for (const state of activePointers.values()) {
+      if (state.keyEl === targetKeyEl) return true;
+    }
+    return false;
+  };
+
+  const audition = (pitch) => {
+    const trackId = getTrackId?.();
+    if (!trackId || !Number.isFinite(pitch)) return;
+    previewNote?.(trackId, pitch, 0.85, 240);
+  };
+
+  const endPointer = (e, { isCancel = false } = {}) => {
+    if (!activePointers.has(e.pointerId)) return;
+    const state = activePointers.get(e.pointerId);
+    activePointers.delete(e.pointerId);
+    if (state.keyEl && !isKeyHeldByAnyPointer(state.keyEl)) {
+      setKeyPressed(state.keyEl, false);
+    }
+    if (
+      (isCancel || state.keyEl !== state.downKeyEl) &&
+      suppressClickKey === state.downKeyEl
+    ) {
+      suppressClickKey = null;
+    }
+  };
+
+  gridArea.addEventListener("pointerdown", (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const keyEl = e.target?.closest?.(".pr-key[data-pitch]");
+    if (!keyEl) return;
+    const pitch = Number(keyEl.dataset.pitch);
+    if (!Number.isFinite(pitch)) return;
+
+    if (typeof keyEl.setPointerCapture === "function") {
+      try {
+        keyEl.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+    activePointers.set(e.pointerId, { pitch, keyEl, downKeyEl: keyEl });
+    suppressClickKey = keyEl;
+    setKeyPressed(keyEl, true);
+    audition(pitch);
+  });
+
+  gridArea.addEventListener("pointermove", (e) => {
+    const state = activePointers.get(e.pointerId);
+    if (!state) return;
+    if (
+      e.pointerType === "mouse" &&
+      typeof e.buttons === "number" &&
+      e.buttons === 0
+    ) {
+      endPointer(e, { isCancel: true });
+      return;
+    }
+    if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+
+    const nextKey = resolvePianoRollKeyFromPoint(root, e.clientX, e.clientY);
+    const rawPitch = nextKey ? Number(nextKey.dataset.pitch) : null;
+    const newPitch = Number.isFinite(rawPitch) ? rawPitch : null;
+    const newKeyEl = newPitch !== null ? nextKey : null;
+    if (newPitch === state.pitch && newKeyEl === state.keyEl) return;
+
+    const prevKeyEl = state.keyEl;
+    state.pitch = newPitch;
+    state.keyEl = newKeyEl;
+    if (
+      prevKeyEl &&
+      prevKeyEl !== newKeyEl &&
+      !isKeyHeldByAnyPointer(prevKeyEl)
+    ) {
+      setKeyPressed(prevKeyEl, false);
+    }
+    if (newKeyEl) {
+      setKeyPressed(newKeyEl, true);
+      audition(newPitch);
+    }
+  });
+
+  gridArea.addEventListener("pointerup", (e) =>
+    endPointer(e, { isCancel: false }),
+  );
+  gridArea.addEventListener("pointercancel", (e) =>
+    endPointer(e, { isCancel: true }),
+  );
+  gridArea.addEventListener("lostpointercapture", (e) =>
+    endPointer(e, { isCancel: true }),
+  );
+
+  gridArea.addEventListener("click", (e) => {
+    const keyEl = e.target?.closest?.(".pr-key[data-pitch]");
+    if (!keyEl) return;
+    if (suppressClickKey === keyEl) {
+      suppressClickKey = null;
+      return;
+    }
+    e.preventDefault?.();
+    const pitch = Number(keyEl.dataset.pitch);
+    audition(pitch);
+  });
+
+  gridArea.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const keyEl = e.target?.closest?.(".pr-key[data-pitch]");
+    if (!keyEl) return;
+    e.preventDefault?.();
+    const pitch = Number(keyEl.dataset.pitch);
+    audition(pitch);
+  });
+}
+
 function computeNotesSignature(notes) {
   if (!Array.isArray(notes) || notes.length === 0) return "0";
   let hash = notes.length;
@@ -442,14 +587,24 @@ export class DawEditorElement extends BaseElement {
           align-items: center;
           padding-left: 4px;
           color: var(--shadow-claw-text-secondary, #94a3b8);
+          -webkit-user-select: none;
           user-select: none;
           position: sticky;
           left: 0;
           z-index: 2;
         }
+        .pr-key[data-pitch] {
+          cursor: pointer;
+          touch-action: none;
+        }
         .pr-key.black {
           background: rgba(0, 0, 0, 0.4);
           color: #64748b;
+        }
+        .pr-key[data-pitch][aria-pressed="true"] {
+          background: var(--accent);
+          color: var(--on-accent, #00363a);
+          font-weight: 700;
         }
         .pr-cells {
           display: flex;
@@ -637,7 +792,7 @@ export class DawEditorElement extends BaseElement {
                 .map(
                   (r) => `
               <div class="pr-row" role="row">
-                <div class="pr-key ${r.isBlack ? "black" : ""}" role="button" tabindex="0" aria-label="Audition ${r.name}" data-pitch="${r.pitch}">${r.name}</div>
+                <div class="pr-key ${r.isBlack ? "black" : ""}" role="button" tabindex="0" aria-pressed="false" aria-label="Audition ${r.name}" data-pitch="${r.pitch}">${r.name}</div>
                 <div class="pr-cells">
                   ${Array.from({ length: numSteps }, (_, step) => {
                     const hasNote = activeMap.has(`${r.pitch}:${step}`);
@@ -724,23 +879,16 @@ export class DawEditorElement extends BaseElement {
         e.target.value = "";
       });
 
-    // Piano key clicks & keyboard Enter/Space -> audition pitch
-    this.shadowRoot.querySelectorAll(".pr-key[data-pitch]").forEach((keyEl) => {
-      const auditionPitch = (e) => {
-        e.preventDefault?.();
-        if (!this._selectedTrackId) return;
-        const pitch = Number(keyEl.dataset.pitch);
-        if (!Number.isNaN(pitch)) {
-          scdaw.previewNote?.(this._selectedTrackId, pitch, 0.85, 240);
-        }
-      };
-      keyEl.addEventListener("click", auditionPitch);
-      keyEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          auditionPitch(e);
-        }
+    // Piano key pointer drag glissando, clicks, & keyboard Enter/Space -> audition pitch
+    const gridArea = this.shadowRoot.querySelector(".grid-area");
+    if (gridArea) {
+      setupPianoRollKeyAudition(gridArea, {
+        root: this.shadowRoot,
+        getTrackId: () => this._selectedTrackId,
+        previewNote: (trackId, pitch, velocity, duration) =>
+          scdaw.previewNote?.(trackId, pitch, velocity, duration),
       });
-    });
+    }
 
     // Note cell clicks & keyboard Enter/Space/Arrow navigation
     this.shadowRoot.querySelectorAll(".pr-cell").forEach((cell) => {

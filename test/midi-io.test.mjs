@@ -7,6 +7,9 @@ import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
 import {
   createMidiIo,
   SoftwareMidiInput,
+  QWERTY_LAYOUTS,
+  getQwertyKeyMapForLayout,
+  shouldHandleSoftwareKeyboardEvent,
 } from "../.agents/scripts/scdaw-midi-io.js";
 
 function createTestSetup() {
@@ -375,4 +378,173 @@ test("MidiIoManager: Gap 4, 5, 6, 7 - liveRevision updates during sweeps without
   } finally {
     await engine.stop();
   }
+});
+
+test("QWERTY_LAYOUTS & getQwertyKeyMapForLayout: defines ableton (18 notes) and two-octave (24 notes) layouts", () => {
+  assert.equal(QWERTY_LAYOUTS.ableton.notes.length, 18);
+  assert.equal(QWERTY_LAYOUTS["two-octave"].notes.length, 24);
+  assert.deepEqual(
+    QWERTY_LAYOUTS["two-octave"].notes.map((n) => n.offset),
+    Array.from({ length: 24 }, (_, i) => i),
+  );
+
+  const abletonMap = getQwertyKeyMapForLayout("ableton");
+  assert.equal(abletonMap.get(0), "A");
+  assert.equal(abletonMap.get(16), ";");
+  assert.equal(abletonMap.get(17), "'");
+  assert.equal(abletonMap.get(18), undefined);
+
+  const twoOctMap = getQwertyKeyMapForLayout("two-octave");
+  assert.equal(twoOctMap.get(0), "Z");
+  assert.equal(twoOctMap.get(1), "S");
+  assert.equal(twoOctMap.get(11), "M");
+  assert.equal(twoOctMap.get(12), "Q");
+  assert.equal(twoOctMap.get(13), "2");
+  assert.equal(twoOctMap.get(23), "U");
+});
+
+test("SoftwareMidiInput: e.code-first resolution, Shift-safe keyUp, setOctave(0), layout switching, octave delta, and selective releaseHeldKeys", () => {
+  const { engine, trackId } = createTestSetup();
+  const sw = new SoftwareMidiInput(engine);
+
+  // Shift-safe release on Semicolon in default ableton layout
+  const semiPitch = sw.keyDown(";", { code: "Semicolon" });
+  assert.equal(semiPitch, 76); // E5
+  assert.equal(engine._liveVoices.has(`${trackId}:76`), true);
+  sw.keyUp(":", { code: "Semicolon" });
+  assert.equal(engine._liveVoices.has(`${trackId}:76`), false);
+
+  // setOctave(0) must actually set octave 0 (not fall back to 4) and clamp to 0..7
+  assert.equal(sw.setOctave(0), 0);
+  assert.equal(sw.octave, 0);
+  assert.equal(sw.state.get().octave, 0);
+  assert.equal(sw.setOctave(99), 7);
+  assert.equal(sw.setOctave(-3), 0);
+  assert.equal(sw.setOctave(4), 4);
+
+  // resolveOctaveDelta in ableton layout
+  assert.equal(sw.resolveOctaveDelta("z", { code: "KeyZ" }), -1);
+  assert.equal(sw.resolveOctaveDelta("-", { code: "Minus" }), -1);
+  assert.equal(sw.resolveOctaveDelta("x", { code: "KeyX" }), 1);
+  assert.equal(sw.resolveOctaveDelta("=", { code: "Equal" }), 1);
+  assert.equal(sw.resolveOctaveDelta("a", { code: "KeyA" }), 0);
+
+  // Hold a note before switching layout -> released automatically on setKeyLayout
+  assert.equal(sw.keyDown("a", { code: "KeyA" }), 60);
+  assert.equal(engine._liveVoices.has(`${trackId}:60`), true);
+  assert.equal(sw.setKeyLayout("two-octave"), "two-octave");
+  assert.equal(sw.keyLayout, "two-octave");
+  assert.equal(sw.state.get().keyLayout, "two-octave");
+  assert.equal(engine._liveVoices.has(`${trackId}:60`), false);
+
+  // two-octave note mappings and Shift-safe Digit2 release
+  assert.equal(sw.keyDown("z", { code: "KeyZ" }), 60);
+  assert.equal(sw.keyDown("q", { code: "KeyQ" }), 72);
+  assert.equal(sw.keyDown("u", { code: "KeyU" }), 83);
+  assert.equal(sw.keyDown("2", { code: "Digit2" }), 73);
+  assert.equal(engine._liveVoices.has(`${trackId}:73`), true);
+  sw.keyUp("@", { code: "Digit2" });
+  assert.equal(engine._liveVoices.has(`${trackId}:73`), false);
+
+  // In two-octave layout, Z/X are notes (delta 0) while Minus/BracketLeft and Equal/BracketRight shift octaves
+  assert.equal(sw.resolveOctaveDelta("z", { code: "KeyZ" }), 0);
+  assert.equal(sw.resolveOctaveDelta("x", { code: "KeyX" }), 0);
+  assert.equal(sw.resolveOctaveDelta("-", { code: "Minus" }), -1);
+  assert.equal(sw.resolveOctaveDelta("[", { code: "BracketLeft" }), -1);
+  assert.equal(sw.resolveOctaveDelta("=", { code: "Equal" }), 1);
+  assert.equal(sw.resolveOctaveDelta("]", { code: "BracketRight" }), 1);
+
+  // releaseHeldKeys({ shouldReleasePitch }) preserves latched pitches while clearing _heldKeys
+  sw.releaseHeldKeys({ shouldReleasePitch: (pitch) => pitch !== 72 });
+  assert.equal(engine._liveVoices.has(`${trackId}:60`), false);
+  assert.equal(engine._liveVoices.has(`${trackId}:83`), false);
+  assert.equal(engine._liveVoices.has(`${trackId}:72`), true);
+  assert.equal(sw._heldKeys.size, 0);
+
+  sw.noteOff(72);
+  assert.equal(engine._liveVoices.has(`${trackId}:72`), false);
+});
+
+test("shouldHandleSoftwareKeyboardEvent: filters modifiers, editable targets, IME, and dialogs", () => {
+  const mkNode = (tagName, extra = {}) => ({ tagName, ...extra });
+  const okEvent = (overrides = {}) => ({
+    defaultPrevented: false,
+    isComposing: false,
+    keyCode: 65,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    target: mkNode("BUTTON"),
+    composedPath: () => [mkNode("BUTTON"), mkNode("DIV")],
+    ...overrides,
+  });
+
+  assert.equal(shouldHandleSoftwareKeyboardEvent(okEvent()), true);
+  assert.equal(shouldHandleSoftwareKeyboardEvent(null), false);
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ ctrlKey: true })),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ metaKey: true })),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ altKey: true })),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ defaultPrevented: true })),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ isComposing: true })),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(okEvent({ keyCode: 229 })),
+    false,
+  );
+
+  for (const tag of ["INPUT", "TEXTAREA", "SELECT"]) {
+    assert.equal(
+      shouldHandleSoftwareKeyboardEvent(
+        okEvent({ composedPath: () => [mkNode(tag)] }),
+      ),
+      false,
+    );
+  }
+
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(
+      okEvent({
+        composedPath: () => [
+          mkNode("SPAN"),
+          mkNode("DIV", { isContentEditable: true }),
+        ],
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(
+      okEvent({
+        composedPath: () => [
+          mkNode("DIV", {
+            getAttribute: (name) =>
+              name === "contenteditable" ? "plaintext-only" : null,
+          }),
+        ],
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    shouldHandleSoftwareKeyboardEvent(
+      okEvent({
+        composedPath: () => [mkNode("BUTTON"), mkNode("DIALOG")],
+      }),
+    ),
+    false,
+  );
 });

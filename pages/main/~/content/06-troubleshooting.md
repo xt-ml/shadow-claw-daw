@@ -33,7 +33,7 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 ### 5. Web MIDI API & Hardware Controllers
 
 - **Browser Support & Permissions**: Hardware MIDI via `navigator.requestMIDIAccess()` requires a Chromium-based or Web MIDI-enabled browser served over HTTPS (or `localhost`).
-- **Fallback**: When Web MIDI is unavailable or permission is denied, Daw gracefully degrades to the on-screen `<scdaw-midi-keyboard>` and QWERTY keyboard input without disrupting audio playback or editing.
+- **Fallback**: When Web MIDI is unavailable or permission is denied, Daw gracefully degrades to the on-screen `<scdaw-midi-keyboard>` and QWERTY keyboard input without disrupting audio playback or editing—supporting pointer/touch drag glissando and multi-touch play, toggleable Ableton (`A–'`, `Z`/`X` octave) and 2-Octave (`Z–M` / `Q–U`, `-`/`=` octave) QWERTY layouts, `e.code`-first Shift-safe key release, automatic filtering of modifier shortcuts (`Ctrl`/`Cmd`/`Alt`), text inputs, and `<dialog>` modals, and automatic held-note release on window `blur` or panel hide to prevent stuck notes.
 - **MIDI Learn & Right-Click Mapping**: Click **🎹 MIDI** in the transport bar to open the MIDI Devices & Routing dialog, use the **🎯 Learn** toggle in `<scdaw-mixer>`, or right-click any mixer fader, pan knob, M/S/R button, synth/device knob, or transport control to arm MIDI Learn for the next incoming CC.
 - **Channel Numbering & `omni`**: Internal MIDI channels are 0-based (`0–15`, shown as `Ch 1–16` in the UI). Setting `channel: "omni"` (or omitting it in `set_midi_learn_mapping` / `scdaw_configure_midi`) matches messages on any MIDI channel; `"omni"` is the default for UI Learn and controller presets.
 - **Default Parameter Ranges & Control Modes**:

@@ -10,26 +10,118 @@ import { State } from "./scdaw-signals.js";
 import { parseMidiMessage, encodeMidiMessage } from "./scdaw-midi.js";
 import { resolveMidiMappingDefaults } from "./scdaw.js";
 
-const QWERTY_SEMITONE_MAP = Object.freeze({
-  a: 0,
-  w: 1,
-  s: 2,
-  e: 3,
-  d: 4,
-  f: 5,
-  t: 6,
-  g: 7,
-  y: 8,
-  h: 9,
-  u: 10,
-  j: 11,
-  k: 12,
-  o: 13,
-  l: 14,
-  p: 15,
-  ";": 16,
-  "'": 17,
+function freezeNotes(notes) {
+  return Object.freeze(notes.map((n) => Object.freeze({ ...n })));
+}
+
+export const QWERTY_LAYOUTS = Object.freeze({
+  ableton: Object.freeze({
+    id: "ableton",
+    label: "A–'",
+    hint: "QWERTY: A–' · Z/X Oct",
+    octaveDownKeys: Object.freeze(["z", "-"]),
+    octaveDownCodes: Object.freeze(["KeyZ", "Minus"]),
+    octaveUpKeys: Object.freeze(["x", "="]),
+    octaveUpCodes: Object.freeze(["KeyX", "Equal"]),
+    notes: freezeNotes([
+      { code: "KeyA", key: "a", label: "A", offset: 0 },
+      { code: "KeyW", key: "w", label: "W", offset: 1 },
+      { code: "KeyS", key: "s", label: "S", offset: 2 },
+      { code: "KeyE", key: "e", label: "E", offset: 3 },
+      { code: "KeyD", key: "d", label: "D", offset: 4 },
+      { code: "KeyF", key: "f", label: "F", offset: 5 },
+      { code: "KeyT", key: "t", label: "T", offset: 6 },
+      { code: "KeyG", key: "g", label: "G", offset: 7 },
+      { code: "KeyY", key: "y", label: "Y", offset: 8 },
+      { code: "KeyH", key: "h", label: "H", offset: 9 },
+      { code: "KeyU", key: "u", label: "U", offset: 10 },
+      { code: "KeyJ", key: "j", label: "J", offset: 11 },
+      { code: "KeyK", key: "k", label: "K", offset: 12 },
+      { code: "KeyO", key: "o", label: "O", offset: 13 },
+      { code: "KeyL", key: "l", label: "L", offset: 14 },
+      { code: "KeyP", key: "p", label: "P", offset: 15 },
+      { code: "Semicolon", key: ";", label: ";", offset: 16 },
+      { code: "Quote", key: "'", label: "'", offset: 17 },
+    ]),
+  }),
+  "two-octave": Object.freeze({
+    id: "two-octave",
+    label: "Z–U (2 Oct)",
+    hint: "QWERTY: Z–M / Q–U · -/= Oct",
+    octaveDownKeys: Object.freeze(["-", "["]),
+    octaveDownCodes: Object.freeze(["Minus", "BracketLeft"]),
+    octaveUpKeys: Object.freeze(["=", "]"]),
+    octaveUpCodes: Object.freeze(["Equal", "BracketRight"]),
+    notes: freezeNotes([
+      { code: "KeyZ", key: "z", label: "Z", offset: 0 },
+      { code: "KeyS", key: "s", label: "S", offset: 1 },
+      { code: "KeyX", key: "x", label: "X", offset: 2 },
+      { code: "KeyD", key: "d", label: "D", offset: 3 },
+      { code: "KeyC", key: "c", label: "C", offset: 4 },
+      { code: "KeyV", key: "v", label: "V", offset: 5 },
+      { code: "KeyG", key: "g", label: "G", offset: 6 },
+      { code: "KeyB", key: "b", label: "B", offset: 7 },
+      { code: "KeyH", key: "h", label: "H", offset: 8 },
+      { code: "KeyN", key: "n", label: "N", offset: 9 },
+      { code: "KeyJ", key: "j", label: "J", offset: 10 },
+      { code: "KeyM", key: "m", label: "M", offset: 11 },
+      { code: "KeyQ", key: "q", label: "Q", offset: 12 },
+      { code: "Digit2", key: "2", label: "2", offset: 13 },
+      { code: "KeyW", key: "w", label: "W", offset: 14 },
+      { code: "Digit3", key: "3", label: "3", offset: 15 },
+      { code: "KeyE", key: "e", label: "E", offset: 16 },
+      { code: "KeyR", key: "r", label: "R", offset: 17 },
+      { code: "Digit5", key: "5", label: "5", offset: 18 },
+      { code: "KeyT", key: "t", label: "T", offset: 19 },
+      { code: "Digit6", key: "6", label: "6", offset: 20 },
+      { code: "KeyY", key: "y", label: "Y", offset: 21 },
+      { code: "Digit7", key: "7", label: "7", offset: 22 },
+      { code: "KeyU", key: "u", label: "U", offset: 23 },
+    ]),
+  }),
 });
+
+export function getQwertyKeyMapForLayout(layoutId = "ableton") {
+  const layout = QWERTY_LAYOUTS[layoutId] || QWERTY_LAYOUTS.ableton;
+  const map = new Map();
+  for (const entry of layout.notes) {
+    map.set(entry.offset, entry.label);
+  }
+  return map;
+}
+
+export function shouldHandleSoftwareKeyboardEvent(event) {
+  if (!event || event.defaultPrevented || event.isComposing) return false;
+  if (event.keyCode === 229) return false;
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+
+  const path =
+    typeof event.composedPath === "function"
+      ? event.composedPath()
+      : [event.target];
+
+  for (const node of path) {
+    if (!node) continue;
+    const tag =
+      typeof node.tagName === "string" ? node.tagName.toUpperCase() : "";
+    if (
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      tag === "SELECT" ||
+      tag === "DIALOG"
+    ) {
+      return false;
+    }
+    if (node.isContentEditable === true) return false;
+    if (typeof node.getAttribute === "function") {
+      const ce = node.getAttribute("contenteditable");
+      if (ce === "" || ce === "true" || ce === "plaintext-only") {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 function clamp(val, min, max) {
   return Math.max(min, Math.min(max, val));
@@ -39,22 +131,61 @@ export class SoftwareMidiInput {
   constructor(engine) {
     this.engine = engine;
     this.octave = 4;
+    this.keyLayout = "ableton";
     this.velocity = 0.8;
     this._heldKeys = new Map();
     this._heldPitches = new Map();
+    this.state = new State({
+      octave: this.octave,
+      keyLayout: this.keyLayout,
+      velocity: this.velocity,
+    });
+  }
+
+  _syncState() {
+    this.state.set({
+      octave: this.octave,
+      keyLayout: this.keyLayout,
+      velocity: this.velocity,
+    });
+  }
+
+  getLayout() {
+    return QWERTY_LAYOUTS[this.keyLayout] || QWERTY_LAYOUTS.ableton;
   }
 
   setOctave(oct) {
-    this.octave = clamp(Math.round(Number(oct) || 4), 0, 8);
+    const parsed = Number(oct);
+    const next = Number.isFinite(parsed) ? clamp(Math.round(parsed), 0, 7) : 4;
+    this.octave = next;
+    this._syncState();
     return this.octave;
   }
 
   shiftOctave(delta) {
-    return this.setOctave(this.octave + delta);
+    return this.setOctave(this.octave + (Number(delta) || 0));
+  }
+
+  setKeyLayout(layoutId) {
+    const next = layoutId in QWERTY_LAYOUTS ? layoutId : "ableton";
+    if (next !== this.keyLayout) {
+      this.releaseHeldKeys();
+      this.keyLayout = next;
+      this._syncState();
+    }
+    return this.keyLayout;
+  }
+
+  toggleKeyLayout() {
+    return this.setKeyLayout(
+      this.keyLayout === "two-octave" ? "ableton" : "two-octave",
+    );
   }
 
   setVelocity(vel) {
-    this.velocity = clamp(Number(vel) || 0.8, 0.05, 1);
+    const parsed = Number(vel);
+    this.velocity = clamp(Number.isFinite(parsed) ? parsed : 0.8, 0.05, 1);
+    this._syncState();
     return this.velocity;
   }
 
@@ -74,27 +205,109 @@ export class SoftwareMidiInput {
     this.engine.liveNoteOff(targetId, p);
   }
 
-  keyDown(key, { repeat = false, trackId = null } = {}) {
-    if (repeat || !key) return null;
-    const normalized = String(key).toLowerCase();
-    if (!(normalized in QWERTY_SEMITONE_MAP)) return null;
-    if (this._heldKeys.has(normalized)) return null;
-
-    const offset = QWERTY_SEMITONE_MAP[normalized];
-    const pitch = clamp((this.octave + 1) * 12 + offset, 0, 127);
-    const targetId = trackId || this.engine?.selectedTrackId?.get();
-    this._heldKeys.set(normalized, { pitch, trackId: targetId });
-    this.noteOn(pitch, this.velocity, targetId);
-    return pitch;
+  _findNoteEntry(key, code = null) {
+    const layout = this.getLayout();
+    if (code) {
+      const byCode = layout.notes.find((n) => n.code === code);
+      if (byCode) return byCode;
+    }
+    if (key) {
+      const normalized = String(key).toLowerCase();
+      const byKey = layout.notes.find((n) => n.key === normalized);
+      if (byKey) return byKey;
+    }
+    return null;
   }
 
-  keyUp(key, { trackId = null } = {}) {
-    if (!key) return;
-    const normalized = String(key).toLowerCase();
-    const entry = this._heldKeys.get(normalized);
-    if (!entry) return;
-    this._heldKeys.delete(normalized);
-    this.noteOff(entry.pitch, trackId || entry.trackId);
+  resolveNotePitch(key, { code = null } = {}) {
+    const entry = this._findNoteEntry(key, code);
+    if (!entry) return null;
+    return {
+      code: entry.code,
+      offset: entry.offset,
+      pitch: clamp((this.octave + 1) * 12 + entry.offset, 0, 127),
+    };
+  }
+
+  resolveOctaveDelta(key, { code = null } = {}) {
+    const layout = this.getLayout();
+    if (code) {
+      if (layout.octaveDownCodes.includes(code)) return -1;
+      if (layout.octaveUpCodes.includes(code)) return 1;
+    }
+    if (key) {
+      const normalized = String(key).toLowerCase();
+      if (layout.octaveDownKeys.includes(normalized)) return -1;
+      if (layout.octaveUpKeys.includes(normalized)) return 1;
+    }
+    return 0;
+  }
+
+  isPitchHeldByKey(pitch, trackId = null) {
+    for (const entry of this._heldKeys.values()) {
+      if (entry.pitch === pitch && (!trackId || entry.trackId === trackId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  keyDown(key, { code = null, repeat = false, trackId = null } = {}) {
+    if (repeat || (!key && !code)) return null;
+    const resolved = this.resolveNotePitch(key, { code });
+    if (!resolved) return null;
+    if (this._heldKeys.has(resolved.code)) return null;
+
+    const targetId = trackId || this.engine?.selectedTrackId?.get();
+    this._heldKeys.set(resolved.code, {
+      pitch: resolved.pitch,
+      trackId: targetId,
+    });
+    this.noteOn(resolved.pitch, this.velocity, targetId);
+    return resolved.pitch;
+  }
+
+  keyUp(key, { code = null, trackId = null, shouldReleasePitch = null } = {}) {
+    if (!key && !code) return;
+    let id = null;
+    if (code && this._heldKeys.has(code)) {
+      id = code;
+    } else {
+      const entryMatch = this._findNoteEntry(key, code);
+      if (entryMatch && this._heldKeys.has(entryMatch.code)) {
+        id = entryMatch.code;
+      } else if (key) {
+        const normalized = String(key).toLowerCase();
+        if (this._heldKeys.has(normalized)) id = normalized;
+      }
+    }
+    if (!id) return;
+    const entry = this._heldKeys.get(id);
+    this._heldKeys.delete(id);
+
+    const targetTrackId = trackId || entry.trackId;
+    const stillHeld = this.isPitchHeldByKey(entry.pitch, targetTrackId);
+    const allowRelease =
+      typeof shouldReleasePitch === "function"
+        ? shouldReleasePitch(entry.pitch)
+        : true;
+    if (!stillHeld && allowRelease) {
+      this.noteOff(entry.pitch, targetTrackId);
+    }
+  }
+
+  releaseHeldKeys({ shouldReleasePitch = null } = {}) {
+    const entries = Array.from(this._heldKeys.values());
+    this._heldKeys.clear();
+    const released = new Set();
+    for (const entry of entries) {
+      const dedupKey = `${entry.trackId}:${entry.pitch}`;
+      if (released.has(dedupKey)) continue;
+      released.add(dedupKey);
+      if (!shouldReleasePitch || shouldReleasePitch(entry.pitch)) {
+        this.noteOff(entry.pitch, entry.trackId);
+      }
+    }
   }
 
   releaseAll() {
