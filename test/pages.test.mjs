@@ -308,6 +308,10 @@ test("Iconography & PWA Manifest: all icons and screenshots are template-specifi
     "manifest.icons must not include SVG favicon (avoids Chrome DevTools image decode failure)",
   );
   assert.ok(
+    iconSrcs.includes("assets/icons/167.png"),
+    "manifest.icons must include assets/icons/167.png",
+  );
+  assert.ok(
     iconSrcs.includes("assets/icons/180.png"),
     "manifest.icons must include assets/icons/180.png",
   );
@@ -349,6 +353,7 @@ test("Iconography & PWA Manifest: all icons and screenshots are template-specifi
     "96.png",
     "128.png",
     "152.png",
+    "167.png",
     "180.png",
     "192.png",
     "512.png",
