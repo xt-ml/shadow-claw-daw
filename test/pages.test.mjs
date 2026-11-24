@@ -172,10 +172,35 @@ test("Documentation: README.md, AGENTS.md, and pages/main docs are up to date an
     resolve(ROOT, "pages/main/~/content/06-troubleshooting.md"),
     "utf8",
   );
+  const portingDoc = readFileSync(
+    resolve(ROOT, "pages/main/~/content/05-porting-and-attribution.md"),
+    "utf8",
+  );
+  const archDoc = readFileSync(
+    resolve(ROOT, "pages/main/~/content/01-architecture.md"),
+    "utf8",
+  );
+  const toolsDoc = readFileSync(
+    resolve(ROOT, "pages/main/~/content/02-tools.md"),
+    "utf8",
+  );
+  const llmsTxt = readFileSync(
+    resolve(ROOT, "pages/resources/llms.txt"),
+    "utf8",
+  );
 
-  // Must document 47 declarative tools and 13 custom elements
-  assert.match(readme, /47 declarative `scdaw_\*` WebMCP tools/);
-  assert.match(agents, /47 declarative tools/);
+  // Must document 50 declarative tools, 15 custom elements, and porting attribution
+  assert.match(readme, /50 declarative `scdaw_\*` WebMCP tools/);
+  assert.match(agents, /50 declarative tools/);
+  assert.match(archDoc, /50 `scdaw_\*` tools/);
+  assert.match(archDoc, /15 encapsulated Custom Elements/);
+  assert.match(toolsDoc, /50 declarative tools/);
+  assert.match(memory, /50 declarative WebMCP tools/);
+  assert.match(memory, /15 modular Web Components/);
+  assert.match(llmsTxt, /50 declarative `scdaw_\*` tools/);
+  assert.match(llmsTxt, /15 mobile-first custom elements/);
+  assert.match(portingDoc, /Audio Editing, Spectral & Restoration Reference/);
+  assert.match(portingDoc, /Audio Editing & DSP Porting Mapping/);
 
   // Must not reference deprecated scdaw.html or shadow-claw-template
   for (const [name, text] of [

@@ -40,6 +40,22 @@
           "gain": {
             "type": "number",
             "description": "Clip gain multiplier (default 1.0)"
+          },
+          "pitch": {
+            "type": "number",
+            "description": "Non-destructive pitch shift in semitones (-24..24)"
+          },
+          "speed": {
+            "type": "number",
+            "description": "Non-destructive playback speed rate (0.25..4.0)"
+          },
+          "stretchToMatchTempo": {
+            "type": "boolean",
+            "description": "Auto-scale playback rate to match project BPM vs sourceBpm"
+          },
+          "sourceBpm": {
+            "type": "number",
+            "description": "Source clip native BPM (20..300)"
           }
         },
         "required": ["name"]

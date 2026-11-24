@@ -34,6 +34,18 @@
           },
           "gain": {
             "type": "number"
+          },
+          "pitch": {
+            "type": "number"
+          },
+          "speed": {
+            "type": "number"
+          },
+          "stretchToMatchTempo": {
+            "type": "boolean"
+          },
+          "sourceBpm": {
+            "type": "number"
           }
         }
       }

@@ -103,9 +103,10 @@ test("Phase 3.1: Systemic error surfacing (formatUserError, reportError, clearEr
   assert.doesNotMatch(transportSrc, /scdaw\.requestDialog\?\./);
   const reportMatches =
     transportSrc.match(/scdaw\.reportError(?:\?\.)?\(/g) || [];
+  const dialogMatches = transportSrc.match(/showErrorDialog\(/g) || [];
   assert.ok(
-    reportMatches.length >= 4,
-    `Expected all recording error blocks in scdaw-transport.js to call scdaw.reportError, found ${reportMatches.length}`,
+    reportMatches.length >= 1 && dialogMatches.length >= 4,
+    `Expected scdaw-transport.js to surface all recording errors via showErrorDialog + scdaw.reportError`,
   );
   assert.match(statusbarSrc, /id=["']error-stat["']/);
   assert.match(
@@ -115,7 +116,7 @@ test("Phase 3.1: Systemic error surfacing (formatUserError, reportError, clearEr
   assert.match(workbenchSrc, /id=["']scdaw-error-dismiss["']/);
 });
 
-test("Phase 3.2: Wave editor pure helpers (envelope, selection, zero-crossing snap, Audacity drag eat/restore, viewport, SVG)", () => {
+test("Phase 3.2: Wave editor pure helpers (envelope, selection, zero-crossing snap, envelope drag eat/restore, viewport, SVG)", () => {
   const sr = 44100;
   const sine = makeSine(220, sr, 0.2, 0.8);
 
@@ -150,7 +151,7 @@ test("Phase 3.2: Wave editor pure helpers (envelope, selection, zero-crossing sn
   assert.ok(sine[sIdx - 1] <= 0 && sine[sIdx] >= 0);
   assert.ok(sine[eIdx - 1] <= 0 && sine[eIdx] >= 0);
 
-  // 4. applyEnvelopePointDrag: Audacity 4 eat/restore semantics
+  // 4. applyEnvelopePointDrag: envelope eat/restore semantics
   const origPts = [
     { time: 0.5, value: 1.0 },
     { time: 1.0, value: 0.5 },

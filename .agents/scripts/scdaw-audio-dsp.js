@@ -7,6 +7,25 @@
  */
 
 import { evaluateClipGainEnvelope } from "./scdaw.js";
+import {
+  applyNoiseReduction,
+  applySpectralEdit,
+} from "./scdaw-spectral-dsp.js";
+import {
+  resampleAudio,
+  timeStretchWsola,
+  pitchShiftAudio,
+  changeSpeedAudio,
+  truncateSilenceAudio,
+} from "./scdaw-time-dsp.js";
+
+export {
+  resampleAudio,
+  timeStretchWsola,
+  pitchShiftAudio,
+  changeSpeedAudio,
+  truncateSilenceAudio,
+};
 
 const _dspBackends = new Map();
 
@@ -846,6 +865,21 @@ export function processAudioChannels(
     }
     case "bake_fades":
       return bakeClipGainAndFades(channels, params.clip || params, sampleRate);
+    case "noise_reduction":
+      return applyNoiseReduction(channels, params.noiseProfile, {
+        ...params,
+        sampleRate,
+      });
+    case "spectral_edit":
+      return applySpectralEdit(channels, { ...params, sampleRate });
+    case "change_tempo":
+      return timeStretchWsola(channels, { ...params, sampleRate });
+    case "change_pitch":
+      return pitchShiftAudio(channels, { ...params, sampleRate });
+    case "change_speed":
+      return changeSpeedAudio(channels, params);
+    case "truncate_silence":
+      return truncateSilenceAudio(channels, { ...params, sampleRate });
     default:
       throw new Error(`Unsupported audio DSP effect: ${effect}`);
   }

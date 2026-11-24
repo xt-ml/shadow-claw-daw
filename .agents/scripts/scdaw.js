@@ -762,6 +762,7 @@ export function createProject(template = "basic-beat") {
       midiMappings: Array.isArray(template.midiMappings)
         ? template.midiMappings
         : base.midiMappings,
+      labels: Array.isArray(template.labels) ? template.labels : base.labels,
       tracks: Array.isArray(template.tracks) ? template.tracks : base.tracks,
     };
   }
@@ -777,6 +778,7 @@ export function createProject(template = "basic-beat") {
       metronome: { enabled: false, volume: 0.8 },
       master: { volume: 0.8 },
       midiMappings: [],
+      labels: [],
       tracks: [],
     };
   }
@@ -968,6 +970,9 @@ export function validateProject(project) {
   ) {
     errors.push("Project loop must be an object");
   }
+  if (project.labels !== undefined && !Array.isArray(project.labels)) {
+    errors.push("Project labels must be an array");
+  }
   if (!Array.isArray(project.tracks)) {
     errors.push("Project tracks must be an array");
   } else if (project.tracks.length > 64) {
@@ -1086,6 +1091,150 @@ function normalizeFadeType(type) {
 
 function makeClipId() {
   return `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function makeLabelId() {
+  return `lbl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function normalizeLabel(raw = {}, existing = null) {
+  const startBeat = Math.max(
+    0,
+    Number(
+      raw.startBeat !== undefined ? raw.startBeat : (existing?.startBeat ?? 0),
+    ) || 0,
+  );
+  const rawEnd =
+    raw.endBeat !== undefined
+      ? Number(raw.endBeat)
+      : existing?.endBeat !== undefined
+        ? Number(existing.endBeat)
+        : startBeat;
+  const endBeat = Math.max(
+    startBeat,
+    Number.isFinite(rawEnd) ? rawEnd : startBeat,
+  );
+  const label = {
+    id: String(raw.id || existing?.id || makeLabelId()),
+    title: String(
+      raw.title !== undefined ? raw.title : (existing?.title ?? "Label"),
+    ),
+    startBeat: Number(startBeat.toFixed(6)),
+    endBeat: Number(endBeat.toFixed(6)),
+  };
+  const lowFreq =
+    raw.lowFrequency !== undefined ? raw.lowFrequency : existing?.lowFrequency;
+  if (
+    lowFreq !== undefined &&
+    lowFreq !== null &&
+    Number.isFinite(Number(lowFreq))
+  ) {
+    label.lowFrequency = Math.max(0, Number(lowFreq));
+  }
+  const highFreq =
+    raw.highFrequency !== undefined
+      ? raw.highFrequency
+      : existing?.highFrequency;
+  if (
+    highFreq !== undefined &&
+    highFreq !== null &&
+    Number.isFinite(Number(highFreq))
+  ) {
+    label.highFrequency = Math.max(0, Number(highFreq));
+  }
+  const color = raw.color !== undefined ? raw.color : existing?.color;
+  if (color) {
+    label.color = String(color);
+  }
+  return label;
+}
+
+function splitSingleAudioClip(clip, splitBeat, bpm = 120) {
+  const clipStart = Number(clip.time || 0);
+  const clipDur = Number(clip.duration || 4);
+  const clipEnd = clipStart + clipDur;
+  const secPerBeat = 60 / (bpm || 120);
+  const leftDurBeats = splitBeat - clipStart;
+  const rightDurBeats = clipEnd - splitBeat;
+  const splitRelSec = leftDurBeats * secPerBeat;
+  const leftDurSec = splitRelSec;
+  const rightDurSec = rightDurBeats * secPerBeat;
+
+  const leftClip = structuredClone(clip);
+  leftClip.duration = Number(leftDurBeats.toFixed(6));
+  leftClip.fadeOut = 0;
+  if (leftClip.fadeIn !== undefined) {
+    leftClip.fadeIn = Math.min(leftClip.fadeIn, leftDurSec);
+  }
+
+  const rightClip = structuredClone(clip);
+  rightClip.id = makeClipId();
+  rightClip.time = Number(splitBeat.toFixed(6));
+  rightClip.duration = Number(rightDurBeats.toFixed(6));
+  rightClip.offset = Number(
+    (Number(clip.offset || 0) + splitRelSec).toFixed(6),
+  );
+  rightClip.fadeIn = 0;
+  if (rightClip.fadeOut !== undefined) {
+    rightClip.fadeOut = Math.min(rightClip.fadeOut, rightDurSec);
+  }
+
+  if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+    const boundaryVal = evaluateGainPointsAt(clip.gainEnvelope, splitRelSec);
+    const leftEnv = clip.gainEnvelope
+      .filter((pt) => pt.time < splitRelSec - 1e-6)
+      .map((pt) => ({ ...pt }));
+    leftEnv.push({
+      time: Number(splitRelSec.toFixed(6)),
+      value: boundaryVal,
+    });
+    leftClip.gainEnvelope = normalizeGainEnvelope(leftEnv, leftDurSec);
+
+    const rightEnv = [
+      { time: 0, value: boundaryVal },
+      ...clip.gainEnvelope
+        .filter((pt) => pt.time > splitRelSec + 1e-6)
+        .map((pt) => ({
+          time: Number((pt.time - splitRelSec).toFixed(6)),
+          value: pt.value,
+        })),
+    ];
+    rightClip.gainEnvelope = normalizeGainEnvelope(rightEnv, rightDurSec);
+  }
+
+  return [leftClip, rightClip];
+}
+
+/**
+ * Compute non-destructive playbackRate and detune (in cents) for an audio clip.
+ *
+ * @param {Object} clip
+ * @param {number} [projectBpm=120]
+ * @returns {{ playbackRate: number, detuneCents: number }}
+ */
+export function computeClipPlaybackParams(clip = {}, projectBpm = 120) {
+  const baseSpeed =
+    clip?.speed !== undefined && Number.isFinite(Number(clip.speed))
+      ? Math.max(0.25, Math.min(4.0, Number(clip.speed)))
+      : 1.0;
+  let rate = baseSpeed;
+  if (clip?.stretchToMatchTempo && Number(clip?.sourceBpm) > 0) {
+    const ratio = Number(projectBpm || 120) / Number(clip.sourceBpm);
+    if (Number.isFinite(ratio) && ratio > 0) {
+      rate *= ratio;
+    }
+  }
+  const playbackRate = Math.max(0.25, Math.min(4.0, Number(rate.toFixed(6))));
+  const rawPitch =
+    clip?.pitch !== undefined && Number.isFinite(Number(clip.pitch))
+      ? Number(clip.pitch)
+      : 0;
+  const clampedSemitones = Math.max(-24, Math.min(24, rawPitch));
+  const detuneCents = Math.max(
+    -2400,
+    Math.min(2400, Math.round(clampedSemitones * 100)),
+  );
+  return { playbackRate, detuneCents };
 }
 
 export function normalizeGainEnvelope(points, maxSec = Infinity) {
@@ -2231,6 +2380,27 @@ export function applyCommand(project, name, params = {}) {
       if (rawClip.muted !== undefined) clip.muted = Boolean(rawClip.muted);
       if (rawClip.color !== undefined) clip.color = String(rawClip.color);
       if (rawClip.groupId !== undefined) clip.groupId = rawClip.groupId;
+      if (
+        rawClip.pitch !== undefined &&
+        Number.isFinite(Number(rawClip.pitch))
+      ) {
+        clip.pitch = Math.max(-24, Math.min(24, Number(rawClip.pitch)));
+      }
+      if (
+        rawClip.speed !== undefined &&
+        Number.isFinite(Number(rawClip.speed))
+      ) {
+        clip.speed = Math.max(0.25, Math.min(4.0, Number(rawClip.speed)));
+      }
+      if (rawClip.stretchToMatchTempo !== undefined) {
+        clip.stretchToMatchTempo = Boolean(rawClip.stretchToMatchTempo);
+      }
+      if (
+        rawClip.sourceBpm !== undefined &&
+        Number.isFinite(Number(rawClip.sourceBpm))
+      ) {
+        clip.sourceBpm = Math.max(20, Math.min(300, Number(rawClip.sourceBpm)));
+      }
 
       track.audioClips.push(clip);
       track.audioClips.sort((a, b) => a.time - b.time);
@@ -2293,6 +2463,33 @@ export function applyCommand(project, name, params = {}) {
           clip.color = String(params.patch.color);
         if (params.patch.groupId !== undefined)
           clip.groupId = params.patch.groupId;
+        if (
+          params.patch.pitch !== undefined &&
+          Number.isFinite(Number(params.patch.pitch))
+        ) {
+          clip.pitch = Math.max(-24, Math.min(24, Number(params.patch.pitch)));
+        }
+        if (
+          params.patch.speed !== undefined &&
+          Number.isFinite(Number(params.patch.speed))
+        ) {
+          clip.speed = Math.max(
+            0.25,
+            Math.min(4.0, Number(params.patch.speed)),
+          );
+        }
+        if (params.patch.stretchToMatchTempo !== undefined) {
+          clip.stretchToMatchTempo = Boolean(params.patch.stretchToMatchTempo);
+        }
+        if (
+          params.patch.sourceBpm !== undefined &&
+          Number.isFinite(Number(params.patch.sourceBpm))
+        ) {
+          clip.sourceBpm = Math.max(
+            20,
+            Math.min(300, Number(params.patch.sourceBpm)),
+          );
+        }
 
         track.audioClips.sort((a, b) => a.time - b.time);
         ensureProjectCoversPulses(
@@ -2346,55 +2543,7 @@ export function applyCommand(project, name, params = {}) {
       }
 
       const bpm = next.bpm || 120;
-      const secPerBeat = 60 / bpm;
-      const leftDurBeats = splitBeat - clipStart;
-      const rightDurBeats = clipEnd - splitBeat;
-      const splitRelSec = leftDurBeats * secPerBeat;
-      const leftDurSec = splitRelSec;
-      const rightDurSec = rightDurBeats * secPerBeat;
-
-      const leftClip = structuredClone(clip);
-      leftClip.duration = leftDurBeats;
-      leftClip.fadeOut = 0;
-      if (leftClip.fadeIn !== undefined) {
-        leftClip.fadeIn = Math.min(leftClip.fadeIn, leftDurSec);
-      }
-
-      const rightClip = structuredClone(clip);
-      rightClip.id = makeClipId();
-      rightClip.time = splitBeat;
-      rightClip.duration = rightDurBeats;
-      rightClip.offset = Number(clip.offset || 0) + splitRelSec;
-      rightClip.fadeIn = 0;
-      if (rightClip.fadeOut !== undefined) {
-        rightClip.fadeOut = Math.min(rightClip.fadeOut, rightDurSec);
-      }
-
-      if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
-        const boundaryVal = evaluateGainPointsAt(
-          clip.gainEnvelope,
-          splitRelSec,
-        );
-        const leftEnv = clip.gainEnvelope
-          .filter((pt) => pt.time < splitRelSec - 1e-6)
-          .map((pt) => ({ ...pt }));
-        leftEnv.push({
-          time: Number(splitRelSec.toFixed(6)),
-          value: boundaryVal,
-        });
-        leftClip.gainEnvelope = normalizeGainEnvelope(leftEnv, leftDurSec);
-
-        const rightEnv = [
-          { time: 0, value: boundaryVal },
-          ...clip.gainEnvelope
-            .filter((pt) => pt.time > splitRelSec + 1e-6)
-            .map((pt) => ({
-              time: Number((pt.time - splitRelSec).toFixed(6)),
-              value: pt.value,
-            })),
-        ];
-        rightClip.gainEnvelope = normalizeGainEnvelope(rightEnv, rightDurSec);
-      }
+      const [leftClip, rightClip] = splitSingleAudioClip(clip, splitBeat, bpm);
 
       track.audioClips.splice(idx, 1, leftClip, rightClip);
       track.audioClips.sort((a, b) => a.time - b.time);
@@ -3296,6 +3445,147 @@ export function applyCommand(project, name, params = {}) {
           trackId: track.id,
           addedCount: added.length,
           notes: added,
+        },
+      };
+    }
+
+    case "add_label": {
+      if (!Array.isArray(next.labels)) next.labels = [];
+      const label = normalizeLabel(params);
+      next.labels.push(label);
+      next.labels.sort((a, b) => a.startBeat - b.startBeat);
+      ensureProjectCoversPulses(next, label.endBeat * PPQN.Quarter);
+      return {
+        project: next,
+        result: { ok: true, label, labels: next.labels },
+      };
+    }
+
+    case "update_label": {
+      if (!Array.isArray(next.labels)) next.labels = [];
+      const idx = next.labels.findIndex((l) => l.id === params.labelId);
+      if (idx === -1) {
+        throw new Error(`Label not found: ${params.labelId}`);
+      }
+      const updated = normalizeLabel(params, next.labels[idx]);
+      next.labels[idx] = updated;
+      next.labels.sort((a, b) => a.startBeat - b.startBeat);
+      ensureProjectCoversPulses(next, updated.endBeat * PPQN.Quarter);
+      return {
+        project: next,
+        result: { ok: true, label: updated, labels: next.labels },
+      };
+    }
+
+    case "remove_label": {
+      if (!Array.isArray(next.labels)) next.labels = [];
+      const before = next.labels.length;
+      next.labels = next.labels.filter((l) => l.id !== params.labelId);
+      if (next.labels.length === before) {
+        throw new Error(`Label not found: ${params.labelId}`);
+      }
+      return {
+        project: next,
+        result: { ok: true, labelId: params.labelId, labels: next.labels },
+      };
+    }
+
+    case "clear_labels": {
+      const removedCount = Array.isArray(next.labels) ? next.labels.length : 0;
+      next.labels = [];
+      return {
+        project: next,
+        result: { ok: true, removedCount, labels: [] },
+      };
+    }
+
+    case "list_labels": {
+      const labels = Array.isArray(next.labels) ? next.labels : [];
+      return {
+        project: next,
+        result: { ok: true, count: labels.length, labels },
+      };
+    }
+
+    case "split_at_labels": {
+      const labels = Array.isArray(next.labels) ? next.labels : [];
+      const beatSet = new Set();
+      for (const l of labels) {
+        if (Number.isFinite(Number(l.startBeat))) {
+          beatSet.add(Number(Number(l.startBeat).toFixed(6)));
+        }
+        if (
+          params.includeRegionEnds &&
+          Number.isFinite(Number(l.endBeat)) &&
+          Number(l.endBeat) > Number(l.startBeat)
+        ) {
+          beatSet.add(Number(Number(l.endBeat).toFixed(6)));
+        }
+      }
+      const splitBeats = [...beatSet].sort((a, b) => a - b);
+      const bpm = next.bpm || 120;
+      const targetTracks = params.trackId
+        ? next.tracks.filter((t) => t.id === params.trackId)
+        : next.tracks.filter((t) => t.kind === "audio");
+      if (params.trackId && targetTracks.length === 0) {
+        throw new Error(`Track not found: ${params.trackId}`);
+      }
+
+      let splitCount = 0;
+      for (const trk of targetTracks) {
+        if (!Array.isArray(trk.audioClips) || trk.audioClips.length === 0) {
+          continue;
+        }
+        let working = trk.audioClips.slice();
+        for (const beat of splitBeats) {
+          const nextWorking = [];
+          for (const clip of working) {
+            const cStart = Number(clip.time || 0);
+            const cEnd = cStart + Number(clip.duration || 4);
+            if (beat >= cStart + 0.0625 && beat <= cEnd - 0.0625) {
+              const [leftClip, rightClip] = splitSingleAudioClip(
+                clip,
+                beat,
+                bpm,
+              );
+              nextWorking.push(leftClip, rightClip);
+              splitCount++;
+            } else {
+              nextWorking.push(clip);
+            }
+          }
+          working = nextWorking;
+        }
+        working.sort((a, b) => a.time - b.time);
+        trk.audioClips = working;
+      }
+
+      return {
+        project: next,
+        result: { ok: true, splitCount, splitBeats },
+      };
+    }
+
+    case "replace_audio_clip_segments": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const idx = track.audioClips.findIndex((c) => c.id === params.clipId);
+      if (idx === -1) throw new Error(`Audio clip not found: ${params.clipId}`);
+      const segments = Array.isArray(params.segments) ? params.segments : [];
+      if (segments.length === 0) {
+        throw new Error(
+          "replace_audio_clip_segments requires at least 1 segment",
+        );
+      }
+      track.audioClips.splice(idx, 1, ...segments);
+      track.audioClips.sort((a, b) => a.time - b.time);
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          segments,
         },
       };
     }

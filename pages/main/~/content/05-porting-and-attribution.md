@@ -1,13 +1,13 @@
 ---
 title: "Porting & Upstream Attribution"
 created: "2026-11-05T23:00:00Z"
-updated: "2026-11-06T01:43:00Z"
+updated: "2026-11-23T00:00:00Z"
 slug: "porting-and-attribution"
 ---
 
 ## Porting & Upstream Attribution
 
-This project derives architecture, DSP formulas, and concepts from **openDAW** and **OpenStudio**, ported into a zero-dependency Vanilla JS, Web Component, and Signal-based architecture for **ShadowClaw**.
+This project derives architecture, DSP formulas, and concepts from **openDAW**, **OpenStudio**, and **Audacity**, ported into a zero-dependency Vanilla JS, Web Component, and Signal-based architecture for **ShadowClaw**.
 
 ### Upstream Provenance
 
@@ -16,13 +16,22 @@ This project derives architecture, DSP formulas, and concepts from **openDAW** a
 - **License**: GNU Affero General Public License v3.0 or later (AGPLv3)
 - **Copyright**: © André Michelle and openDAW contributors
 
+### Audio Editing, Spectral & Restoration Reference (Audacity)
+
+- **Repository**: [audacity/audacity](https://github.com/audacity/audacity)
+- **Reference Branches & Commit SHAs**:
+  - Audacity 4 (`master`): `f56f25d4c26ae5a0a1466c3f16876e547be0d179` (`2026-11-23`)
+  - Audacity 3 (`audacity3`): `e168e5f70b8432efdd53c069b534c829065abcb0` (`2026-09-24`)
+- **License**: GNU General Public License v3.0 (GPLv3) / GPLv2-or-later
+- **Copyright**: © Audacity contributors and Muse Group
+
 ### Secondary UI Reference
 
 - **Repository**: OpenStudio (hybrid DAW reference)
 - **License**: GNU Affero General Public License v3.0 (AGPLv3)
 - **Reference Scope**: Mixer and transport visual layout concepts only.
 
-### Component Porting Mapping
+### Component Porting Mapping (openDAW & ShadowClaw)
 
 | Upstream Source File (openDAW)                                               | Local File                                          | Ported Concepts / Code                                                                                  |
 | ---------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -57,6 +66,22 @@ This project derives architecture, DSP formulas, and concepts from **openDAW** a
 | `packages/studio/core/src/analysis/`                                         | `.agents/scripts/scdaw-dsp.js`, `scdaw.js`          | Mix telemetry: peak/RMS dBFS, crest factor, clipping, and 3-band energy balance (`analyzeAudioBuffer`). |
 | `packages/lib/midi/src/MidiFileDecoder.ts`                                   | `.agents/scripts/scdaw-midi.js`                     | Robust SMF import: kind allocation, canonical 0-1 velocity scaling, and lengthBars calculation.         |
 | `packages/studio/core/src/project/ProjectSchema.ts`                          | `.agents/scripts/scdaw-schema.js`                   | Schema v2 migration with multi-tempo `tempoMap`, `signatureMap`, `sections`, and velocity repair.       |
+
+### Audio Editing & DSP Porting Mapping (Audacity)
+
+| Upstream Source File (Audacity 3 / 4)                                                                       | Local File                                                              | Ported Concepts / Code                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/trackedit/dom/clip.h`, `iclipsinteraction.h`, `itrackeditinteraction.h`                                | `.agents/scripts/scdaw.js`                                              | Non-destructive clip editing (`split`, `trim`, `duplicate`, `join`, equal-power `crossfade`, fade curves, `silence_range`, mute, pitch/speed). |
+| `src/automation/automationtypes.h`, `iclipgaininteraction.h`                                                | `.agents/scripts/scdaw.js`, `scdaw-wave-editor.js`, `scdaw-timeline.js` | Per-clip gain envelopes, fade handles, and envelope point drag eat/restore semantics.                                                          |
+| `src/trackedit/internal/au3/au3tracksinteraction.cpp` (`nearestZeroCrossing`)                               | `.agents/scripts/scdaw-audio-dsp.js`, `scdaw-wave-editor.js`            | Sub-sample-accurate rising zero-crossing lookup and waveform selection snapping.                                                               |
+| `src/effects/builtin_collection/loudness/normalizeloudnesseffect.cpp`, `EBUR128.cpp`, `normalizeeffect.cpp` | `.agents/scripts/scdaw-audio-dsp.js`                                    | DC offset removal, peak normalize, K-weighted ITU-R BS.1770 / EBU R128 LUFS & RMS loudness normalization, and offline fade baking.             |
+| `src/effects/builtin_collection/clickremoval/clickremovaleffect.cpp`                                        | `.agents/scripts/scdaw-audio-dsp.js`                                    | `removeClicksAudio` multi-width impulse detection and linear sample repair.                                                                    |
+| `src/effects/builtin_collection/{tonegen,noisegen,dtmfgen,silencegen}/*`                                    | `.agents/scripts/scdaw-audio-dsp.js`                                    | Pure-JS waveform/chirp tone, white/pink/brownian noise, DTMF dual-tone, and silence generators.                                                |
+| `au3/libraries/au3-fft/FFT.cpp`, `SpectrumAnalyst.cpp`                                                      | `.agents/scripts/scdaw-spectral-dsp.js`, `scdaw-spectrum.js`            | Radix-2 FFT/IFFT, 6 window functions (`hann`..`blackmanHarris`), calibrated power spectrum (`Plot Spectrum`), and note readout.                |
+| `src/effects/builtin_collection/noisereduction/noisereductioneffect.cpp`                                    | `.agents/scripts/scdaw-spectral-dsp.js`                                 | Two-pass profile-based STFT noise reduction with sensitivity, reduction dB, frequency smoothing, and attack/release.                           |
+| `src/spectrogram/spectrogramtypes.h`                                                                        | `.agents/scripts/scdaw-spectral-dsp.js`, `scdaw-wave-editor.js`         | Spectrogram matrices (`linear`/`logarithmic`/`mel`), palettes (`roseus`/`classic`/`grayscale`/`inverseGrayscale`), and spectral band editing.  |
+| `au3-builtin-effects/FindClippingBase.cpp`, `TruncSilenceBase.cpp`, `au3-music-information-retrieval/`      | `.agents/scripts/scdaw-spectral-dsp.js`, `scdaw-time-dsp.js`            | Clipping finder, silence finder, Truncate/Compress Silence with crossfades, energy-flux beat/onset detection, WSOLA tempo & pitch shift.       |
+| `src/trackedit/dom/label.h`                                                                                 | `.agents/scripts/scdaw.js`, `scdaw-timeline.js`, `scdaw-dawproject.js`  | Point, region, and spectral (`lowFrequency`/`highFrequency`) project label tracks, `split_at_labels`, and DAWproject `<Markers>` round-trip.   |
 
 ### Reactive Primitives Attribution
 

@@ -22,6 +22,36 @@ import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
+export function extractDroppedAudioFiles(dataTransfer) {
+  const rawFiles = dataTransfer?.files ? Array.from(dataTransfer.files) : [];
+  return rawFiles.filter((file) => {
+    const type = String(file?.type || "").toLowerCase();
+    const name = String(file?.name || "");
+    if (type.startsWith("audio/") || type === "application/ogg") return true;
+    return /\.(wav|wave|mp3|ogg|flac|m4a|aac|webm)$/i.test(name);
+  });
+}
+
+export function computeLabelLayout(labels = [], totalBeats = 16) {
+  if (!Array.isArray(labels) || labels.length === 0) return [];
+  const safeTotal = Math.max(0.25, Number(totalBeats) || 16);
+  return labels.map((label) => {
+    const start = Math.max(0, Number(label?.startBeat ?? 0) || 0);
+    const end = Math.max(start, Number(label?.endBeat ?? start) || start);
+    const isRegion = end > start + 1e-4;
+    const leftPct = Math.max(0, Math.min(100, (start / safeTotal) * 100));
+    const widthPct = isRegion
+      ? Math.max(1, Math.min(100 - leftPct, ((end - start) / safeTotal) * 100))
+      : 0;
+    return {
+      label,
+      leftPct: Number(leftPct.toFixed(4)),
+      widthPct: Number(widthPct.toFixed(4)),
+      isRegion,
+    };
+  });
+}
+
 export function calculateClipFadeHandleDrag({
   edge = "fade-in",
   deltaX = 0,
@@ -1177,7 +1207,13 @@ export class DawTimelineElement extends BaseElement {
         return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.recordArm || t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${clipSig}|${autoKeys}`;
       })
       .join(";");
-    return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${trackSigs}`;
+    const labelSig = (p.labels || [])
+      .map(
+        (l) =>
+          `${l.id}:${l.title}:${l.startBeat}:${l.endBeat}:${l.color || ""}`,
+      )
+      .join(",");
+    return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${labelSig}|${trackSigs}`;
   }
 
   disconnectedCallback() {
@@ -1565,6 +1601,12 @@ export class DawTimelineElement extends BaseElement {
           margin-right: var(--timeline-gutter-r, 16px);
         }
 
+        .scdaw-timeline__lane--drop-target {
+          outline: 2px dashed var(--accent, #80d4db);
+          outline-offset: -2px;
+          background: rgba(128, 212, 219, 0.14);
+        }
+
         .scdaw-timeline__clip,
         .clip-block {
           position: absolute;
@@ -1827,6 +1869,94 @@ export class DawTimelineElement extends BaseElement {
             width: 24px;
             height: 24px;
           }
+          #timeline-add-label-btn,
+          #timeline-clear-labels-btn,
+          .scdaw-timeline__label-item,
+          .scdaw-timeline__label-remove {
+            min-width: 44px;
+            min-height: 44px;
+          }
+        }
+
+        .scdaw-timeline__label-track {
+          display: flex;
+          border-bottom: 1px solid var(--border-subtle);
+          min-height: 30px;
+          min-width: 280px;
+          background: rgba(56, 189, 248, 0.06);
+        }
+
+        .scdaw-timeline__label-header {
+          width: var(--track-header-w);
+          min-width: var(--track-header-w);
+          max-width: var(--track-header-w);
+          box-sizing: border-box;
+          padding: 0.2rem 0.45rem;
+          border-right: 1px solid var(--border);
+          background: var(--bg-card);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+          font-size: 0.7rem;
+          font-weight: 600;
+          position: sticky;
+          left: 0;
+          z-index: 2;
+        }
+
+        .scdaw-timeline__label-lane {
+          flex: 1;
+          position: relative;
+          min-width: 160px;
+          margin-left: var(--timeline-gutter-l, 16px);
+          margin-right: var(--timeline-gutter-r, 16px);
+        }
+
+        .scdaw-timeline__label-item {
+          position: absolute;
+          top: 3px;
+          bottom: 3px;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: 0 5px;
+          border-radius: 4px;
+          font: inherit;
+          color: #ffffff;
+          font-size: 0.68rem;
+          background: rgba(56, 189, 248, 0.28);
+          border: 1px solid var(--accent, #38bdf8);
+          cursor: pointer;
+          white-space: nowrap;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+
+        .scdaw-timeline__label-item--point {
+          border-left-width: 3px;
+        }
+
+        .scdaw-timeline__label-item:focus-visible,
+        .scdaw-timeline__label-remove:focus-visible {
+          outline: 2px solid #ffffff;
+          outline-offset: 1px;
+        }
+
+        .scdaw-timeline__label-remove {
+          appearance: none;
+          background: transparent;
+          border: none;
+          font: inherit;
+          color: inherit;
+          padding: 0 2px;
+          cursor: pointer;
+          opacity: 0.75;
+          line-height: 1;
+        }
+
+        .scdaw-timeline__label-remove:hover {
+          opacity: 1;
         }
       </style>
       <div class="scdaw-timeline daw-panel" role="region" aria-label="Arrangement Timeline and Tracks">
@@ -1853,6 +1983,7 @@ export class DawTimelineElement extends BaseElement {
             </button>
           </div>
           <div class="scdaw-timeline__actions">
+            <button id="timeline-add-label-btn" type="button" class="btn btn-icon" aria-label="Add project label at playhead">+ Label</button>
             <button id="add-drums-btn" type="button" class="btn btn-icon" aria-label="Add drum track">+ Drums</button>
             <button id="add-synth-btn" type="button" class="btn btn-icon" aria-label="Add synth track">+ Synth</button>
             <button id="add-audio-btn" type="button" class="btn btn-icon" aria-label="Add audio track">+ Audio</button>
@@ -1886,6 +2017,47 @@ export class DawTimelineElement extends BaseElement {
           </div>
 
           <div class="scdaw-timeline__tracks track-list" role="list" aria-label="Audio and MIDI tracks">
+            ${(() => {
+              const labels = Array.isArray(p.labels) ? p.labels : [];
+              if (labels.length === 0) return "";
+              const labelLayout = computeLabelLayout(labels, totalBeats);
+              return `
+                <div class="scdaw-timeline__label-track">
+                  <div class="scdaw-timeline__label-header">
+                    <span>🏷️ Labels (${labels.length})</span>
+                    <button id="timeline-clear-labels-btn" type="button" class="btn btn-icon scdaw-timeline__btn--delete" aria-label="Clear all project labels" title="Clear all labels">✕</button>
+                  </div>
+                  <div class="scdaw-timeline__label-lane" role="list" aria-label="Project labels">
+                    ${labelLayout
+                      .map(({ label, leftPct, widthPct, isRegion }) => {
+                        const styleParts = [`left:${leftPct}%`];
+                        if (isRegion) styleParts.push(`width:${widthPct}%`);
+                        if (label.color) {
+                          styleParts.push(`border-color:${label.color}`);
+                        }
+                        const ariaRange = isRegion
+                          ? `beats ${label.startBeat} to ${label.endBeat}`
+                          : `beat ${label.startBeat}`;
+                        return `
+                          <div
+                            class="scdaw-timeline__label-item ${isRegion ? "scdaw-timeline__label-item--region" : "scdaw-timeline__label-item--point"}"
+                            role="listitem"
+                            tabindex="0"
+                            data-label-id="${label.id}"
+                            data-start-beat="${label.startBeat}"
+                            style="${styleParts.join("; ")};"
+                            aria-label="Label ${label.title}, ${ariaRange}. Press Enter to seek, Delete to remove."
+                            title="${label.title} (${ariaRange})">
+                            <span>${label.title}</span>
+                            <button type="button" class="scdaw-timeline__label-remove" data-remove-label="${label.id}" aria-label="Remove label ${label.title}">×</button>
+                          </div>
+                        `;
+                      })
+                      .join("")}
+                  </div>
+                </div>
+              `;
+            })()}
             ${(() => {
               const hasSolo = p.tracks.some((trk) => trk.solo);
               const totalBeats = computeProjectTotalPulses(p) / PPQN.Quarter;
@@ -2111,7 +2283,7 @@ export class DawTimelineElement extends BaseElement {
                       <span class="scdaw-timeline__track-count" data-track="${t.id}" title="${countLabel}">${countLabel}</span>
                     </div>
                   </div>
-                  <div class="scdaw-timeline__lane lane-area">
+                  <div class="scdaw-timeline__lane lane-area" data-track="${t.id}" data-kind="${t.kind}">
                     ${laneClipsHtml}
                   </div>
                 </div>
@@ -2164,6 +2336,59 @@ export class DawTimelineElement extends BaseElement {
         const curIdx = modes.indexOf(this._snapMode || "beat");
         this._snapMode = modes[(curIdx + 1) % modes.length];
         this.render();
+      });
+
+    this.shadowRoot
+      .getElementById("timeline-add-label-btn")
+      ?.addEventListener("click", () => {
+        const curBeat = Number(
+          ((scdaw.getState?.().positionPpqn || 0) / PPQN.Quarter).toFixed(3),
+        );
+        const existingCount = Array.isArray(scdaw.getProject?.()?.labels)
+          ? scdaw.getProject().labels.length
+          : 0;
+        scdaw.sendCommand("add_label", {
+          title: `Marker ${existingCount + 1}`,
+          startBeat: curBeat,
+          endBeat: curBeat,
+        });
+      });
+
+    this.shadowRoot
+      .getElementById("timeline-clear-labels-btn")
+      ?.addEventListener("click", () => {
+        scdaw.sendCommand("clear_labels", {});
+      });
+
+    this.shadowRoot
+      .querySelectorAll?.(".scdaw-timeline__label-item")
+      ?.forEach((el) => {
+        const seekToLabel = () => {
+          const beat = Number(el.dataset?.startBeat || 0);
+          scdaw.seek?.(Math.round(beat * PPQN.Quarter));
+        };
+        el.addEventListener("click", (e) => {
+          const remBtn = e.target?.closest?.("[data-remove-label]");
+          if (remBtn) {
+            e.stopPropagation?.();
+            scdaw.sendCommand("remove_label", {
+              labelId: remBtn.dataset.removeLabel,
+            });
+            return;
+          }
+          seekToLabel();
+        });
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Delete" || e.key === "Backspace") {
+            e.preventDefault?.();
+            scdaw.sendCommand("remove_label", {
+              labelId: el.dataset?.labelId,
+            });
+          } else if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault?.();
+            seekToLabel();
+          }
+        });
       });
 
     this.shadowRoot
@@ -2230,6 +2455,42 @@ export class DawTimelineElement extends BaseElement {
         }
       });
     });
+
+    // Drag-and-drop audio files directly onto audio lanes
+    this.shadowRoot
+      .querySelectorAll?.('.scdaw-timeline__lane[data-kind="audio"]')
+      ?.forEach((laneEl) => {
+        const trackId = laneEl.dataset?.track;
+        laneEl.addEventListener("dragover", (e) => {
+          e.preventDefault?.();
+          laneEl.classList?.add("scdaw-timeline__lane--drop-target");
+        });
+        laneEl.addEventListener("dragleave", () => {
+          laneEl.classList?.remove("scdaw-timeline__lane--drop-target");
+        });
+        laneEl.addEventListener("drop", async (e) => {
+          e.preventDefault?.();
+          laneEl.classList?.remove("scdaw-timeline__lane--drop-target");
+          const files = extractDroppedAudioFiles(e.dataTransfer);
+          if (files.length === 0) return;
+          const rect = laneEl.getBoundingClientRect?.();
+          let dropBeat = 0;
+          if (rect && rect.width > 0 && Number.isFinite(e.clientX)) {
+            const frac = Math.max(
+              0,
+              Math.min(1, (e.clientX - rect.left) / rect.width),
+            );
+            dropBeat = Number((frac * totalBeats).toFixed(2));
+          }
+          try {
+            for (const file of files) {
+              await scdaw.importAudioFile(trackId, file, { time: dropBeat });
+            }
+          } catch (err) {
+            scdaw.reportError?.(err, "Audio Import");
+          }
+        });
+      });
 
     // Ruler click/drag to seek playhead position
     const rulerEl = this.shadowRoot.querySelector?.(".ruler-container");

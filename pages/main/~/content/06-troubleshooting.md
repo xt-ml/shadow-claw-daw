@@ -1,7 +1,7 @@
 ---
 title: "Troubleshooting Guide"
 created: "2026-11-05T23:00:00Z"
-updated: "2026-11-05T23:00:00Z"
+updated: "2026-11-23T00:00:00Z"
 slug: "troubleshooting"
 ---
 
@@ -52,3 +52,15 @@ Only one tab acts as the primary audio leader to avoid audio stutter and duplica
 - **Length Pre-Validation**: `validateBase64UrlLength` and `validateCompressedUrl` check candidate share URLs against browser length budgets (`MAX_HASH_URL_LENGTH` = `65536` chars; `MAX_QUERY_URL_LENGTH` = `8192` chars) before presenting a link, displaying an error in the modal recommending `.mid` or `.scdaw.json` export when exceeded.
 - **Autoplay (`?autoplay=true`)**: Append `?autoplay=true` (or `?autoplay=1`, or `#...&autoplay=true`) to start playback automatically once the workbench loads—or immediately after confirming the **"Load Song from URL"** dialog when combined with `#file=` / `?file=`.
 - **Examples & Headless Python Generator**: See [Song Showcase & Programmatic Examples](07-examples.md) (`/main/examples/`) for live public-domain demos (`Happy Birthday`, `Twinkle, Twinkle, Little Star`, `Silent Night`) and a zero-dependency Python template (`zlib` raw DEFLATE `wbits=-15` + Base64URL) for generating shareable `#file=` URLs directly.
+
+### 7. Microphone & Recording Errors (`NotFoundError`, `NotAllowedError`)
+
+- **What Happened**: Clicking **● REC** without a connected audio input device (or when microphone permissions are blocked/in use by another app) triggers `navigator.mediaDevices.getUserMedia()` errors such as `NotFoundError: Requested device not found`.
+- **How Daw Surfaces It**: `<scdaw-transport>` presents a native modal `<dialog id="scdaw-error-dialog">` explaining the cause and next steps, while `<scdaw-workbench>` (`#scdaw-error-banner`) and `<scdaw-statusbar>` (`#error-stat`) record the formatted message instead of silently failing in DevTools.
+- **Workaround / Testing Without a Microphone**: Drag and drop any `.wav`, `.mp3`, `.ogg`, or `.flac` file onto an audio track lane or `<scdaw-wave-editor>`, call `scdaw_import_audio`, or click **+ Generate** inside `<scdaw-wave-editor>` (`Tone`, `Noise`, `DTMF`, or `Silence`) to work with audio clips without hardware input.
+
+### 8. Audio Import, Lossless Undo & Optional Worker / WASM DSP
+
+- **Supported Imports**: Audio tracks accept local files via the `📂` track button, drag-and-drop onto audio lanes or `<scdaw-wave-editor>`, or base64/data-URI payloads via `scdaw_import_audio`. Uncompressed `.wav` files also decode through a pure-JS RIFF/WAVE fallback when `AudioContext.decodeAudioData` is absent.
+- **Lossless Undo**: Offline DSP processors (`normalize`, `loudness`, `noise_reduction`, `change_tempo`, `change_pitch`, `truncate_silence`, etc.) write results into immutable versioned sample cache keys (`__<effect>_...`), so pressing **Undo** (`scdaw_undo`) restores the original PCM samples and clip duration cleanly.
+- **DSP Acceleration Fallback**: `scdaw-audio-dsp-worker.js` supports optional Web Worker offloading and Rust/WASM backends via `registerDspBackend`; if a worker or `.wasm` module fails to load, execution falls back automatically to zero-config pure JavaScript.

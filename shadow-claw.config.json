@@ -52,7 +52,8 @@
       "scdaw-statusbar",
       "scdaw-resize-handle",
       "scdaw-midi-keyboard",
-      "scdaw-wave-editor"
+      "scdaw-wave-editor",
+      "scdaw-spectrum"
     ],
     "allowedDomains": ["localhost", "127.0.0.1", "cdn.jsdelivr.net", "esm.sh"],
     "scripts": [
@@ -131,9 +132,12 @@
     "scdaw_set_automation",
     "scdaw_clear_automation",
     "scdaw_add_audio_clip",
+    "scdaw_import_audio",
     "scdaw_set_audio_clip",
     "scdaw_edit_audio_clip",
     "scdaw_process_audio_clip",
+    "scdaw_analyze_audio_clip",
+    "scdaw_manage_labels",
     "scdaw_set_track_send",
     "scdaw_record_arm",
     "scdaw_set_metronome",

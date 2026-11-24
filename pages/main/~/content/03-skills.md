@@ -1,7 +1,7 @@
 ---
 title: "Autonomous Agent Skills"
 created: "2026-11-05T23:00:00Z"
-updated: "2026-11-05T23:00:00Z"
+updated: "2026-11-23T00:00:00Z"
 slug: "skills"
 ---
 
@@ -64,3 +64,7 @@ Quick diagnostics on transport status, audio context state, tempo, and track com
 ### 14. `/scdaw-doctor`
 
 Diagnoses common environment faults, browser autoplay lockouts, or missing leader workbench tabs.
+
+### 15. `/audio-editing`
+
+Performs end-to-end non-destructive and offline audio editing workflows: importing base64 audio (`scdaw_import_audio`), splitting/trimming/crossfading/enveloping (`scdaw_edit_audio_clip`), normalizing loudness/removing clicks/reducing noise/stretching time or pitch (`scdaw_process_audio_clip`), running FFT spectrum/clipping/silence/beat analysis (`scdaw_analyze_audio_clip`), managing point/region/spectral label tracks (`scdaw_manage_labels`), and inspecting `<scdaw-wave-editor>` or `<scdaw-spectrum>`.

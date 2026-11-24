@@ -827,6 +827,7 @@ export const TOOLS_METADATA = [
             "timeline",
             "editor",
             "wave-editor",
+            "spectrum",
             "devices",
             "statusbar",
             "knob",
@@ -1110,6 +1111,23 @@ export const TOOLS_METADATA = [
               type: "number",
               description: "Clip gain multiplier (default 1.0)",
             },
+            pitch: {
+              type: "number",
+              description: "Non-destructive pitch shift in semitones (-24..24)",
+            },
+            speed: {
+              type: "number",
+              description: "Non-destructive playback speed rate (0.25..4.0)",
+            },
+            stretchToMatchTempo: {
+              type: "boolean",
+              description:
+                "Auto-scale playback rate to match project BPM vs sourceBpm",
+            },
+            sourceBpm: {
+              type: "number",
+              description: "Source clip native BPM (20..300)",
+            },
           },
           required: ["name"],
         },
@@ -1157,6 +1175,18 @@ export const TOOLS_METADATA = [
               type: "number",
             },
             gain: {
+              type: "number",
+            },
+            pitch: {
+              type: "number",
+            },
+            speed: {
+              type: "number",
+            },
+            stretchToMatchTempo: {
+              type: "boolean",
+            },
+            sourceBpm: {
               type: "number",
             },
           },
@@ -1700,6 +1730,7 @@ export const TOOLS_METADATA = [
             "set_fades",
             "set_envelope",
             "silence_range",
+            "split_at_silences",
             "mute",
             "remove",
           ],
@@ -1712,6 +1743,16 @@ export const TOOLS_METADATA = [
         clipId: {
           type: "string",
           description: "Target audio clip ID",
+        },
+        thresholdDb: {
+          type: "number",
+          description:
+            "Silence threshold in dBFS (default -40, for action='split_at_silences')",
+        },
+        minDurationSec: {
+          type: "number",
+          description:
+            "Minimum silence duration in seconds (default 0.25, for action='split_at_silences')",
         },
         clipIds: {
           type: "array",
@@ -1839,6 +1880,13 @@ export const TOOLS_METADATA = [
             "fade_in",
             "fade_out",
             "bake_fades",
+            "noise_profile",
+            "noise_reduction",
+            "spectral_edit",
+            "change_tempo",
+            "change_pitch",
+            "change_speed",
+            "truncate_silence",
             "generate_tone",
             "generate_noise",
             "generate_dtmf",
@@ -1879,6 +1927,149 @@ export const TOOLS_METADATA = [
         },
       },
       required: ["effect"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_analyze_audio_clip",
+    description:
+      "Analyze an audio clip's waveform statistics, calibrated FFT power spectrum, clipping regions, silence regions, beat/onset transients, or spectrogram.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trackId: {
+          type: "string",
+          description: "Target audio track ID",
+        },
+        clipId: {
+          type: "string",
+          description: "Target audio clip ID",
+        },
+        analysis: {
+          type: "string",
+          enum: [
+            "stats",
+            "spectrum",
+            "clipping",
+            "silence_finder",
+            "beat_finder",
+            "spectrogram",
+          ],
+          description: "Analysis routine to execute (default 'stats')",
+        },
+        startSec: {
+          type: "number",
+          description: "Optional sub-range start time in seconds",
+        },
+        endSec: {
+          type: "number",
+          description: "Optional sub-range end time in seconds",
+        },
+        params: {
+          type: "object",
+          description:
+            "Optional analysis parameters (fftSize, windowType, thresholdDb, minDurationSec, scale, rows)",
+        },
+      },
+      required: ["trackId", "clipId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: true,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_manage_labels",
+    description:
+      "Add, update, list, remove, or clear point, region, and spectral project labels, or split audio clips at label boundaries.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["add", "update", "remove", "clear", "list", "split_at_labels"],
+          description: "Label management action to execute",
+        },
+        labelId: {
+          type: "string",
+          description: "Target label ID (for 'update' or 'remove')",
+        },
+        title: {
+          type: "string",
+          description: "Label title text",
+        },
+        startBeat: {
+          type: "number",
+          description: "Start beat position of the label",
+        },
+        endBeat: {
+          type: "number",
+          description:
+            "End beat position (equals startBeat for point label, > startBeat for region label)",
+        },
+        lowFrequency: {
+          type: "number",
+          description: "Optional lower spectral frequency bound in Hz",
+        },
+        highFrequency: {
+          type: "number",
+          description: "Optional upper spectral frequency bound in Hz",
+        },
+        color: {
+          type: "string",
+          description: "Optional CSS color hex string for the label flag",
+        },
+        trackId: {
+          type: "string",
+          description:
+            "Optional target audio track ID for action='split_at_labels'",
+        },
+        includeRegionEnds: {
+          type: "boolean",
+          description:
+            "When splitting at labels, also split at region endBeat positions",
+        },
+      },
+      required: ["action"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+  },
+  {
+    name: "scdaw_import_audio",
+    description:
+      "Import base64-encoded WAV/MP3/OGG/FLAC audio or data URI onto an audio track (auto-creating an audio track if omitted).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        data: {
+          type: "string",
+          description:
+            "Base64-encoded audio file bytes or data:audio/...;base64 URI",
+        },
+        trackId: {
+          type: "string",
+          description:
+            "Optional target audio track ID (auto-selects or creates an audio track if omitted)",
+        },
+        name: {
+          type: "string",
+          description: "Clip display name / filename",
+        },
+        time: {
+          type: "number",
+          description: "Start beat position in timeline (default 0)",
+        },
+      },
+      required: ["data"],
       additionalProperties: false,
     },
     annotations: {

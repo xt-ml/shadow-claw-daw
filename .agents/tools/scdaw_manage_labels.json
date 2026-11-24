@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_manage_labels",
+  "description": "Add, update, list, remove, or clear point, region, and spectral project labels, or split audio clips at label boundaries.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["add", "update", "remove", "clear", "list", "split_at_labels"],
+        "description": "Label management action to execute"
+      },
+      "labelId": {
+        "type": "string",
+        "description": "Target label ID (for 'update' or 'remove')"
+      },
+      "title": {
+        "type": "string",
+        "description": "Label title text"
+      },
+      "startBeat": {
+        "type": "number",
+        "description": "Start beat position of the label"
+      },
+      "endBeat": {
+        "type": "number",
+        "description": "End beat position (equals startBeat for point label, > startBeat for region label)"
+      },
+      "lowFrequency": {
+        "type": "number",
+        "description": "Optional lower spectral frequency bound in Hz"
+      },
+      "highFrequency": {
+        "type": "number",
+        "description": "Optional upper spectral frequency bound in Hz"
+      },
+      "color": {
+        "type": "string",
+        "description": "Optional CSS color hex string for the label flag"
+      },
+      "trackId": {
+        "type": "string",
+        "description": "Optional target audio track ID for action='split_at_labels'"
+      },
+      "includeRegionEnds": {
+        "type": "boolean",
+        "description": "When splitting at labels, also split at region endBeat positions"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": false
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_manage_labels. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_manage_labels\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

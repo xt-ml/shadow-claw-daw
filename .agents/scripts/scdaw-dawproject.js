@@ -449,7 +449,7 @@ export function encodeDawProject(project, options = {}) {
       xmlElement(
         "Track",
         {
-          contentType: isDrums ? "notes" : "notes",
+          contentType: track.kind === "audio" ? "audio" : "notes",
           loaded: "true",
           id: tId,
           name: track.name || `Track ${idx + 1}`,
@@ -565,28 +565,79 @@ export function encodeDawProject(project, options = {}) {
       ]),
     );
 
-    // Timeline Audio Clips (e.g. Vocal stems, samples)
+    // Timeline Audio Clips (e.g. Vocal stems, samples, fades, envelopes)
     if (Array.isArray(track.audioClips) && track.audioClips.length > 0) {
       const audioClipElems = track.audioClips.map((ac) => {
         const audioClipId = nextId();
-        return xmlElement(
-          "Clip",
-          {
-            time: String(ac.time || 0.0),
+        const clipAttrs = {
+          time: String(ac.time || 0.0),
+          duration: String(ac.duration || totalBeats),
+          contentTimeUnit: "beats",
+          name: ac.name || "Audio Clip",
+          id: audioClipId,
+        };
+        if (ac.offset !== undefined && Number(ac.offset) !== 0) {
+          clipAttrs.playStart = String(ac.offset);
+        }
+        if (ac.gain !== undefined && Number(ac.gain) !== 1) {
+          clipAttrs.gain = String(ac.gain);
+        }
+        if (
+          (ac.fadeIn && Number(ac.fadeIn) > 0) ||
+          (ac.fadeOut && Number(ac.fadeOut) > 0)
+        ) {
+          clipAttrs.fadeTimeUnit = "seconds";
+          if (ac.fadeIn !== undefined) clipAttrs.fadeInTime = String(ac.fadeIn);
+          if (ac.fadeOut !== undefined)
+            clipAttrs.fadeOutTime = String(ac.fadeOut);
+          if (ac.fadeInType) clipAttrs.fadeInType = String(ac.fadeInType);
+          if (ac.fadeOutType) clipAttrs.fadeOutType = String(ac.fadeOutType);
+        }
+        if (ac.muted) clipAttrs.enable = "false";
+        if (ac.color) clipAttrs.color = String(ac.color);
+        if (ac.groupId !== undefined && ac.groupId !== null) {
+          clipAttrs.groupId = String(ac.groupId);
+        }
+        if (ac.pitch !== undefined && Number(ac.pitch) !== 0) {
+          clipAttrs.pitch = String(ac.pitch);
+        }
+        if (ac.speed !== undefined && Number(ac.speed) !== 1) {
+          clipAttrs.speed = String(ac.speed);
+        }
+        if (ac.stretchToMatchTempo !== undefined) {
+          clipAttrs.stretchToMatchTempo = String(
+            Boolean(ac.stretchToMatchTempo),
+          );
+        }
+        if (ac.sourceBpm !== undefined) {
+          clipAttrs.sourceBpm = String(ac.sourceBpm);
+        }
+
+        const clipChildren = [
+          xmlElement("Audio", {
+            sample: ac.sample || "",
             duration: String(ac.duration || totalBeats),
-            contentTimeUnit: "beats",
-            name: ac.name || "Audio Clip",
-            id: audioClipId,
-          },
-          [
-            xmlElement("Audio", {
-              sample: ac.sample || "",
-              duration: String(ac.duration || totalBeats),
-              channels: "2",
-              id: nextId(),
-            }),
-          ],
-        );
+            channels: "2",
+            id: nextId(),
+          }),
+        ];
+        if (Array.isArray(ac.gainEnvelope) && ac.gainEnvelope.length > 0) {
+          clipChildren.push(
+            xmlElement(
+              "Points",
+              { target: "gain", unit: "linear", id: nextId() },
+              ac.gainEnvelope.map((pt) =>
+                xmlElement("RealPoint", {
+                  time: Number(pt.time || 0).toFixed(6),
+                  value: Number(pt.value ?? 1).toFixed(6),
+                  id: nextId(),
+                }),
+              ),
+            ),
+          );
+        }
+
+        return xmlElement("Clip", clipAttrs, clipChildren);
       });
       arrangementLanes.push(
         xmlElement("Lanes", { track: ids.trackId, id: nextId() }, [
@@ -630,6 +681,37 @@ export function encodeDawProject(project, options = {}) {
     ]),
   );
 
+  // Project Markers / Labels
+  const arrangementChildren = [
+    xmlElement("Lanes", { timeUnit: "beats", id: nextId() }, arrangementLanes),
+  ];
+  if (Array.isArray(project.labels) && project.labels.length > 0) {
+    arrangementChildren.push(
+      xmlElement(
+        "Markers",
+        { id: nextId() },
+        project.labels.map((lbl) => {
+          const startBeat = Number(lbl.startBeat || 0);
+          const endBeat = Math.max(startBeat, Number(lbl.endBeat ?? startBeat));
+          const attrs = {
+            id: lbl.id || nextId(),
+            name: lbl.title || "Label",
+            time: String(startBeat),
+            duration: String(Number((endBeat - startBeat).toFixed(6))),
+          };
+          if (lbl.color) attrs.color = String(lbl.color);
+          if (lbl.lowFrequency !== undefined) {
+            attrs.lowFrequency = String(lbl.lowFrequency);
+          }
+          if (lbl.highFrequency !== undefined) {
+            attrs.highFrequency = String(lbl.highFrequency);
+          }
+          return xmlElement("Marker", attrs);
+        }),
+      ),
+    );
+  }
+
   // 4. Assemble root Project Document
   const projectDoc = serializeXmlDocument(
     xmlElement("Project", { version: "1.0" }, [
@@ -650,13 +732,7 @@ export function encodeDawProject(project, options = {}) {
         }),
       ]),
       xmlElement("Structure", {}, structureTracks),
-      xmlElement("Arrangement", { id: nextId() }, [
-        xmlElement(
-          "Lanes",
-          { timeUnit: "beats", id: nextId() },
-          arrangementLanes,
-        ),
-      ]),
+      xmlElement("Arrangement", { id: nextId() }, arrangementChildren),
     ]),
   );
 
@@ -825,12 +901,15 @@ export function decodeDawProject(input, options = {}) {
           }
         }
 
+        const contentType = String(trackNode.attributes.contentType || "");
+        const isAudio = contentType === "audio";
         const isDrums = /drum|percussion|beat/i.test(name);
+        const trackKind = isAudio ? "audio" : isDrums ? "drums" : "synth";
         const trackObj = {
           id: tId,
           name,
-          type: isDrums ? "drums" : "synth",
-          kind: isDrums ? "drums" : "synth",
+          type: trackKind,
+          kind: trackKind,
           volume,
           pan,
           mute,
@@ -839,6 +918,7 @@ export function decodeDawProject(input, options = {}) {
           audioFx,
           midiFx,
           notes: [],
+          ...(isAudio ? { audioClips: [] } : {}),
         };
 
         tracksById.set(tId, trackObj);
@@ -878,16 +958,72 @@ export function decodeDawProject(input, options = {}) {
           const audioNode = clip.children?.find((c) => c.tag === "Audio");
           if (audioNode) {
             if (!trackObj.audioClips) trackObj.audioClips = [];
-            trackObj.audioClips.push({
+            if (trackObj.notes.length === 0) {
+              trackObj.kind = "audio";
+              trackObj.type = "audio";
+            }
+            const clipObj = {
+              id: clip.attributes.id || undefined,
               time: parseFloat(clip.attributes.time || "0"),
               duration: parseFloat(
                 clip.attributes.duration ||
                   audioNode.attributes.duration ||
                   "4",
               ),
+              offset: parseFloat(clip.attributes.playStart || "0") || 0,
+              gain:
+                clip.attributes.gain !== undefined
+                  ? parseFloat(clip.attributes.gain)
+                  : 1.0,
               sample: audioNode.attributes.sample || "",
               name: clip.attributes.name || "Audio Clip",
-            });
+            };
+            if (clip.attributes.fadeInTime !== undefined) {
+              clipObj.fadeIn = parseFloat(clip.attributes.fadeInTime) || 0;
+            }
+            if (clip.attributes.fadeOutTime !== undefined) {
+              clipObj.fadeOut = parseFloat(clip.attributes.fadeOutTime) || 0;
+            }
+            if (clip.attributes.fadeInType) {
+              clipObj.fadeInType = clip.attributes.fadeInType;
+            }
+            if (clip.attributes.fadeOutType) {
+              clipObj.fadeOutType = clip.attributes.fadeOutType;
+            }
+            if (clip.attributes.enable === "false") {
+              clipObj.muted = true;
+            }
+            if (clip.attributes.color) {
+              clipObj.color = clip.attributes.color;
+            }
+            if (clip.attributes.groupId !== undefined) {
+              clipObj.groupId = clip.attributes.groupId;
+            }
+            if (clip.attributes.pitch !== undefined) {
+              clipObj.pitch = parseFloat(clip.attributes.pitch);
+            }
+            if (clip.attributes.speed !== undefined) {
+              clipObj.speed = parseFloat(clip.attributes.speed);
+            }
+            if (clip.attributes.stretchToMatchTempo !== undefined) {
+              clipObj.stretchToMatchTempo =
+                clip.attributes.stretchToMatchTempo === "true";
+            }
+            if (clip.attributes.sourceBpm !== undefined) {
+              clipObj.sourceBpm = parseFloat(clip.attributes.sourceBpm);
+            }
+            const envNode = clip.children?.find(
+              (c) => c.tag === "Points" && c.attributes.target === "gain",
+            );
+            if (envNode && Array.isArray(envNode.children)) {
+              clipObj.gainEnvelope = envNode.children
+                .filter((c) => c.tag === "RealPoint" || c.tag === "Point")
+                .map((pt) => ({
+                  time: parseFloat(pt.attributes.time || "0"),
+                  value: parseFloat(pt.attributes.value ?? "1"),
+                }));
+            }
+            trackObj.audioClips.push(clipObj);
           }
 
           const clipTimeBeats = parseFloat(clip.attributes.time || "0");
@@ -929,10 +1065,35 @@ export function decodeDawProject(input, options = {}) {
       }
     }
 
+    // 4. Read Project Markers / Labels
+    const labels = [];
+    const markersNode = arrangement?.children?.find((c) => c.tag === "Markers");
+    if (markersNode && Array.isArray(markersNode.children)) {
+      for (const m of markersNode.children.filter((c) => c.tag === "Marker")) {
+        const startBeat = parseFloat(m.attributes.time || "0") || 0;
+        const durBeat = parseFloat(m.attributes.duration || "0") || 0;
+        const lbl = {
+          id: m.attributes.id || undefined,
+          title: m.attributes.name || "Label",
+          startBeat,
+          endBeat: Number((startBeat + Math.max(0, durBeat)).toFixed(6)),
+        };
+        if (m.attributes.color) lbl.color = m.attributes.color;
+        if (m.attributes.lowFrequency !== undefined) {
+          lbl.lowFrequency = parseFloat(m.attributes.lowFrequency);
+        }
+        if (m.attributes.highFrequency !== undefined) {
+          lbl.highFrequency = parseFloat(m.attributes.highFrequency);
+        }
+        labels.push(lbl);
+      }
+    }
+
     return createProject({
       name: title,
       bpm,
       signature,
+      labels,
       tracks: tracksList,
     });
   })();

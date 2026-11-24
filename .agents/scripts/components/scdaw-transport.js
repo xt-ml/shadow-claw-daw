@@ -7,9 +7,40 @@
  */
 
 import { SHARED_STYLES } from "./scdaw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
+import { scdaw, formatUserError } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { PPQN, RESERVED_MIDI_CCS, MIDI_CONTROLLER_PRESETS } from "../scdaw.js";
+
+/**
+ * Format an audio/recording error into user-facing modal dialog copy.
+ * @param {Error|string} err
+ * @param {string} [context="Recording"]
+ * @returns {{ title: string, message: string, hint: string }}
+ */
+export function formatRecordingErrorDialog(err, context = "Recording") {
+  const name = String(err?.name || "");
+  const message = formatUserError(err, context);
+  let hint = "";
+  if (
+    name === "NotFoundError" ||
+    name === "DevicesNotFoundError" ||
+    /no microphone|requested device not found/i.test(message)
+  ) {
+    hint =
+      "Tip: Connect or select an audio input microphone, or import/generate audio clips in the 🌊 Audio Wave Editor.";
+  } else if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    hint =
+      "Tip: Click the camera/microphone icon in your browser address bar to allow microphone access.";
+  } else if (name === "NotReadableError" || name === "TrackStartError") {
+    hint =
+      "Tip: Close other applications or browser tabs currently capturing your microphone.";
+  }
+  return {
+    title: `${context || "Audio"} Error`,
+    message,
+    hint,
+  };
+}
 
 function escapeHtml(str) {
   return String(str ?? "")
@@ -906,19 +937,37 @@ export class DawTransportElement extends BaseElement {
           color: #ffffff;
         }
 
-        dialog:modal,
-        dialog::backdrop {
+        dialog:modal {
           overscroll-behavior: contain;
+        }
+
+        dialog::backdrop {
+          overflow: hidden;
+          overscroll-behavior: contain;
+        }
+
+        .scdaw-dialog--error {
+          border-color: rgba(248, 113, 113, 0.7);
+        }
+
+        .scdaw-dialog__hint {
+          margin: 0;
+          font-size: 0.78rem;
+          color: var(--accent, #80d4db);
+          line-height: 1.4;
         }
 
         @media (pointer: coarse) {
           .scdaw-transport__btn,
           .scdaw-transport__step-btn,
           .scdaw-transport__select,
-          .scdaw-transport__input {
+          .scdaw-transport__input,
+          .scdaw-dialog__footer .btn,
+          .scdaw-dialog__header .btn-icon {
             min-height: 44px;
           }
-          .scdaw-transport__step-btn {
+          .scdaw-transport__step-btn,
+          .scdaw-dialog__header .btn-icon {
             min-width: 44px;
           }
         }
@@ -1087,8 +1136,80 @@ export class DawTransportElement extends BaseElement {
         </form>
       </dialog>
 
+      <dialog id="scdaw-error-dialog" class="scdaw-dialog scdaw-dialog--error" closedby="any" aria-labelledby="error-dialog-title" aria-describedby="error-dialog-message">
+        <form method="dialog" class="scdaw-dialog__form">
+          <div class="scdaw-dialog__header">
+            <h1 id="error-dialog-title" class="scdaw-dialog__title">Recording Error</h1>
+            <button type="button" id="error-dialog-close" class="btn btn-icon" aria-label="Close error dialog">✕</button>
+          </div>
+          <div class="scdaw-dialog__body">
+            <p id="error-dialog-message" class="scdaw-dialog__desc"></p>
+            <p id="error-dialog-hint" class="scdaw-dialog__hint"></p>
+          </div>
+          <div class="scdaw-dialog__footer">
+            <button id="error-dialog-ok" type="submit" value="ok" class="btn btn-primary" autofocus>OK</button>
+          </div>
+        </form>
+      </dialog>
+
       <span id="transport-live-msg" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></span>
     `;
+
+    const errorDialog = this.shadowRoot.getElementById("scdaw-error-dialog");
+    const errorTitleEl = this.shadowRoot.getElementById("error-dialog-title");
+    const errorMsgEl = this.shadowRoot.getElementById("error-dialog-message");
+    const errorHintEl = this.shadowRoot.getElementById("error-dialog-hint");
+    const errorCloseBtn = this.shadowRoot.getElementById("error-dialog-close");
+
+    errorCloseBtn?.addEventListener("click", () => errorDialog?.close?.());
+    errorDialog?.addEventListener("close", () => {
+      errorDialog.returnValue = "";
+    });
+    if (
+      errorDialog &&
+      typeof HTMLDialogElement !== "undefined" &&
+      !("closedBy" in HTMLDialogElement.prototype)
+    ) {
+      let pressedOutside = false;
+      const isOutside = (e) => {
+        const r = errorDialog.getBoundingClientRect?.();
+        if (!r) return false;
+        return (
+          e.clientX < r.left ||
+          e.clientX > r.right ||
+          e.clientY < r.top ||
+          e.clientY > r.bottom
+        );
+      };
+      errorDialog.addEventListener("pointerdown", (e) => {
+        pressedOutside = isOutside(e);
+      });
+      errorDialog.addEventListener("pointerup", (e) => {
+        if (pressedOutside && isOutside(e)) errorDialog.close?.();
+      });
+    }
+
+    const showErrorDialog = (
+      err,
+      { title = null, context = "Recording" } = {},
+    ) => {
+      const info = formatRecordingErrorDialog(err, context);
+      const finalTitle = title || info.title;
+      scdaw.reportError?.(err, { title: finalTitle, context });
+      if (errorTitleEl) errorTitleEl.textContent = finalTitle;
+      if (errorMsgEl) errorMsgEl.textContent = info.message;
+      if (errorHintEl) {
+        errorHintEl.textContent = info.hint || "";
+        errorHintEl.hidden = !info.hint;
+      }
+      if (
+        errorDialog &&
+        typeof errorDialog.showModal === "function" &&
+        !errorDialog.open
+      ) {
+        errorDialog.showModal();
+      }
+    };
 
     const dialog = this.shadowRoot.getElementById("scdaw-rec-dialog");
     const descEl = this.shadowRoot.getElementById("rec-dialog-desc");
@@ -1449,7 +1570,7 @@ export class DawTransportElement extends BaseElement {
           renderMidiDialogBody();
         } catch (err) {
           console.error("Failed to import MIDI mappings:", err);
-          scdaw.reportError?.(err, {
+          showErrorDialog(err, {
             title: "MIDI Import Error",
             context: "MIDI Mappings",
           });
@@ -1641,7 +1762,7 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
-            scdaw.reportError?.(err, {
+            showErrorDialog(err, {
               title: "Recording Error",
               context: "Recording",
             });
@@ -1660,7 +1781,7 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
-            scdaw.reportError?.(err, {
+            showErrorDialog(err, {
               title: "Recording Error",
               context: "Recording",
             });
@@ -1679,7 +1800,7 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
-            scdaw.reportError?.(err, {
+            showErrorDialog(err, {
               title: "Recording Error",
               context: "Recording",
             });
@@ -1752,7 +1873,7 @@ export class DawTransportElement extends BaseElement {
             await scdaw.startRecording(targetTrack?.id);
           } catch (err) {
             console.error("Recording error:", err);
-            scdaw.reportError?.(err, {
+            showErrorDialog(err, {
               title: "Recording Error",
               context: "Recording",
             });

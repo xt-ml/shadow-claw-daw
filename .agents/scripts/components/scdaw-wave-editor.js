@@ -10,6 +10,14 @@ import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { evaluateClipGainEnvelope } from "../scdaw.js";
 import { findNearestZeroCrossing } from "../scdaw-audio-dsp.js";
+import { extractDroppedAudioFiles } from "./scdaw-timeline.js";
+import {
+  SPECTROGRAM_PALETTES,
+  SPECTROGRAM_SCALES,
+  computeSpectrogram,
+  mapSpectrogramColor,
+} from "../scdaw-spectral-dsp.js";
+import "./scdaw-spectrum.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
@@ -323,6 +331,69 @@ export function renderWaveformSvg({
   `.trim();
 }
 
+/**
+ * Render an accessible SVG spectrogram heatmap with optional spectral selection overlay.
+ */
+export function renderSpectrogramSvg({
+  spectrogram,
+  palette = "roseus",
+  width = 600,
+  height = 160,
+  freqSelection = null,
+} = {}) {
+  const cols = Math.max(1, spectrogram?.columns || 1);
+  const rows = Math.max(1, spectrogram?.rows || 1);
+  const data = spectrogram?.data || new Float32Array(cols * rows);
+
+  // Downsample horizontally to <= 64 columns so SVG stays lightweight
+  const drawCols = Math.min(64, cols);
+  const cellW = width / drawCols;
+  const cellH = height / rows;
+  const rects = [];
+
+  for (let dc = 0; dc < drawCols; dc++) {
+    const srcCol = Math.min(cols - 1, Math.floor((dc * cols) / drawCols));
+    const x = dc * cellW;
+    for (let r = 0; r < rows; r++) {
+      const val = data[srcCol * rows + r] || 0;
+      const [cr, cg, cb] = mapSpectrogramColor(val, palette);
+      const y = height - (r + 1) * cellH;
+      rects.push(
+        `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(cellW + 0.5).toFixed(1)}" height="${(cellH + 0.5).toFixed(1)}" fill="rgb(${cr},${cg},${cb})" />`,
+      );
+    }
+  }
+
+  let freqSelRect = "";
+  if (
+    freqSelection &&
+    Number.isFinite(freqSelection.lowFreq) &&
+    Number.isFinite(freqSelection.highFreq)
+  ) {
+    const fMin = spectrogram?.minFreq ?? 20;
+    const fMax = freqSelection.maxFreq ?? spectrogram?.maxFreq ?? 22050;
+    const lo = Math.max(
+      fMin,
+      Math.min(fMax, Math.min(freqSelection.lowFreq, freqSelection.highFreq)),
+    );
+    const hi = Math.max(
+      fMin,
+      Math.min(fMax, Math.max(freqSelection.lowFreq, freqSelection.highFreq)),
+    );
+    const span = Math.max(1, fMax - fMin);
+    const yTop = height - ((hi - fMin) / span) * height;
+    const yBot = height - ((lo - fMin) / span) * height;
+    freqSelRect = `<rect class="scdaw-wave__freq-selection" x="0" y="${yTop.toFixed(1)}" width="${width}" height="${Math.max(2, yBot - yTop).toFixed(1)}" fill="rgba(250, 204, 21, 0.18)" stroke="#fde047" stroke-width="1" />`;
+  }
+
+  return `
+    <svg class="scdaw-wave__svg scdaw-wave__svg--spectrogram" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Spectrogram view (${palette})">
+      ${rects.join("")}
+      ${freqSelRect}
+    </svg>
+  `.trim();
+}
+
 export class DawWaveEditorElement extends BaseElement {
   constructor() {
     super();
@@ -334,6 +405,10 @@ export class DawWaveEditorElement extends BaseElement {
     this._scrollFrac = 0;
     this._zeroCrossingSnap = true;
     this._envelopeMode = false;
+    this._viewMode = "waveform"; // "waveform" | "spectrogram" | "split"
+    this._palette = "roseus";
+    this._specScale = "logarithmic";
+    this._showSpectrum = false;
     this._selection = null;
     this._statusMessage = "";
   }
@@ -409,7 +484,7 @@ export class DawWaveEditorElement extends BaseElement {
       zoom: this._zoom,
       scrollFrac: this._scrollFrac,
     });
-    const svgHtml = clip
+    const waveSvgHtml = clip
       ? renderWaveformSvg({
           channels,
           durationSec: clipDurSec,
@@ -420,6 +495,35 @@ export class DawWaveEditorElement extends BaseElement {
           sampleRate: sr,
         })
       : `<div class="scdaw-wave__empty">Select an audio track or generate/import an audio clip to edit waveforms.</div>`;
+
+    let stageBodyHtml = waveSvgHtml;
+    if (
+      clip &&
+      (this._viewMode === "spectrogram" || this._viewMode === "split")
+    ) {
+      const pcm = channels[0] || new Float32Array(0);
+      const sFrame = Math.floor(vp.viewStartSec * sr);
+      const eFrame = Math.min(pcm.length, Math.ceil(vp.viewEndSec * sr));
+      const sg = computeSpectrogram(
+        pcm.subarray(sFrame, Math.max(sFrame + 1, eFrame)),
+        {
+          fftSize: 512,
+          hopSize: 128,
+          rows: 28,
+          scale: this._specScale,
+          sampleRate: sr,
+        },
+      );
+      const sgSvg = renderSpectrogramSvg({
+        spectrogram: sg,
+        palette: this._palette,
+        height: this._viewMode === "split" ? 90 : 160,
+      });
+      stageBodyHtml =
+        this._viewMode === "split"
+          ? `<div style="display:flex;flex-direction:column;height:100%;">${waveSvgHtml.replace('class="scdaw-wave__svg"', 'class="scdaw-wave__svg" style="height:50%;"')}${sgSvg.replace('class="scdaw-wave__svg scdaw-wave__svg--spectrogram"', 'class="scdaw-wave__svg scdaw-wave__svg--spectrogram" style="height:50%;"')}</div>`
+          : sgSvg;
+    }
 
     const selSummary =
       this._selection && this._selection.lengthSec > 0.001
@@ -476,6 +580,11 @@ export class DawWaveEditorElement extends BaseElement {
           cursor: crosshair;
           touch-action: none;
           user-select: none;
+        }
+        .scdaw-wave__stage--drop-target {
+          outline: 2px dashed var(--shadow-claw-accent, #80d4db);
+          outline-offset: -2px;
+          background: rgba(128, 212, 219, 0.12);
         }
         .scdaw-wave__stage:focus-visible,
         .scdaw-wave button:focus-visible,
@@ -571,6 +680,18 @@ export class DawWaveEditorElement extends BaseElement {
             <button id="wave-zoom-in" type="button" class="btn btn-icon" aria-label="Zoom in waveform">+</button>
             <button id="wave-zc-toggle" type="button" class="btn btn-icon ${this._zeroCrossingSnap ? "btn-primary" : ""}" aria-pressed="${this._zeroCrossingSnap}" title="Snap selection to zero crossings">ZC Snap</button>
             <button id="wave-env-toggle" type="button" class="btn btn-icon ${this._envelopeMode ? "btn-primary" : ""}" aria-pressed="${this._envelopeMode}" title="Toggle clip gain envelope editing">Envelope</button>
+            <select id="wave-view-select" aria-label="Waveform or Spectrogram display mode">
+              <option value="waveform" ${this._viewMode === "waveform" ? "selected" : ""}>Waveform</option>
+              <option value="spectrogram" ${this._viewMode === "spectrogram" ? "selected" : ""}>Spectrogram</option>
+              <option value="split" ${this._viewMode === "split" ? "selected" : ""}>Split View</option>
+            </select>
+            <select id="wave-palette-select" aria-label="Spectrogram color palette">
+              ${SPECTROGRAM_PALETTES.map((pal) => `<option value="${pal}" ${this._palette === pal ? "selected" : ""}>${pal}</option>`).join("")}
+            </select>
+            <select id="wave-scale-select" aria-label="Spectrogram frequency scale">
+              ${SPECTROGRAM_SCALES.map((sc) => `<option value="${sc}" ${this._specScale === sc ? "selected" : ""}>${sc}</option>`).join("")}
+            </select>
+            <button id="wave-spectrum-toggle" type="button" class="btn btn-icon ${this._showSpectrum ? "btn-primary" : ""}" aria-pressed="${this._showSpectrum}" title="Toggle Plot Spectrum frequency analyzer">📊 Spectrum</button>
             <select id="wave-gen-select" aria-label="Audio generator type">
               <option value="tone">Tone</option>
               <option value="noise">Noise</option>
@@ -582,16 +703,18 @@ export class DawWaveEditorElement extends BaseElement {
         </div>
 
         <div id="wave-stage" class="scdaw-wave__stage" tabindex="0" role="region" aria-label="Interactive audio waveform canvas">
-          ${svgHtml}
+          ${stageBodyHtml}
         </div>
 
         <div class="scdaw-wave__toolbar" role="toolbar" aria-label="Audio clip editing and DSP actions">
           <div class="scdaw-wave__controls-row" role="group" aria-label="Clip edit operations">
             <button type="button" class="btn btn-icon wave-op-btn" data-op="split" ${!clip ? "disabled" : ""}>Split</button>
+            <button type="button" class="btn btn-icon wave-op-btn" data-op="split_at_silences" ${!clip ? "disabled" : ""}>Split Silences</button>
             <button type="button" class="btn btn-icon wave-op-btn" data-op="trim" ${!clip || !this._selection?.lengthSec ? "disabled" : ""}>Trim</button>
             <button type="button" class="btn btn-icon wave-op-btn" data-op="silence_range" ${!clip || !this._selection?.lengthSec ? "disabled" : ""}>Silence</button>
             <button type="button" class="btn btn-icon wave-op-btn" data-op="duplicate" ${!clip ? "disabled" : ""}>Duplicate</button>
             <button type="button" class="btn btn-icon wave-op-btn" data-op="mute" ${!clip ? "disabled" : ""}>${clip?.muted ? "Unmute" : "Mute"}</button>
+            <button id="wave-add-label-btn" type="button" class="btn btn-icon" ${!clip ? "disabled" : ""}>+ Label</button>
           </div>
           <div class="scdaw-wave__controls-row" role="group" aria-label="Offline DSP processors">
             <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="normalize" ${!clip ? "disabled" : ""}>Normalize</button>
@@ -604,8 +727,16 @@ export class DawWaveEditorElement extends BaseElement {
             <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="fade_in" ${!clip ? "disabled" : ""}>Fade In</button>
             <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="fade_out" ${!clip ? "disabled" : ""}>Fade Out</button>
             <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="bake_fades" ${!clip ? "disabled" : ""}>Bake Fades</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="truncate_silence" ${!clip ? "disabled" : ""}>Truncate Silence</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="change_tempo" ${!clip ? "disabled" : ""}>Tempo +10%</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="change_pitch" ${!clip ? "disabled" : ""}>Pitch +2st</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="change_speed" ${!clip ? "disabled" : ""}>Speed +10%</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="noise_profile" ${!clip ? "disabled" : ""}>Get Noise Profile</button>
+            <button type="button" class="btn btn-icon wave-dsp-btn" data-effect="noise_reduction" ${!clip ? "disabled" : ""}>Reduce Noise</button>
           </div>
         </div>
+
+        ${this._showSpectrum ? `<scdaw-spectrum></scdaw-spectrum>` : ""}
 
         <div class="scdaw-wave__footer">
           <span id="wave-selection-readout">${selSummary}</span>
@@ -648,6 +779,30 @@ export class DawWaveEditorElement extends BaseElement {
       this._envelopeMode = !this._envelopeMode;
       this.render();
     });
+    srRoot
+      .getElementById("wave-view-select")
+      ?.addEventListener("change", (e) => {
+        this._viewMode = e.target.value || "waveform";
+        this.render();
+      });
+    srRoot
+      .getElementById("wave-palette-select")
+      ?.addEventListener("change", (e) => {
+        this._palette = e.target.value || "roseus";
+        this.render();
+      });
+    srRoot
+      .getElementById("wave-scale-select")
+      ?.addEventListener("change", (e) => {
+        this._specScale = e.target.value || "logarithmic";
+        this.render();
+      });
+    srRoot
+      .getElementById("wave-spectrum-toggle")
+      ?.addEventListener("click", () => {
+        this._showSpectrum = !this._showSpectrum;
+        this.render();
+      });
     srRoot.getElementById("wave-gen-btn")?.addEventListener("click", () => {
       const generator =
         srRoot.getElementById("wave-gen-select")?.value || "tone";
@@ -673,7 +828,19 @@ export class DawWaveEditorElement extends BaseElement {
               ? { mode: "lufs", targetLufs: -14 }
               : effect === "normalize"
                 ? { targetDb: -1 }
-                : {};
+                : effect === "change_tempo"
+                  ? { tempoMultiplier: 1.1 }
+                  : effect === "change_pitch"
+                    ? { semitones: 2 }
+                    : effect === "change_speed"
+                      ? { rate: 1.1 }
+                      : effect === "truncate_silence"
+                        ? {
+                            thresholdDb: -40,
+                            minDurationSec: 0.25,
+                            truncateToSec: 0.05,
+                          }
+                        : {};
         this._runAction(btn.textContent || effect, async () => {
           await scdaw.sendCommand("process_audio_clip", {
             trackId: track.id,
@@ -729,6 +896,14 @@ export class DawWaveEditorElement extends BaseElement {
               ),
             });
             this._selection = null;
+          } else if (op === "split_at_silences") {
+            await scdaw.sendCommand("split_at_silences", {
+              trackId: track.id,
+              clipId: clip.id,
+              thresholdDb: -40,
+              minDurationSec: 0.25,
+            });
+            this._selection = null;
           } else if (op === "duplicate") {
             await scdaw.sendCommand("duplicate_audio_clip", {
               trackId: track.id,
@@ -744,8 +919,51 @@ export class DawWaveEditorElement extends BaseElement {
       });
     });
 
-    // Stage pointer selection & envelope dragging
+    srRoot
+      .getElementById("wave-add-label-btn")
+      ?.addEventListener("click", () => {
+        if (!clip) return;
+        const secToBeat = (s) => (s * bpm) / 60;
+        const startBeat = this._selection?.lengthSec
+          ? Number((clip.time + secToBeat(this._selection.startSec)).toFixed(3))
+          : Number((clip.time || 0).toFixed(3));
+        const endBeat = this._selection?.lengthSec
+          ? Number((clip.time + secToBeat(this._selection.endSec)).toFixed(3))
+          : startBeat;
+        this._runAction("Add Label", async () => {
+          await scdaw.sendCommand("add_label", {
+            title: clip.name || "Clip Marker",
+            startBeat,
+            endBeat,
+          });
+        });
+      });
+
+    // Stage pointer selection, envelope dragging & drag-and-drop import
     const stage = srRoot.getElementById("wave-stage");
+    if (stage) {
+      stage.addEventListener("dragover", (e) => {
+        e.preventDefault?.();
+        stage.classList?.add("scdaw-wave__stage--drop-target");
+      });
+      stage.addEventListener("dragleave", () => {
+        stage.classList?.remove("scdaw-wave__stage--drop-target");
+      });
+      stage.addEventListener("drop", (e) => {
+        e.preventDefault?.();
+        stage.classList?.remove("scdaw-wave__stage--drop-target");
+        const files = extractDroppedAudioFiles(e.dataTransfer);
+        if (files.length === 0) return;
+        this._runAction("Import Audio", async () => {
+          for (const file of files) {
+            const res = await scdaw.importAudioFile(track?.id || null, file, {
+              time: 0,
+            });
+            if (res?.clipId) this._selectedClipId = res.clipId;
+          }
+        });
+      });
+    }
     if (stage && clip) {
       let draggingSel = false;
       let selAnchorSec = 0;

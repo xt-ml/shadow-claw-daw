@@ -16,6 +16,7 @@
           "set_fades",
           "set_envelope",
           "silence_range",
+          "split_at_silences",
           "mute",
           "remove"
         ],
@@ -28,6 +29,14 @@
       "clipId": {
         "type": "string",
         "description": "Target audio clip ID"
+      },
+      "thresholdDb": {
+        "type": "number",
+        "description": "Silence threshold in dBFS (default -40, for action='split_at_silences')"
+      },
+      "minDurationSec": {
+        "type": "number",
+        "description": "Minimum silence duration in seconds (default 0.25, for action='split_at_silences')"
       },
       "clipIds": {
         "type": "array",

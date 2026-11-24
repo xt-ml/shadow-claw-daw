@@ -1,7 +1,7 @@
 ---
 title: "Song Showcase & Programmatic Examples"
 created: "2026-11-19T00:00:00Z"
-updated: "2026-11-19T00:00:00Z"
+updated: "2026-11-23T00:00:00Z"
 slug: "examples"
 ---
 
@@ -206,7 +206,7 @@ Agents have two complementary paths for composing music in ShadowClaw DAW:
    - **Step 4 — Deliver Playable Link**: Append `&autoplay=true` so the user hears the song right after clicking **Load Song from URL**.
 
 2. **Live Workbench Control (Browser WebMCP Tools)**
-   - When the workbench tab is open at [`/main/`](https://xt-ml.github.io/shadow-claw-daw/main/), agents can call `scdaw_compose_song` (high-level `SongSpec` compiler with bar/beat strings), `scdaw_write_notes`, `scdaw_set_instrument`, `scdaw_apply_preset`, `scdaw_manage_fx`, or invoke skills such as `/song`, `/beat`, `/jam`, and `/soundfont-orchestra`.
+   - When the workbench tab is open at [`/main/`](https://xt-ml.github.io/shadow-claw-daw/main/), agents can call `scdaw_compose_song` (high-level `SongSpec` compiler with bar/beat strings), `scdaw_write_notes`, `scdaw_set_instrument`, `scdaw_apply_preset`, `scdaw_manage_fx`, import and edit audio clips (`scdaw_import_audio`, `scdaw_edit_audio_clip`, `scdaw_process_audio_clip`, `scdaw_analyze_audio_clip`, `scdaw_manage_labels`), or invoke skills such as `/song`, `/beat`, `/jam`, `/soundfont-orchestra`, and `/audio-editing`.
 
 #### Agent Quick Reference
 

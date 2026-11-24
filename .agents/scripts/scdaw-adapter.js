@@ -385,6 +385,22 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("add_audio_clip", params);
     }
 
+    case "scdaw_import_audio": {
+      const raw = String(params.data || "").replace(/^data:[^;]+;base64,/, "");
+      let buf;
+      if (typeof atob === "function") {
+        const bin = atob(raw);
+        buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      } else {
+        buf = Buffer.from(raw, "base64");
+      }
+      return await scdaw.importAudioFile(params.trackId || null, buf, {
+        name: params.name,
+        time: params.time ?? 0,
+      });
+    }
+
     case "scdaw_set_audio_clip": {
       return await scdaw.sendCommand("set_audio_clip", params);
     }
@@ -408,6 +424,8 @@ export async function handleToolDispatch(name, params) {
           return await scdaw.sendCommand("set_clip_gain_envelope", params);
         case "silence_range":
           return await scdaw.sendCommand("silence_clip_range", params);
+        case "split_at_silences":
+          return await scdaw.sendCommand("split_at_silences", params);
         case "mute":
           return await scdaw.sendCommand("silence_audio_clip", params);
         case "remove":
@@ -428,6 +446,30 @@ export async function handleToolDispatch(name, params) {
         });
       }
       return await scdaw.sendCommand("process_audio_clip", params);
+    }
+
+    case "scdaw_analyze_audio_clip": {
+      return await scdaw.sendCommand("analyze_audio_clip", params);
+    }
+
+    case "scdaw_manage_labels": {
+      const action = params.action;
+      switch (action) {
+        case "add":
+          return await scdaw.sendCommand("add_label", params);
+        case "update":
+          return await scdaw.sendCommand("update_label", params);
+        case "remove":
+          return await scdaw.sendCommand("remove_label", params);
+        case "clear":
+          return await scdaw.sendCommand("clear_labels", params);
+        case "list":
+          return await scdaw.sendCommand("list_labels", params);
+        case "split_at_labels":
+          return await scdaw.sendCommand("split_at_labels", params);
+        default:
+          throw new Error(`Unsupported scdaw_manage_labels action: ${action}`);
+      }
     }
 
     case "scdaw_set_track_send": {
@@ -513,6 +555,7 @@ export async function handleToolDispatch(name, params) {
         timeline: "<scdaw-timeline></scdaw-timeline>",
         editor: "<scdaw-editor></scdaw-editor>",
         "wave-editor": "<scdaw-wave-editor></scdaw-wave-editor>",
+        spectrum: "<scdaw-spectrum></scdaw-spectrum>",
         sequencer: "<scdaw-sequencer></scdaw-sequencer>",
         synth: "<scdaw-synth></scdaw-synth>",
         devices: "<scdaw-devices></scdaw-devices>",
