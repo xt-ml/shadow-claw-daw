@@ -9,6 +9,7 @@ import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
 import {
   computeEventsInRange,
   createProject,
+  encodeWav,
   PPQN,
 } from "../.agents/scripts/scdaw.js";
 
@@ -900,8 +901,8 @@ test("Instruments & Engine: track volume is applied once at track GainNode, not 
   });
 
   try {
-    await engine.play();
     const beforeVoiceGainCount = capturedGains.length;
+    await engine.play();
     engine._onClockTick();
     const voiceGains = capturedGains.slice(beforeVoiceGainCount);
     // Voice envelope gain should peak at velocity (0.8), not velocity * 0.5 (0.4)
@@ -1213,4 +1214,241 @@ test("DawEngine: previewNote auditions a short non-gated voice on the target tra
     null,
     "previewNote should return null for unknown track",
   );
+});
+
+test("DawEngine: play() schedules beat-0 soloed audio clips immediately and tolerates delayed first tick", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    const addRes = await engine.sendCommand("add_track", {
+      name: "Audio Track",
+      kind: "audio",
+    });
+    const trackId = addRes.trackId;
+    await engine.sendCommand("set_track", { trackId, solo: true });
+
+    const sr = 16000;
+    const samples = new Float32Array(sr * 2); // 2 seconds = 4 beats @ 120 BPM
+    for (let i = 0; i < samples.length; i++) {
+      samples[i] = Math.sin((2 * Math.PI * 440 * i) / sr) * 0.5;
+    }
+    const wavBuf = encodeWav([samples, samples], sr);
+    const clipRes = await engine.importAudioFile(trackId, wavBuf, {
+      name: "Beat_It_-_Groove_Sketch.wav",
+      time: 0,
+    });
+    assert.equal(clipRes.ok, true);
+
+    // Clear any prior bufferSources, then start playback.
+    // play() itself must immediately schedule the beat-0 clip without waiting for a 25ms timer tick.
+    ctx.bufferSources.length = 0;
+    await engine.play();
+    assert.ok(
+      ctx.bufferSources.length >= 1,
+      "play() should schedule beat-0 audio clip synchronously on the initial tick",
+    );
+    const immediateSrc = ctx.bufferSources[ctx.bufferSources.length - 1];
+    assert.equal(immediateSrc.startTime, 0);
+    assert.equal(immediateSrc.startOffset, 0);
+    assert.ok(immediateSrc.startDuration > 1.9);
+
+    const trackNodes = engine.graph.tracks.get(trackId);
+    assert.ok(
+      trackNodes.gain.gain.value > 0,
+      "Soloed audio track must keep non-zero gain",
+    );
+
+    // Also guard delayed-first-tick scenario (25ms worker wakeup latency after play() at t=0):
+    await engine.stop();
+    ctx.bufferSources.length = 0;
+    ctx.currentTime = 0;
+    engine._updateState({ playing: true, positionPpqn: 0 });
+    engine._anchorPpqn = 0;
+    engine._anchorAudioTime = 0;
+    engine._scheduledUntilUnwrapped = null;
+    ctx.currentTime = 0.025; // 25ms late first tick -> unwrappedNow ~ 48 PPQN
+    engine._onClockTick();
+    assert.ok(
+      ctx.bufferSources.length >= 1,
+      "Delayed first tick (25ms) must still catch beat-0 audio clip via _anchorPpqn",
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine: supports mid-clip playback when starting or seeking inside an audio clip", async () => {
+  const ctx = new FakeAudioContext();
+  const engine = new DawEngine({
+    audioContext: ctx,
+    project: createProject("empty"),
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    await engine.sendCommand("set_transport", { bpm: 120, lengthBars: 4 });
+    const addRes = await engine.sendCommand("add_track", {
+      name: "Vocals",
+      kind: "audio",
+    });
+    const trackId = addRes.trackId;
+    const sr = 16000;
+    const pcm = new Float32Array(sr * 2); // 2s = 4 beats @ 120 BPM
+    pcm.fill(0.4);
+    await engine.loadSample("mid_clip_sample", {
+      numberOfChannels: 1,
+      length: pcm.length,
+      sampleRate: sr,
+      duration: 2.0,
+      getChannelData: () => pcm,
+    });
+    await engine.sendCommand("add_audio_clip", {
+      trackId,
+      clip: {
+        id: "clip_mid",
+        name: "Mid Clip",
+        sample: "mid_clip_sample",
+        time: 0,
+        duration: 4, // 2.0s @ 120 BPM
+        offset: 0,
+        gain: 1.0,
+        fadeIn: 0.5,
+      },
+    });
+
+    // Seek to beat 2 (1.0s into the 2.0s clip) BEFORE pressing play
+    ctx.bufferSources.length = 0;
+    engine.seek(2 * PPQN.Quarter);
+    await engine.play();
+    assert.equal(
+      ctx.bufferSources.length,
+      1,
+      "play() from mid-clip position must start the enclosing audio clip",
+    );
+    const startSrc = ctx.bufferSources[0];
+    assert.ok(
+      Math.abs(startSrc.startOffset - 1.0) < 1e-4,
+      `Expected mid-clip offset ~1.0s, got ${startSrc.startOffset}`,
+    );
+    assert.ok(
+      Math.abs(startSrc.startDuration - 1.0) < 1e-4,
+      `Expected remaining duration ~1.0s, got ${startSrc.startDuration}`,
+    );
+
+    // Seeking to beat 3 (1.5s into clip) WHILE playing must immediately re-trigger at 1.5s offset
+    ctx.bufferSources.length = 0;
+    engine.seek(3 * PPQN.Quarter);
+    assert.equal(
+      ctx.bufferSources.length,
+      1,
+      "seek() while playing must immediately start enclosing audio clip at new offset",
+    );
+    const seekSrc = ctx.bufferSources[0];
+    assert.ok(
+      Math.abs(seekSrc.startOffset - 1.5) < 1e-4,
+      `Expected seek offset ~1.5s, got ${seekSrc.startOffset}`,
+    );
+    assert.ok(
+      Math.abs(seekSrc.startDuration - 0.5) < 1e-4,
+      `Expected remaining duration ~0.5s, got ${seekSrc.startDuration}`,
+    );
+  } finally {
+    await engine.stop();
+  }
+});
+
+test("DawEngine: loadSample falls back to WAV PCM when decodeAudioData rejects and converts plain buffers to AudioBuffer", async () => {
+  class StrictAudioBuffer {
+    constructor(channels, length, sampleRate) {
+      this.numberOfChannels = channels;
+      this.length = length;
+      this.sampleRate = sampleRate;
+      this.duration = length / sampleRate;
+      this._ch = Array.from(
+        { length: channels },
+        () => new Float32Array(length),
+      );
+    }
+    getChannelData(ch = 0) {
+      return this._ch[ch] || this._ch[0];
+    }
+  }
+
+  class StrictContext extends FakeAudioContext {
+    async decodeAudioData() {
+      throw new Error("EncodingError: Unable to decode audio data");
+    }
+    createBuffer(channels, length, sampleRate) {
+      return new StrictAudioBuffer(channels, length, sampleRate);
+    }
+  }
+
+  const prevAudioBuffer = globalThis.AudioBuffer;
+  globalThis.AudioBuffer = StrictAudioBuffer;
+  const ctx = new StrictContext({ sampleRate: 16000 });
+  const engine = new DawEngine({
+    audioContext: ctx,
+    offlineAudioContextClass: FakeOfflineAudioContext,
+  });
+
+  try {
+    const sr = 16000;
+    const pcm = new Float32Array(sr * 0.5);
+    pcm.fill(0.25);
+    const wavBuf = encodeWav([pcm, pcm], sr);
+
+    const info = await engine.loadSample("wav_fallback", wavBuf);
+    assert.equal(info.sampleRate, sr);
+    const decoded = engine.getSample("wav_fallback");
+    assert.ok(
+      decoded instanceof StrictAudioBuffer,
+      "WAV fallback should convert decoded PCM into real ctx AudioBuffer",
+    );
+    assert.ok(
+      Math.abs(decoded.getChannelData(0)[10] - 0.25) < 0.01,
+      "WAV fallback should preserve non-zero PCM sample amplitude",
+    );
+
+    // Plain JS object stored before ctx existed must convert to StrictAudioBuffer on playback
+    const plainBuf = {
+      numberOfChannels: 1,
+      length: pcm.length,
+      sampleRate: sr,
+      duration: 0.5,
+      getChannelData: () => pcm,
+    };
+    await engine.loadSample("plain_pre_ctx", plainBuf);
+    const addRes = await engine.sendCommand("add_track", {
+      name: "Preload",
+      kind: "audio",
+    });
+    await engine.sendCommand("add_audio_clip", {
+      trackId: addRes.trackId,
+      clip: {
+        name: "Plain Clip",
+        sample: "plain_pre_ctx",
+        time: 0,
+        duration: 1,
+      },
+    });
+
+    await engine.play();
+    const src = ctx.bufferSources[ctx.bufferSources.length - 1];
+    assert.ok(
+      src.buffer instanceof StrictAudioBuffer,
+      "Playback must upgrade plain buffer-like objects to native AudioBuffer",
+    );
+    assert.ok(
+      Math.abs(src.buffer.getChannelData(0)[10] - 0.25) < 0.01,
+      "Upgraded AudioBuffer must retain original PCM data",
+    );
+  } finally {
+    await engine.stop();
+    if (prevAudioBuffer === undefined) delete globalThis.AudioBuffer;
+    else globalThis.AudioBuffer = prevAudioBuffer;
+  }
 });

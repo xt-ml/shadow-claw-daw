@@ -219,6 +219,8 @@ export function scheduleClipGainAutomation(
   startSec,
   durSec,
   steps = 64,
+  sliceStartSec = 0,
+  fullDurSec = durSec,
 ) {
   if (!gainParam || !clip) return;
   if (clip.muted) {
@@ -235,11 +237,15 @@ export function scheduleClipGainAutomation(
     return;
   }
 
+  const evalDur =
+    Number.isFinite(fullDurSec) && fullDurSec > 0
+      ? fullDurSec
+      : sliceStartSec + durSec;
   const count = Math.max(2, steps);
   const curve = new Float32Array(count + 1);
   for (let i = 0; i <= count; i++) {
     const rel = (i / count) * durSec;
-    curve[i] = evaluateClipGainEnvelope(clip, rel, durSec);
+    curve[i] = evaluateClipGainEnvelope(clip, sliceStartSec + rel, evalDur);
   }
 
   if (typeof gainParam.setValueCurveAtTime === "function") {
@@ -672,6 +678,9 @@ export class DawEngine extends EventTarget {
       } catch (_) {}
     }
     this._updateAudioState();
+    if (this.ctx && !this.graph) {
+      this._updateGraph();
+    }
 
     const nowAudio = this.ctx ? this.ctx.currentTime : Date.now() / 1000;
     const startPpqn = this.state.get().positionPpqn || 0;
@@ -682,6 +691,9 @@ export class DawEngine extends EventTarget {
     this._scheduledUntilPpqn = null;
     this._scheduledUntilUnwrapped = null;
     this._updateState({ playing: true });
+
+    // Schedule the first lookahead window synchronously so beat-0 audio clips start immediately
+    this._onClockTick();
 
     if (this._worker) {
       this._worker.postMessage("start");
@@ -728,7 +740,8 @@ export class DawEngine extends EventTarget {
     this._scheduledUntilPpqn = null;
     this._scheduledUntilUnwrapped = null;
 
-    if (this.state.get().playing) {
+    const wasPlaying = this.state.get().playing;
+    if (wasPlaying) {
       for (const voice of this._activeVoices) {
         try {
           if (typeof voice.stop === "function") voice.stop(0);
@@ -746,6 +759,11 @@ export class DawEngine extends EventTarget {
       beat,
       step,
     });
+
+    if (wasPlaying) {
+      this._onClockTick();
+    }
+
     return { ok: true, positionPpqn: targetPpqn, bar, beat, step };
   }
 
@@ -1145,12 +1163,15 @@ export class DawEngine extends EventTarget {
     const maxCatchupPulses = secondsToPulses(MAX_LATE_CATCHUP_SEC, bpm);
     const unwrappedLookaheadEnd = unwrappedNow + lookaheadPulses;
 
-    let schedFromUnwrapped;
-    if (
+    const isInitialSchedule =
       this._scheduledUntilUnwrapped === null ||
-      this._scheduledUntilUnwrapped === undefined
-    ) {
-      schedFromUnwrapped = unwrappedNow;
+      this._scheduledUntilUnwrapped === undefined;
+    let schedFromUnwrapped;
+    if (isInitialSchedule) {
+      schedFromUnwrapped = Math.max(
+        this._anchorPpqn,
+        unwrappedNow - maxCatchupPulses,
+      );
     } else {
       schedFromUnwrapped = Math.max(
         this._scheduledUntilUnwrapped,
@@ -1228,6 +1249,7 @@ export class DawEngine extends EventTarget {
               const clipDurPulses = Math.round(
                 (clip.duration || 4) * PPQN.Quarter,
               );
+              const clipEndPulses = clipStartPulses + clipDurPulses;
               const clipPos = clipStartPulses % totalPulses;
               let clipInRange = false;
               if (schedStart <= schedEnd) {
@@ -1235,19 +1257,53 @@ export class DawEngine extends EventTarget {
               } else {
                 clipInRange = clipPos >= schedStart || clipPos < schedEnd;
               }
-              if (clipInRange) {
-                const evTime = this._resolveEventAudioTime(
-                  clipPos,
-                  nextPos,
-                  totalPulses,
-                  nowAudio,
+              const midClipActive =
+                !clipInRange &&
+                isInitialSchedule &&
+                clipStartPulses < schedStart &&
+                schedStart < clipEndPulses;
+
+              if (clipInRange || midClipActive) {
+                const durSec = pulsesToSeconds(clipDurPulses, bpm);
+                const { playbackRate, detuneCents } = computeClipPlaybackParams(
+                  clip,
                   bpm,
-                  MAX_LATE_CATCHUP_SEC,
                 );
-                if (evTime === null) continue;
+                let evTime;
+                let sourceOffset = clip.offset || 0;
+                let playDurSec = durSec;
+                let sliceStartSec = 0;
+
+                if (clipInRange) {
+                  evTime = this._resolveEventAudioTime(
+                    clipPos,
+                    nextPos,
+                    totalPulses,
+                    nowAudio,
+                    bpm,
+                    MAX_LATE_CATCHUP_SEC,
+                  );
+                  if (evTime === null) continue;
+                } else {
+                  evTime = nowAudio;
+                  sliceStartSec = pulsesToSeconds(
+                    schedStart - clipStartPulses,
+                    bpm,
+                  );
+                  playDurSec = Math.max(0, durSec - sliceStartSec);
+                  if (playDurSec <= 0.001) continue;
+                  sourceOffset =
+                    (clip.offset || 0) + sliceStartSec * playbackRate;
+                }
+
                 const source = this.ctx.createBufferSource();
+                const cachedBuf = this._ensurePlayableAudioBuffer(
+                  this.ctx,
+                  this._sampleCache.get(clip.sample),
+                  clip.sample,
+                );
                 const sampleBuf =
-                  this._sampleCache.get(clip.sample) ||
+                  cachedBuf ||
                   (this.ctx.createBuffer
                     ? this.ctx.createBuffer(
                         2,
@@ -1256,10 +1312,6 @@ export class DawEngine extends EventTarget {
                       )
                     : null);
                 if (sampleBuf) source.buffer = sampleBuf;
-                const { playbackRate, detuneCents } = computeClipPlaybackParams(
-                  clip,
-                  bpm,
-                );
                 if (playbackRate !== 1 && source.playbackRate?.setValueAtTime) {
                   source.playbackRate.setValueAtTime(playbackRate, evTime);
                 }
@@ -1267,11 +1319,18 @@ export class DawEngine extends EventTarget {
                   source.detune.setValueAtTime(detuneCents, evTime);
                 }
                 const clipGain = this.ctx.createGain();
-                const durSec = pulsesToSeconds(clipDurPulses, bpm);
-                scheduleClipGainAutomation(clipGain.gain, clip, evTime, durSec);
+                scheduleClipGainAutomation(
+                  clipGain.gain,
+                  clip,
+                  evTime,
+                  playDurSec,
+                  64,
+                  sliceStartSec,
+                  durSec,
+                );
                 source.connect(clipGain);
-                clipGain.connect(nodes.gain);
-                source.start(evTime, clip.offset || 0, durSec);
+                clipGain.connect(nodes.input || nodes.gain);
+                source.start(evTime, sourceOffset, playDurSec);
                 source.trackId = track.id;
                 this._activeVoices.add(source);
                 const cleanupClip = () => {
@@ -1632,8 +1691,12 @@ export class DawEngine extends EventTarget {
               bpm,
             );
             const source = offlineCtx.createBufferSource();
+            const cachedOfflineBuf = this._ensurePlayableAudioBuffer(
+              offlineCtx,
+              this._sampleCache.get(clip.sample),
+            );
             const sampleBuf =
-              this._sampleCache.get(clip.sample) ||
+              cachedOfflineBuf ||
               (offlineCtx.createBuffer
                 ? offlineCtx.createBuffer(
                     2,
@@ -2815,7 +2878,23 @@ export class DawEngine extends EventTarget {
               bufferOrAudioBuffer.byteOffset + bufferOrAudioBuffer.byteLength,
             );
       if (this.ctx && typeof this.ctx.decodeAudioData === "function") {
-        audioBuffer = await this.ctx.decodeAudioData(arrayBuf);
+        try {
+          audioBuffer = await this.ctx.decodeAudioData(arrayBuf.slice(0));
+        } catch (decodeErr) {
+          const wavFallback = decodeWavPcmFallback(arrayBuf);
+          if (wavFallback) {
+            const channels = Array.from(
+              { length: Math.max(1, wavFallback.numberOfChannels || 1) },
+              (_, ch) => wavFallback.getChannelData(ch),
+            );
+            audioBuffer = this._channelsToAudioBuffer(
+              channels,
+              wavFallback.sampleRate,
+            );
+          } else {
+            throw decodeErr;
+          }
+        }
       } else {
         audioBuffer = decodeWavPcmFallback(arrayBuf);
         if (!audioBuffer) {
@@ -2914,6 +2993,34 @@ export class DawEngine extends EventTarget {
       clip: res.clip,
       sampleInfo: info,
     };
+  }
+
+  _ensurePlayableAudioBuffer(ctx, sampleBuf, cacheKey = null) {
+    if (!sampleBuf) return sampleBuf;
+    const needsNativeAudioBuffer =
+      typeof AudioBuffer !== "undefined" && !(sampleBuf instanceof AudioBuffer);
+    if (
+      needsNativeAudioBuffer &&
+      ctx &&
+      typeof ctx.createBuffer === "function" &&
+      typeof sampleBuf.getChannelData === "function"
+    ) {
+      const numChannels = Math.max(1, sampleBuf.numberOfChannels || 1);
+      const length = Math.max(1, sampleBuf.length || 1);
+      const sr = sampleBuf.sampleRate || ctx.sampleRate || 44100;
+      const nativeBuf = ctx.createBuffer(numChannels, length, sr);
+      for (let ch = 0; ch < numChannels; ch++) {
+        const srcCh = sampleBuf.getChannelData(ch);
+        if (srcCh) {
+          nativeBuf.getChannelData(ch).set(srcCh);
+        }
+      }
+      if (cacheKey && ctx === this.ctx) {
+        this._sampleCache.set(cacheKey, nativeBuf);
+      }
+      return nativeBuf;
+    }
+    return sampleBuf;
   }
 
   _channelsToAudioBuffer(channels, sampleRate = 44100) {

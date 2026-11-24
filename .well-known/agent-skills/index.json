@@ -1223,7 +1223,7 @@
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:f0bbc6bf1015496046d5732acfd47dbfa7422666e3484cf85cd99b23d9235de2"
+      "digest": "sha256:4954239103d070ecea6c2a6a80fabd7f5eab24ed58ad12cbc53c8635f119b77e"
     },
     {
       "name": "scdaw-fs",
