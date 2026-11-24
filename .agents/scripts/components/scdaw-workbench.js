@@ -1497,6 +1497,11 @@ export class DawWorkbenchElement extends BaseElement {
                 <option value="json" selected>Native Project (.scdaw.json)</option>
                 <option value="dawproject">DAWproject Interchange (.dawproject)</option>
                 <option value="wav">WAV Audio Mixdown (.wav)</option>
+                <option value="mp3">MP3 Audio (FFmpeg CDN, .mp3)</option>
+                <option value="ogg">OGG Vorbis (FFmpeg CDN, .ogg)</option>
+                <option value="opus">Opus Audio (FFmpeg CDN, .opus)</option>
+                <option value="flac">FLAC Lossless (FFmpeg CDN, .flac)</option>
+                <option value="m4a">M4A / AAC (FFmpeg CDN, .m4a)</option>
                 <option value="stems">Consolidated Stems Bundle (.zip)</option>
                 <option value="midi">Standard MIDI File (.mid)</option>
               </select>
@@ -1516,12 +1521,21 @@ export class DawWorkbenchElement extends BaseElement {
 
             <div id="export-opt-wav" style="display:none; flex-direction:column; gap:0.6rem;">
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
-                <div class="scdaw-dialog__field">
+                <div id="export-opt-bitdepth" class="scdaw-dialog__field">
                   <label for="export-bitdepth">Bit Depth</label>
                   <select id="export-bitdepth" style="width:100%;">
                     <option value="16">16-bit PCM</option>
                     <option value="24" selected>24-bit PCM (Studio Standard)</option>
                     <option value="32">32-bit Float</option>
+                  </select>
+                </div>
+                <div id="export-opt-bitrate" class="scdaw-dialog__field" style="display:none;">
+                  <label for="export-bitrate">Audio Bitrate</label>
+                  <select id="export-bitrate" style="width:100%;">
+                    <option value="128">128 kbps</option>
+                    <option value="192" selected>192 kbps</option>
+                    <option value="256">256 kbps</option>
+                    <option value="320">320 kbps</option>
                   </select>
                 </div>
                 <div class="scdaw-dialog__field">
@@ -1541,6 +1555,8 @@ export class DawWorkbenchElement extends BaseElement {
                 </select>
               </div>
             </div>
+
+            <div id="export-modal-status" role="status" aria-live="polite" style="font-size:0.75rem; min-height:1.1em; color:var(--shadow-claw-accent, #80d4db);"></div>
 
             <div style="display:flex; justify-content:flex-end; gap:0.6rem; margin-top:0.6rem; flex-wrap:wrap;">
               <button type="button" id="export-modal-cancel" class="btn">Cancel</button>
@@ -1982,10 +1998,35 @@ export class DawWorkbenchElement extends BaseElement {
     const formatSelect = this.shadowRoot.getElementById("export-format-select");
     const stemsOpt = this.shadowRoot.getElementById("export-opt-stems");
     const wavOpt = this.shadowRoot.getElementById("export-opt-wav");
+    const bitDepthOpt = this.shadowRoot.getElementById("export-opt-bitdepth");
+    const bitrateOpt = this.shadowRoot.getElementById("export-opt-bitrate");
+    const exportStatusEl = this.shadowRoot.getElementById(
+      "export-modal-status",
+    );
+
+    const syncExportFormatOptions = (fmt) => {
+      const isFfmpegAudio = ["mp3", "ogg", "opus", "flac", "m4a"].includes(fmt);
+      const isLossyAudio = ["mp3", "ogg", "opus", "m4a"].includes(fmt);
+      if (stemsOpt) {
+        stemsOpt.style.display = fmt === "stems" ? "flex" : "none";
+      }
+      if (wavOpt) {
+        wavOpt.style.display =
+          fmt === "wav" || fmt === "stems" || isFfmpegAudio ? "flex" : "none";
+      }
+      if (bitDepthOpt) {
+        bitDepthOpt.style.display =
+          fmt === "wav" || fmt === "stems" || fmt === "flac" ? "flex" : "none";
+      }
+      if (bitrateOpt) {
+        bitrateOpt.style.display = isLossyAudio ? "flex" : "none";
+      }
+    };
 
     const openExportModal = async (preferredFormat = null) => {
       if (exportModal && typeof exportModal.showModal === "function") {
         const p = scdaw.getProject();
+        if (exportStatusEl) exportStatusEl.textContent = "";
         if (exportFilenameInput) {
           exportFilenameInput.value = (p.name || "daw").replace(
             /[^a-zA-Z0-9_-]/g,
@@ -1994,7 +2035,9 @@ export class DawWorkbenchElement extends BaseElement {
         }
         if (preferredFormat && formatSelect) {
           formatSelect.value = preferredFormat;
-          formatSelect.dispatchEvent(new Event("change"));
+          syncExportFormatOptions(preferredFormat);
+        } else if (formatSelect) {
+          syncExportFormatOptions(formatSelect.value);
         }
         const targetGid = exportConvSelect?.value || DEFAULT_GROUP_ID;
         await populateConversations(exportConvSelect, targetGid);
@@ -2011,14 +2054,7 @@ export class DawWorkbenchElement extends BaseElement {
       ?.addEventListener("click", () => openExportModal("wav"));
 
     formatSelect?.addEventListener("change", (e) => {
-      const fmt = e.target.value;
-      if (stemsOpt) {
-        stemsOpt.style.display = fmt === "stems" ? "flex" : "none";
-      }
-      if (wavOpt) {
-        wavOpt.style.display =
-          fmt === "wav" || fmt === "stems" ? "flex" : "none";
-      }
+      syncExportFormatOptions(e.target.value);
     });
 
     this.shadowRoot
@@ -2147,6 +2183,10 @@ export class DawWorkbenchElement extends BaseElement {
           this.shadowRoot.getElementById("export-bitdepth")?.value || "24",
           10,
         );
+        const bitrateKbps = parseInt(
+          this.shadowRoot.getElementById("export-bitrate")?.value || "192",
+          10,
+        );
         const loops = parseInt(
           this.shadowRoot.getElementById("export-loops")?.value || "1",
           10,
@@ -2157,17 +2197,27 @@ export class DawWorkbenchElement extends BaseElement {
 
         const submitBtn = this.shadowRoot.getElementById("export-modal-submit");
         if (submitBtn) submitBtn.textContent = "Saving...";
+        if (exportStatusEl) exportStatusEl.textContent = "";
 
         try {
-          if (fmt === "wav") {
-            const fname = rawName.endsWith(".wav") ? rawName : `${rawName}.wav`;
+          if (["wav", "mp3", "ogg", "opus", "flac", "m4a"].includes(fmt)) {
+            const fname = rawName.endsWith(`.${fmt}`)
+              ? rawName
+              : `${rawName}.${fmt}`;
             await scdaw.bounce({
+              format: fmt,
               loops,
               bitDepth,
+              bitrateKbps,
               conversationId,
               filename: fname,
               saveToOpfs: saveToFs,
               saveToWorkspace: downloadCopy,
+              onProgress: (ratio, msg) => {
+                if (exportStatusEl) {
+                  exportStatusEl.textContent = `${msg} (${Math.round(ratio * 100)}%)`;
+                }
+              },
             });
           } else if (fmt === "stems") {
             const fname = rawName.endsWith(".zip")

@@ -76,6 +76,10 @@ import {
 import { AudioRecorder } from "./scdaw-recorder.js";
 import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
 import { createMidiIo } from "./scdaw-midi-io.js";
+import {
+  normalizeAudioExportFormat,
+  transcodeWavWithFfmpeg,
+} from "./scdaw-encoders.js";
 
 function decodeBase64AudioBytes(input) {
   const b64 = String(input || "")
@@ -1510,6 +1514,10 @@ export class DawEngine extends EventTarget {
       saveToOpfs = true,
       conversationId = DEFAULT_GROUP_ID,
       filename = null,
+      format = "wav",
+      bitrateKbps = 192,
+      onProgress = null,
+      ffmpegLoader = null,
     } = options;
     const p = this.project.get();
     const bpm = p.bpm || 120;
@@ -1762,15 +1770,48 @@ export class DawEngine extends EventTarget {
     }
 
     const stats = peakAndRms(left);
+    const requestedFormat = normalizeAudioExportFormat(format);
+    const safeBitrateKbps = Math.max(
+      64,
+      Math.min(320, Math.round(Number(bitrateKbps) || 192)),
+    );
     const wavBuffer = encodeWav([left, right], sampleRate, { bitDepth });
-    const resolvedFilename = filename || `${p.name || "daw"}-bounce.wav`;
+
+    let outputBytes = new Uint8Array(wavBuffer);
+    let outputMime = "audio/wav";
+    let outputExt = "wav";
+    let engineUsed = "native";
+
+    if (requestedFormat !== "wav") {
+      const encoded = await transcodeWavWithFfmpeg(wavBuffer, {
+        format: requestedFormat,
+        bitrateKbps: safeBitrateKbps,
+        sampleRate,
+        channels: 2,
+        onProgress,
+        ffmpegLoader,
+      });
+      outputBytes = encoded.bytes;
+      outputMime = encoded.mimeType;
+      outputExt = encoded.extension;
+      engineUsed = encoded.engineUsed;
+    }
+
+    const baseName = filename
+      ? String(filename).replace(/\.(wav|mp3|ogg|opus|flac|m4a)$/i, "")
+      : `${p.name || "daw"}-bounce`;
+    const resolvedFilename = `${baseName}.${outputExt}`;
+    const outputArrayBuffer = outputBytes.buffer.slice(
+      outputBytes.byteOffset,
+      outputBytes.byteOffset + outputBytes.byteLength,
+    );
 
     if (saveToOpfs) {
       try {
         await writeConversationFile(
           conversationId,
           resolvedFilename,
-          wavBuffer,
+          outputArrayBuffer,
         );
       } catch (err) {
         console.warn("Failed to write bounce to conversation files:", err);
@@ -1785,7 +1826,7 @@ export class DawEngine extends EventTarget {
       typeof URL !== "undefined"
     ) {
       try {
-        const blob = new Blob([wavBuffer], { type: "audio/wav" });
+        const blob = new Blob([outputBytes], { type: outputMime });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -1798,7 +1839,7 @@ export class DawEngine extends EventTarget {
     }
 
     const bounceMeta = {
-      bytes: wavBuffer.byteLength,
+      bytes: outputBytes.byteLength,
       durationSec: left.length / sampleRate,
       peakDb: stats.peakDb,
       rmsDb: stats.rmsDb,
@@ -1806,7 +1847,16 @@ export class DawEngine extends EventTarget {
       sampleRate,
       bitDepth,
       loops,
+      format: outputExt,
+      mimeType: outputMime,
+      extension: outputExt,
+      engineUsed,
+      filename: resolvedFilename,
+      ...(outputExt !== "wav" && outputExt !== "flac"
+        ? { bitrateKbps: safeBitrateKbps }
+        : {}),
       name: p.name,
+      audioBuffer: outputArrayBuffer,
       wavBuffer,
       timestamp: new Date().toISOString(),
     };

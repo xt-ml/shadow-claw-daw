@@ -420,10 +420,21 @@ export const TOOLS_METADATA = [
   {
     name: "scdaw_bounce",
     description:
-      "Render project offline into a WAV audio file (16-bit, 24-bit, or 32-bit Float) via OfflineAudioContext, initiating browser download and returning audio metadata.",
+      "Render project offline via OfflineAudioContext into native WAV (16/24/32-bit) or optional FFmpeg WASM compressed/lossless audio (mp3, ogg, opus, flac, m4a), initiating download and returning audio metadata.",
     inputSchema: {
       type: "object",
       properties: {
+        format: {
+          type: "string",
+          enum: ["wav", "mp3", "ogg", "opus", "flac", "m4a"],
+          description:
+            "Output audio format: native wav (default) or lazy FFmpeg WASM mp3, ogg, opus, flac, m4a",
+        },
+        bitrateKbps: {
+          type: "number",
+          description:
+            "Target bitrate in kbps for lossy FFmpeg exports (mp3, ogg, opus, m4a; clamped 64-320, default 192)",
+        },
         loops: {
           type: "number",
           description:

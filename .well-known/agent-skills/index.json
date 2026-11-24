@@ -92,7 +92,7 @@
         {
           "name": "scdaw_bounce",
           "url": "../../.agents/tools/scdaw_bounce.json",
-          "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+          "digest": "sha256:c4150f81d515a02ad9770479580ce154efdfcbbf3a208a368487563061dab41f"
         },
         {
           "name": "scdaw_edit_audio_clip",
@@ -210,7 +210,7 @@
         {
           "name": "scdaw_bounce",
           "url": "../../.agents/tools/scdaw_bounce.json",
-          "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+          "digest": "sha256:c4150f81d515a02ad9770479580ce154efdfcbbf3a208a368487563061dab41f"
         },
         {
           "name": "scdaw_export_midi",
@@ -811,9 +811,9 @@
     },
     {
       "name": "scdaw_bounce",
-      "description": "Render project offline into a WAV audio file (16-bit, 24-bit, or 32-bit Float) via OfflineAudioContext, initiating browser download and returning audio metadata.",
+      "description": "Render project offline via OfflineAudioContext into native WAV (16/24/32-bit) or optional FFmpeg WASM compressed/lossless audio (mp3, ogg, opus, flac, m4a), initiating download and returning audio metadata.",
       "url": "../../.agents/tools/scdaw_bounce.json",
-      "digest": "sha256:73ab6f8e73a443e8e10593915ff41235d78fc2e3485b36caee1c8724efedf410"
+      "digest": "sha256:c4150f81d515a02ad9770479580ce154efdfcbbf3a208a368487563061dab41f"
     },
     {
       "name": "scdaw_clear_automation",
@@ -1169,7 +1169,7 @@
       "name": "scdaw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-workbench.",
       "url": "../../.agents/scripts/components/scdaw-workbench.js",
-      "digest": "sha256:e0bdaa6f3b3e8c52e05ab6e1bc3812abfe7ceeb52c120d2f7f9db1d4dfcfd232"
+      "digest": "sha256:43f8f25c26df5a34005cae582431a7f3406ecf5fc3b88142063ea4add1163f33"
     },
     {
       "name": "scdaw-adapter",
@@ -1220,10 +1220,16 @@
       "digest": "sha256:93231544242d72e020fd88b4b4c7b2f6aacf36c0f108d62242e1260589848957"
     },
     {
+      "name": "scdaw-encoders",
+      "description": "Portable ESM engine logic and tool execution handler for scdaw-encoders.",
+      "url": "../../.agents/scripts/scdaw-encoders.js",
+      "digest": "sha256:fd5d829e343e76f35e01e9afc091a19fc324e6ccc1c2d141afba5fd57e8f64ea"
+    },
+    {
       "name": "scdaw-engine",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
       "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:4954239103d070ecea6c2a6a80fabd7f5eab24ed58ad12cbc53c8635f119b77e"
+      "digest": "sha256:b18e1c6964bed075efa93dc19753aef6c70983f8f185aefe498c5ccac37a42ee"
     },
     {
       "name": "scdaw-fs",
@@ -1301,7 +1307,7 @@
       "name": "scdaw-tools-metadata",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-tools-metadata.",
       "url": "../../.agents/scripts/scdaw-tools-metadata.js",
-      "digest": "sha256:00ca97c9f7b8593a2bc1119899d718f61d3683b6c05710ba4e940479a165a9a2"
+      "digest": "sha256:fa1c7aa9df2284bff2807092d45d887de98148f20647b8bfb2d698fab3d5c073"
     },
     {
       "name": "scdaw-url-param",
@@ -1413,6 +1419,7 @@
       "../../.agents/scripts/scdaw-dawproject.js",
       "../../.agents/scripts/scdaw-dsp.js",
       "../../.agents/scripts/scdaw-element.js",
+      "../../.agents/scripts/scdaw-encoders.js",
       "../../.agents/scripts/scdaw-engine.js",
       "../../.agents/scripts/scdaw-fs.js",
       "../../.agents/scripts/scdaw-instruments.js",
