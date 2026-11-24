@@ -413,3 +413,65 @@ test("Iconography & PWA Manifest: all icons and screenshots are template-specifi
     );
   }
 });
+
+test("Documentation Links: all relative file links resolve on disk, use HTTPS, and avoid broken sibling .md links in content pages", () => {
+  const docFiles = [
+    "README.md",
+    "AGENTS.md",
+    "pages/main/MEMORY.md",
+    "pages/main/~/content/01-architecture.md",
+    "pages/main/~/content/02-tools.md",
+    "pages/main/~/content/03-skills.md",
+    "pages/main/~/content/04-workbench.md",
+    "pages/main/~/content/05-porting-and-attribution.md",
+    "pages/main/~/content/06-troubleshooting.md",
+    "pages/main/~/content/07-examples.md",
+  ];
+
+  const brokenRelative = [];
+  const insecureHttp = [];
+  const siblingMdInContent = [];
+
+  for (const relDoc of docFiles) {
+    const absDoc = resolve(ROOT, relDoc);
+    const md = readFileSync(absDoc, "utf8");
+    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let m;
+    while ((m = linkRe.exec(md)) !== null) {
+      const target = m[2].trim();
+      if (target.startsWith("#")) continue;
+      if (/^http:\/\//i.test(target) && /xt-ml\.github\.io/i.test(target)) {
+        insecureHttp.push(`${relDoc} -> ${target}`);
+        continue;
+      }
+      if (/^https?:\/\//i.test(target)) continue;
+
+      const resolved = resolve(dirname(absDoc), target);
+      if (!existsSync(resolved)) {
+        brokenRelative.push(`${relDoc} -> ${target}`);
+      }
+      if (
+        relDoc.startsWith("pages/main/~/content/") &&
+        /\.md$/i.test(target)
+      ) {
+        siblingMdInContent.push(`${relDoc} -> ${target}`);
+      }
+    }
+  }
+
+  assert.deepEqual(
+    brokenRelative,
+    [],
+    `Found broken relative documentation links: ${brokenRelative.join(", ")}`,
+  );
+  assert.deepEqual(
+    insecureHttp,
+    [],
+    `Found insecure http:// github.io links: ${insecureHttp.join(", ")}`,
+  );
+  assert.deepEqual(
+    siblingMdInContent,
+    [],
+    `Found sibling .md links inside pages/main/~/content that break on pretty paths: ${siblingMdInContent.join(", ")}`,
+  );
+});

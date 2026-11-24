@@ -30,7 +30,7 @@ An in-browser digital audio workstation (DAW) template powered by **[ShadowClaw]
 | Attribution & Provenance              | [05-porting-and-attribution.md](pages/main/~/content/05-porting-and-attribution.md) | [main/porting-and-attribution/](https://xt-ml.github.io/shadow-claw-daw/main/porting-and-attribution/) |
 | Troubleshooting & URL Sharing         | [06-troubleshooting.md](pages/main/~/content/06-troubleshooting.md)                 | [main/troubleshooting/](https://xt-ml.github.io/shadow-claw-daw/main/troubleshooting/)                 |
 | Song Showcase & Programmatic Examples | [07-examples.md](pages/main/~/content/07-examples.md)                               | [main/examples/](https://xt-ml.github.io/shadow-claw-daw/main/examples/)                               |
-| Agent Memory                          | [agent-memory.md](pages/main/~/content/agent-memory.md)                             | [main/memory/](https://xt-ml.github.io/shadow-claw-daw/main/memory/)                                   |
+| Agent Memory                          | [MEMORY.md](pages/main/MEMORY.md)                                                   | [main/memory/](https://xt-ml.github.io/shadow-claw-daw/main/memory/)                                   |
 
 ## Commands
 
