@@ -31,6 +31,7 @@ import {
   deserializeProject,
   createHistory,
   automationValueAt,
+  evaluateClipGainEnvelope,
 } from "./scdaw.js";
 import { encodeZip } from "./scdaw-zip.js";
 import {
@@ -49,6 +50,13 @@ import {
   analyzeAudioBuffer,
 } from "./scdaw-dsp.js";
 import {
+  processAudioChannels,
+  generateToneAudio,
+  generateNoiseAudio,
+  generateDtmfAudio,
+  generateSilenceAudio,
+} from "./scdaw-audio-dsp.js";
+import {
   writeConversationFile,
   readConversationFile,
   listConversations,
@@ -58,6 +66,48 @@ import {
 import { AudioRecorder } from "./scdaw-recorder.js";
 import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
 import { createMidiIo } from "./scdaw-midi-io.js";
+
+export function scheduleClipGainAutomation(
+  gainParam,
+  clip,
+  startSec,
+  durSec,
+  steps = 64,
+) {
+  if (!gainParam || !clip) return;
+  if (clip.muted) {
+    gainParam.setValueAtTime(0, startSec);
+    return;
+  }
+  const hasFades =
+    (Number(clip.fadeIn) || 0) > 0 || (Number(clip.fadeOut) || 0) > 0;
+  const hasEnvelope =
+    Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0;
+
+  if ((!hasFades && !hasEnvelope) || !Number.isFinite(durSec) || durSec <= 0) {
+    gainParam.setValueAtTime(clip.gain ?? 1.0, startSec);
+    return;
+  }
+
+  const count = Math.max(2, steps);
+  const curve = new Float32Array(count + 1);
+  for (let i = 0; i <= count; i++) {
+    const rel = (i / count) * durSec;
+    curve[i] = evaluateClipGainEnvelope(clip, rel, durSec);
+  }
+
+  if (typeof gainParam.setValueCurveAtTime === "function") {
+    gainParam.setValueCurveAtTime(curve, startSec, durSec);
+  } else {
+    gainParam.setValueAtTime(curve[0], startSec);
+    for (let i = 1; i <= count; i++) {
+      gainParam.linearRampToValueAtTime(
+        curve[i],
+        startSec + (i / count) * durSec,
+      );
+    }
+  }
+}
 
 export class DawEngine extends EventTarget {
   constructor(options = {}) {
@@ -1005,6 +1055,7 @@ export class DawEngine extends EventTarget {
             const nodes = this.graph.tracks.get(track.id);
             if (!nodes || track.mute || (hasSolo && !track.solo)) continue;
             for (const clip of track.audioClips) {
+              if (clip.muted) continue;
               const clipStartPulses = Math.round(
                 (clip.time || 0) * PPQN.Quarter,
               );
@@ -1040,13 +1091,10 @@ export class DawEngine extends EventTarget {
                     : null);
                 if (sampleBuf) source.buffer = sampleBuf;
                 const clipGain = this.ctx.createGain();
-                clipGain.gain.setValueAtTime(
-                  clip.gain ?? 1.0,
-                  this.ctx.currentTime,
-                );
+                const durSec = pulsesToSeconds(clipDurPulses, bpm);
+                scheduleClipGainAutomation(clipGain.gain, clip, evTime, durSec);
                 source.connect(clipGain);
                 clipGain.connect(nodes.gain);
-                const durSec = pulsesToSeconds(clipDurPulses, bpm);
                 source.start(evTime, clip.offset || 0, durSec);
                 source.trackId = track.id;
                 this._activeVoices.add(source);
@@ -1398,6 +1446,7 @@ export class DawEngine extends EventTarget {
         for (let l = 0; l < loops; l++) {
           const loopOffsetPulses = l * totalPulses;
           for (const clip of track.audioClips) {
+            if (clip.muted) continue;
             const clipStartPulses = Math.round((clip.time || 0) * PPQN.Quarter);
             const clipDurPulses = Math.round(
               (clip.duration || 4) * PPQN.Quarter,
@@ -1418,10 +1467,10 @@ export class DawEngine extends EventTarget {
                 : null);
             if (sampleBuf) source.buffer = sampleBuf;
             const clipGain = offlineCtx.createGain();
-            clipGain.gain.setValueAtTime(clip.gain ?? 1.0, 0);
+            const durSec = pulsesToSeconds(clipDurPulses, bpm);
+            scheduleClipGainAutomation(clipGain.gain, clip, when, durSec);
             source.connect(clipGain);
             clipGain.connect(gainNode);
-            const durSec = pulsesToSeconds(clipDurPulses, bpm);
             source.start(when, clip.offset || 0, durSec);
           }
         }
@@ -2277,6 +2326,12 @@ export class DawEngine extends EventTarget {
         params,
       );
     }
+    if (name === "process_audio_clip") {
+      return await this.processAudioClip(params);
+    }
+    if (name === "generate_audio_clip") {
+      return await this.generateAudioClip(params);
+    }
     if (name === "undo") {
       const prev = this.history.undo();
       if (!prev) return { ok: false, message: "Nothing to undo" };
@@ -2637,6 +2692,197 @@ export class DawEngine extends EventTarget {
       clipId: res.clipId,
       clip: res.clip,
       sampleInfo: info,
+    };
+  }
+
+  _channelsToAudioBuffer(channels, sampleRate = 44100) {
+    const numChannels = Math.max(1, channels.length);
+    const length = channels[0]?.length || 1;
+    const sr = sampleRate || this.ctx?.sampleRate || 44100;
+    if (this.ctx && typeof this.ctx.createBuffer === "function") {
+      const buf = this.ctx.createBuffer(numChannels, length, sr);
+      for (let ch = 0; ch < numChannels; ch++) {
+        buf.getChannelData(ch).set(channels[ch]);
+      }
+      return buf;
+    }
+    const copies = channels.map((c) => new Float32Array(c));
+    return {
+      numberOfChannels: numChannels,
+      length,
+      sampleRate: sr,
+      duration: length / sr,
+      getChannelData: (ch = 0) => copies[ch] || copies[0],
+    };
+  }
+
+  async processAudioClip({
+    trackId,
+    clipId,
+    effect,
+    params = {},
+    startSec = null,
+    endSec = null,
+  }) {
+    const p = this.project.get();
+    const track = p.tracks.find((t) => t.id === trackId);
+    if (!track) throw new Error(`Track not found: ${trackId}`);
+    const clip = (track.audioClips || []).find((c) => c.id === clipId);
+    if (!clip) throw new Error(`Audio clip not found: ${clipId}`);
+
+    const sourceBuf = this._sampleCache.get(clip.sample);
+    if (!sourceBuf) {
+      throw new Error(
+        `Sample buffer not found for clip ${clipId}: ${clip.sample}`,
+      );
+    }
+
+    const sr = sourceBuf.sampleRate || this.ctx?.sampleRate || 44100;
+    const numCh = sourceBuf.numberOfChannels || 1;
+    const fullChannels = Array.from(
+      { length: numCh },
+      (_, i) => new Float32Array(sourceBuf.getChannelData(i)),
+    );
+    const totalLen = fullChannels[0]?.length || 0;
+
+    let result;
+    const hasRange =
+      (startSec !== null && startSec !== undefined) ||
+      (endSec !== null && endSec !== undefined);
+
+    if (hasRange && totalLen > 0) {
+      const sFrame = Math.max(
+        0,
+        Math.min(totalLen, Math.round((Number(startSec) || 0) * sr)),
+      );
+      const eFrame =
+        endSec !== null && endSec !== undefined
+          ? Math.max(
+              sFrame,
+              Math.min(totalLen, Math.round(Number(endSec) * sr)),
+            )
+          : totalLen;
+      const sliced = fullChannels.map((ch) => ch.slice(sFrame, eFrame));
+      result = processAudioChannels(
+        sliced,
+        effect,
+        effect === "bake_fades" ? { ...params, clip } : params,
+        sr,
+      );
+      for (let c = 0; c < fullChannels.length; c++) {
+        const processed = result.channels[c] || result.channels[0];
+        fullChannels[c].set(processed.subarray(0, eFrame - sFrame), sFrame);
+      }
+      result = { channels: fullChannels, meta: result.meta };
+    } else {
+      result = processAudioChannels(
+        fullChannels,
+        effect,
+        effect === "bake_fades" ? { ...params, clip } : params,
+        sr,
+      );
+    }
+
+    const baseKey = String(clip.sample || "sample").split("__")[0];
+    const sampleKey = `${baseKey}__${effect}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+    const newBuf = this._channelsToAudioBuffer(result.channels, sr);
+    this._sampleCache.set(sampleKey, newBuf);
+
+    const patch = { sample: sampleKey };
+    if (effect === "bake_fades") {
+      patch.fadeIn = 0;
+      patch.fadeOut = 0;
+      patch.gainEnvelope = [];
+      patch.gain = 1.0;
+    }
+
+    const updated = await this.sendCommand("set_audio_clip", {
+      trackId,
+      clipId,
+      patch,
+    });
+
+    return {
+      ok: true,
+      trackId,
+      clipId,
+      effect,
+      sampleKey,
+      previousSampleKey: clip.sample,
+      meta: result.meta,
+      clip: updated.clip,
+    };
+  }
+
+  async generateAudioClip({
+    trackId = null,
+    generator = "tone",
+    params = {},
+    time = 0,
+    name = null,
+  } = {}) {
+    const p = this.project.get();
+    let targetTrack = trackId
+      ? p.tracks.find((t) => t.id === trackId)
+      : p.tracks.find(
+          (t) => t.id === this.selectedTrackId.get() && t.kind === "audio",
+        ) || p.tracks.find((t) => t.kind === "audio");
+
+    if (!targetTrack) {
+      const addRes = await this.sendCommand("add_track", {
+        kind: "audio",
+        name: "Generated Audio",
+      });
+      targetTrack = this.project
+        .get()
+        .tracks.find((t) => t.id === addRes.trackId);
+    }
+
+    const sr = this.ctx?.sampleRate || 44100;
+    const genType = String(generator || "tone").toLowerCase();
+    let gen;
+    if (genType === "noise") {
+      gen = generateNoiseAudio({ ...params, sampleRate: sr });
+    } else if (genType === "dtmf") {
+      gen = generateDtmfAudio({ ...params, sampleRate: sr });
+    } else if (genType === "silence") {
+      gen = generateSilenceAudio({ ...params, sampleRate: sr });
+    } else {
+      gen = generateToneAudio({ ...params, sampleRate: sr });
+    }
+
+    const sampleKey = `gen_${genType}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+    const buf = this._channelsToAudioBuffer(gen.channels, gen.sampleRate);
+    this._sampleCache.set(sampleKey, buf);
+
+    const bpm = this.project.get().bpm || 120;
+    const durationBeats = Math.max(
+      0.25,
+      Number(((gen.durationSec * bpm) / 60).toFixed(3)),
+    );
+    const clipName =
+      name || `${genType.charAt(0).toUpperCase() + genType.slice(1)} Clip`;
+
+    const res = await this.sendCommand("add_audio_clip", {
+      trackId: targetTrack.id,
+      clip: {
+        name: clipName,
+        sample: sampleKey,
+        time: Number(time || 0),
+        duration: durationBeats,
+        offset: 0,
+        gain: 1.0,
+      },
+    });
+
+    return {
+      ok: true,
+      trackId: targetTrack.id,
+      clipId: res.clipId,
+      clip: res.clip,
+      sampleKey,
+      durationSec: gen.durationSec,
+      sampleRate: gen.sampleRate,
     };
   }
 

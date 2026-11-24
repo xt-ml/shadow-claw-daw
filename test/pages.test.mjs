@@ -173,9 +173,9 @@ test("Documentation: README.md, AGENTS.md, and pages/main docs are up to date an
     "utf8",
   );
 
-  // Must document 45 declarative tools and 13 custom elements
-  assert.match(readme, /45 declarative `scdaw_\*` WebMCP tools/);
-  assert.match(agents, /45 declarative tools/);
+  // Must document 47 declarative tools and 13 custom elements
+  assert.match(readme, /47 declarative `scdaw_\*` WebMCP tools/);
+  assert.match(agents, /47 declarative tools/);
 
   // Must not reference deprecated scdaw.html or shadow-claw-template
   for (const [name, text] of [

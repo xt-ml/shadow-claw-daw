@@ -25,6 +25,17 @@ class FakeAudioParam {
     this.events.push({ type: "setTargetAtTime", val, time, constant });
     this.value = val;
   }
+  setValueCurveAtTime(values, startTime, duration) {
+    this.events.push({
+      type: "setValueCurveAtTime",
+      values: Array.from(values),
+      startTime,
+      duration,
+    });
+    if (values && values.length > 0) {
+      this.value = values[values.length - 1];
+    }
+  }
 }
 
 class FakeAudioNode {
@@ -147,8 +158,10 @@ class FakeAudioBufferSourceNode extends FakeAudioNode {
     this.buffer = null;
     this.loop = false;
   }
-  start(when = 0) {
+  start(when = 0, offset = 0, duration = undefined) {
     this.startTime = when;
+    this.startOffset = offset;
+    this.startDuration = duration;
   }
   stop(when = 0) {
     this.stopTime = when;

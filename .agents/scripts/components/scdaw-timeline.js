@@ -16,10 +16,109 @@ import {
   getNormalizedSignatureMap,
   getBarTimeline,
   computeProjectTotalPulses,
+  evaluateClipGainEnvelope,
 } from "../scdaw.js";
 import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
 const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+
+export function calculateClipFadeHandleDrag({
+  edge = "fade-in",
+  deltaX = 0,
+  clipWidthPx = 200,
+  clipDurSec = 4,
+  currentFadeSec = 0,
+  otherFadeSec = 0,
+  shiftKey = false,
+}) {
+  const width = Math.max(1, Number(clipWidthPx) || 200);
+  const dur = Math.max(0, Number(clipDurSec) || 0);
+  const maxFade = Math.max(0, dur - Math.max(0, Number(otherFadeSec) || 0));
+  const deltaSec = (Number(deltaX) / width) * dur;
+  const raw =
+    edge === "fade-out"
+      ? Number(currentFadeSec || 0) - deltaSec
+      : Number(currentFadeSec || 0) + deltaSec;
+  const clamped = Math.max(0, Math.min(maxFade, raw));
+  const precision = shiftKey ? 100 : 20;
+  return Math.round(clamped * precision) / precision;
+}
+
+export function renderClipFadeOverlaySvg(clip, bpm = 120) {
+  if (!clip) return "";
+  const clipDurSec = (Number(clip.duration || 4) * 60) / (Number(bpm) || 120);
+  const fadeIn = Math.max(0, Number(clip.fadeIn) || 0);
+  const fadeOut = Math.max(0, Number(clip.fadeOut) || 0);
+  const env = Array.isArray(clip.gainEnvelope) ? clip.gainEnvelope : [];
+  if (fadeIn <= 0 && fadeOut <= 0 && env.length === 0) return "";
+  if (clipDurSec <= 0) return "";
+
+  const parts = [];
+  if (fadeIn > 0) {
+    const endPct = Math.min(100, (fadeIn / clipDurSec) * 100);
+    const pts = ["0,0"];
+    const steps = 8;
+    for (let i = 0; i <= steps; i++) {
+      const frac = i / steps;
+      const t = frac * fadeIn;
+      const g = evaluateClipGainEnvelope(
+        { gain: 1, fadeIn, fadeInType: clip.fadeInType || "linear" },
+        t,
+        clipDurSec,
+      );
+      const x = frac * endPct;
+      const y = (1 - Math.max(0, Math.min(1, g))) * 100;
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    pts.push(`${endPct.toFixed(1)},0`);
+    parts.push(
+      `<path d="M ${pts.join(" L ")} Z" fill="rgba(15, 23, 42, 0.45)" />`,
+    );
+  }
+
+  if (fadeOut > 0) {
+    const startPct = Math.max(0, 100 - (fadeOut / clipDurSec) * 100);
+    const pts = [`${startPct.toFixed(1)},0`];
+    const steps = 8;
+    for (let i = 0; i <= steps; i++) {
+      const frac = i / steps;
+      const t = clipDurSec - fadeOut + frac * fadeOut;
+      const g = evaluateClipGainEnvelope(
+        { gain: 1, fadeOut, fadeOutType: clip.fadeOutType || "linear" },
+        t,
+        clipDurSec,
+      );
+      const x = startPct + frac * (100 - startPct);
+      const y = (1 - Math.max(0, Math.min(1, g))) * 100;
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    pts.push("100,0");
+    parts.push(
+      `<path d="M ${pts.join(" L ")} Z" fill="rgba(15, 23, 42, 0.45)" />`,
+    );
+  }
+
+  if (env.length > 0) {
+    const polyPts = [];
+    const envSteps = 20;
+    for (let i = 0; i <= envSteps; i++) {
+      const t = (i / envSteps) * clipDurSec;
+      const g = evaluateClipGainEnvelope(
+        { gain: 1, gainEnvelope: env },
+        t,
+        clipDurSec,
+      );
+      const x = (i / envSteps) * 100;
+      const y = (1 - Math.max(0, Math.min(1, g / 2))) * 100;
+      polyPts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+    }
+    parts.push(
+      `<polyline points="${polyPts.join(" ")}" fill="none" stroke="rgba(253, 224, 71, 0.85)" stroke-width="1.8" vector-effect="non-scaling-stroke" />`,
+    );
+  }
+
+  return `<svg class="scdaw-timeline__clip-fade-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${parts.join("")}</svg>`;
+}
 
 export function calculateProjectBarsFromDrag({
   startBars = 1,
@@ -553,6 +652,11 @@ export function setupClipInteraction({
   snapThresholdPx = 10,
   onUpdate,
   onRemove,
+  onSplit,
+  onDuplicate,
+  onFadeChange,
+  onMuteToggle,
+  getPlayheadBeat,
 }) {
   if (!clipEl) return () => {};
 
@@ -563,6 +667,8 @@ export function setupClipInteraction({
   let startBeat = Number(clip.time || 0);
   let startDuration = Number(clip.duration || 4);
   let startOffset = Number(clip.offset || 0);
+  let startFadeIn = Number(clip.fadeIn || 0);
+  let startFadeOut = Number(clip.fadeOut || 0);
 
   const snapGrid = snapMode === "bar" ? beatsPerBar : 1;
   const effectiveSnapMode =
@@ -576,16 +682,41 @@ export function setupClipInteraction({
     return 400;
   };
 
+  const getClipWidthPx = () => {
+    if (typeof clipEl.getBoundingClientRect === "function") {
+      const rect = clipEl.getBoundingClientRect();
+      if (rect.width > 0) return rect.width;
+    }
+    return Math.max(
+      20,
+      (startDuration / Math.max(1, totalBeats)) * getLaneWidth(),
+    );
+  };
+
+  const clipDurSec = (Number(clip.duration || 4) * 60) / (Number(bpm) || 120);
+
   const onPointerDown = (e) => {
     if (e.button !== undefined && e.button !== 0) return;
     e.stopPropagation?.();
     const target = e.target;
-    const isLeftHandle = target.closest?.(".scdaw-timeline__clip-handle--left");
-    const isRightHandle = target.closest?.(
+    const isFadeInHandle = target?.closest?.(
+      ".scdaw-timeline__fade-handle--in",
+    );
+    const isFadeOutHandle = target?.closest?.(
+      ".scdaw-timeline__fade-handle--out",
+    );
+    const isLeftHandle = target?.closest?.(
+      ".scdaw-timeline__clip-handle--left",
+    );
+    const isRightHandle = target?.closest?.(
       ".scdaw-timeline__clip-handle--right",
     );
 
-    if (isLeftHandle) {
+    if (isFadeInHandle) {
+      interactionMode = "fade-in";
+    } else if (isFadeOutHandle) {
+      interactionMode = "fade-out";
+    } else if (isLeftHandle) {
       interactionMode = "resize-left";
     } else if (isRightHandle) {
       interactionMode = "resize-right";
@@ -599,6 +730,8 @@ export function setupClipInteraction({
     startBeat = Number(clip.time || 0);
     startDuration = Number(clip.duration || 4);
     startOffset = Number(clip.offset || 0);
+    startFadeIn = Number(clip.fadeIn || 0);
+    startFadeOut = Number(clip.fadeOut || 0);
 
     try {
       clipEl.setPointerCapture?.(e.pointerId);
@@ -621,6 +754,27 @@ export function setupClipInteraction({
 
     e.preventDefault?.();
     const laneWidth = getLaneWidth();
+
+    if (interactionMode === "fade-in" || interactionMode === "fade-out") {
+      const nextFade = calculateClipFadeHandleDrag({
+        edge: interactionMode,
+        deltaX,
+        clipWidthPx: getClipWidthPx(),
+        clipDurSec,
+        currentFadeSec:
+          interactionMode === "fade-in" ? startFadeIn : startFadeOut,
+        otherFadeSec:
+          interactionMode === "fade-in" ? startFadeOut : startFadeIn,
+        shiftKey: Boolean(e.shiftKey),
+      });
+      const sel =
+        interactionMode === "fade-in"
+          ? ".scdaw-timeline__fade-handle--in"
+          : ".scdaw-timeline__fade-handle--out";
+      const hEl = clipEl.querySelector?.(sel);
+      hEl?.setAttribute?.("aria-valuenow", String(nextFade));
+      return;
+    }
 
     if (interactionMode === "move") {
       const nextTime = calculateClipDragPosition({
@@ -696,7 +850,33 @@ export function setupClipInteraction({
       const deltaX = e.clientX - startX;
       const laneWidth = getLaneWidth();
 
-      if (interactionMode === "move") {
+      if (interactionMode === "fade-in") {
+        const fadeIn = calculateClipFadeHandleDrag({
+          edge: "fade-in",
+          deltaX,
+          clipWidthPx: getClipWidthPx(),
+          clipDurSec,
+          currentFadeSec: startFadeIn,
+          otherFadeSec: startFadeOut,
+          shiftKey: Boolean(e.shiftKey),
+        });
+        if (fadeIn !== startFadeIn) {
+          onFadeChange?.({ fadeIn });
+        }
+      } else if (interactionMode === "fade-out") {
+        const fadeOut = calculateClipFadeHandleDrag({
+          edge: "fade-out",
+          deltaX,
+          clipWidthPx: getClipWidthPx(),
+          clipDurSec,
+          currentFadeSec: startFadeOut,
+          otherFadeSec: startFadeIn,
+          shiftKey: Boolean(e.shiftKey),
+        });
+        if (fadeOut !== startFadeOut) {
+          onFadeChange?.({ fadeOut });
+        }
+      } else if (interactionMode === "move") {
         const nextTime = calculateClipDragPosition({
           startBeat,
           deltaX,
@@ -770,10 +950,77 @@ export function setupClipInteraction({
     }
 
     const target = e.target;
-    const isLeftHandle = target.closest?.(".scdaw-timeline__clip-handle--left");
-    const isRightHandle = target.closest?.(
+    const isFadeInHandle = target?.closest?.(
+      ".scdaw-timeline__fade-handle--in",
+    );
+    const isFadeOutHandle = target?.closest?.(
+      ".scdaw-timeline__fade-handle--out",
+    );
+    const isLeftHandle = target?.closest?.(
+      ".scdaw-timeline__clip-handle--left",
+    );
+    const isRightHandle = target?.closest?.(
       ".scdaw-timeline__clip-handle--right",
     );
+
+    if (isFadeInHandle || isFadeOutHandle) {
+      const step = e.shiftKey ? 0.05 : 0.25;
+      let delta = 0;
+      if (e.key === "ArrowRight") delta = isFadeInHandle ? step : -step;
+      else if (e.key === "ArrowLeft") delta = isFadeInHandle ? -step : step;
+      else return;
+
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      const curIn = Number(clip.fadeIn || 0);
+      const curOut = Number(clip.fadeOut || 0);
+      if (isFadeInHandle) {
+        const nextIn = Math.max(
+          0,
+          Math.min(Math.max(0, clipDurSec - curOut), curIn + delta),
+        );
+        onFadeChange?.({ fadeIn: Number(nextIn.toFixed(3)) });
+      } else {
+        const nextOut = Math.max(
+          0,
+          Math.min(Math.max(0, clipDurSec - curIn), curOut + delta),
+        );
+        onFadeChange?.({ fadeOut: Number(nextOut.toFixed(3)) });
+      }
+      return;
+    }
+
+    if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+      const lowerKey = String(e.key || "").toLowerCase();
+      if (lowerKey === "s" && typeof onSplit === "function") {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        const cStart = Number(clip.time || 0);
+        const cEnd = cStart + Number(clip.duration || 4);
+        const playhead =
+          typeof getPlayheadBeat === "function" ? getPlayheadBeat() : null;
+        const splitBeat =
+          playhead !== null &&
+          playhead > cStart + 0.05 &&
+          playhead < cEnd - 0.05
+            ? Number(playhead.toFixed(3))
+            : Number((cStart + Number(clip.duration || 4) / 2).toFixed(3));
+        onSplit(splitBeat);
+        return;
+      }
+      if (lowerKey === "d" && typeof onDuplicate === "function") {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        onDuplicate();
+        return;
+      }
+      if (lowerKey === "m" && typeof onMuteToggle === "function") {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        onMuteToggle();
+        return;
+      }
+    }
 
     if (isLeftHandle) {
       const step = e.shiftKey ? 0.25 : 1;
@@ -921,7 +1168,13 @@ export class DawTimelineElement extends BaseElement {
               .map(([k, v]) => `${k}:${Array.isArray(v) ? v.length : 0}`)
               .join(",")
           : "";
-        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.recordArm || t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${autoKeys}`;
+        const clipSig = (t.audioClips || [])
+          .map(
+            (c) =>
+              `${c.id}:${c.time}:${c.duration}:${c.offset}:${c.fadeIn || 0}:${c.fadeOut || 0}:${Boolean(c.muted)}:${c.gainEnvelope?.length || 0}`,
+          )
+          .join(",");
+        return `${t.id}|${t.name}|${t.kind}|${Boolean(t.mute)}|${Boolean(t.solo)}|${Boolean(t.recordArm || t.armed)}|${t.clips?.length || 0}|${t.audioClips?.length || 0}|${clipSig}|${autoKeys}`;
       })
       .join(";");
     return `${p.lengthBars}|${(p.signature || []).join("/")}|${p.bpm}|${p.swing}|${selectedTrackId || ""}|${trackSigs}`;
@@ -1397,6 +1650,47 @@ export class DawTimelineElement extends BaseElement {
           border-right: 3px solid var(--accent, #6366f1);
         }
 
+        .scdaw-timeline__clip-fade-svg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        .scdaw-timeline__fade-handle {
+          position: absolute;
+          top: 0;
+          width: 14px;
+          height: 14px;
+          z-index: 7;
+          cursor: ew-resize;
+          touch-action: none;
+          opacity: 0.7;
+          background: rgba(255, 255, 255, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.65);
+          transition: opacity 0.12s ease, background 0.12s ease;
+        }
+
+        .scdaw-timeline__fade-handle--in {
+          left: 0;
+          border-bottom-right-radius: 100%;
+        }
+
+        .scdaw-timeline__fade-handle--out {
+          right: 0;
+          border-bottom-left-radius: 100%;
+        }
+
+        .scdaw-timeline__fade-handle:hover,
+        .scdaw-timeline__fade-handle:focus-visible {
+          opacity: 1;
+          background: var(--accent, #9df0f8);
+          outline: 2px solid #ffffff;
+          outline-offset: -1px;
+        }
+
         .scdaw-timeline__clip--audio:hover .scdaw-timeline__clip-handle,
         .scdaw-timeline__clip--audio:focus-visible .scdaw-timeline__clip-handle,
         .scdaw-timeline__clip-handle:hover,
@@ -1528,6 +1822,10 @@ export class DawTimelineElement extends BaseElement {
           }
           .scdaw-timeline__auto-point {
             r: 7;
+          }
+          .scdaw-timeline__fade-handle {
+            width: 24px;
+            height: 24px;
           }
         }
       </style>
@@ -1713,19 +2011,30 @@ export class DawTimelineElement extends BaseElement {
                           }
 
                           const isStacked = rowCount > 1;
+                          const clipBpm = p.bpm || 120;
+                          const clipDurSec =
+                            (Number(clip.duration || 4) * 60) / clipBpm;
+                          const fadeOverlaySvg = renderClipFadeOverlaySvg(
+                            clip,
+                            clipBpm,
+                          );
+                          const isClipMuted = isSilenced || Boolean(clip.muted);
                           return `
-                            <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isSilenced ? "scdaw-timeline__clip--muted" : ""} ${isStacked ? "scdaw-timeline__clip--stacked" : ""}"
+                            <div class="scdaw-timeline__clip scdaw-timeline__clip--audio clip-block ${isClipMuted ? "scdaw-timeline__clip--muted" : ""} ${isStacked ? "scdaw-timeline__clip--stacked" : ""}"
                                  data-clip="${clip.id}"
                                  data-track="${t.id}"
                                  style="left:${leftPct}%; width:${widthPct}%; ${topStyle} position:absolute; z-index:${rowIndex + 1};"
                                  role="button"
                                  tabindex="0"
-                                 title="${clip.name} (Beat ${(clip.time || 0) + 1}, ${clip.duration} beats${isStacked ? ` — Layer ${rowIndex + 1} of ${rowCount}` : ""})"
-                                 aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats${isStacked ? `, Layer ${rowIndex + 1} of ${rowCount}` : ""}">
+                                 title="${clip.name} (Beat ${(clip.time || 0) + 1}, ${clip.duration} beats${clip.muted ? " — Muted" : ""}${isStacked ? ` — Layer ${rowIndex + 1} of ${rowCount}` : ""})"
+                                 aria-label="Audio clip ${clip.name}, beat ${clip.time}, duration ${clip.duration} beats${clip.muted ? ", muted" : ""}${isStacked ? `, Layer ${rowIndex + 1} of ${rowCount}` : ""}. Press S to split, D to duplicate, M to mute.">
+                              <div class="scdaw-timeline__fade-handle scdaw-timeline__fade-handle--in" data-edge="fade-in" role="slider" tabindex="0" aria-label="Fade in duration for ${clip.name}" aria-valuemin="0" aria-valuemax="${clipDurSec.toFixed(2)}" aria-valuenow="${(clip.fadeIn || 0).toFixed(2)}" title="Drag to adjust fade-in"></div>
                               <div class="scdaw-timeline__clip-handle scdaw-timeline__clip-handle--left" data-edge="left" role="slider" tabindex="0" aria-label="Trim start for ${clip.name}" aria-valuemin="0" aria-valuemax="${totalBeats}" aria-valuenow="${clip.time || 0}" title="Drag to trim start"></div>
                               ${waveformSvg}
-                              <span style="margin-right:4px; z-index:1;" aria-hidden="true">🎙</span>
+                              ${fadeOverlaySvg}
+                              <span style="margin-right:4px; z-index:1;" aria-hidden="true">${clip.muted ? "🔇" : "🎙"}</span>
                               <span style="z-index:1; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; font-size:${rowCount > 1 ? "0.72rem" : "0.85rem"};">${clip.name}</span>
+                              <div class="scdaw-timeline__fade-handle scdaw-timeline__fade-handle--out" data-edge="fade-out" role="slider" tabindex="0" aria-label="Fade out duration for ${clip.name}" aria-valuemin="0" aria-valuemax="${clipDurSec.toFixed(2)}" aria-valuenow="${(clip.fadeOut || 0).toFixed(2)}" title="Drag to adjust fade-out"></div>
                               <div class="scdaw-timeline__clip-handle scdaw-timeline__clip-handle--right" data-edge="right" role="slider" tabindex="0" aria-label="Resize duration for ${clip.name}" aria-valuemin="0.25" aria-valuemax="${totalBeats}" aria-valuenow="${clip.duration || 4}" title="Drag to resize duration"></div>
                             </div>
                           `;
@@ -2178,6 +2487,28 @@ export class DawTimelineElement extends BaseElement {
             onRemove: () => {
               scdaw.sendCommand("remove_audio_clip", { trackId, clipId });
             },
+            onSplit: (splitBeat) => {
+              scdaw.sendCommand("split_audio_clip", {
+                trackId,
+                clipId,
+                splitBeat,
+              });
+            },
+            onDuplicate: () => {
+              scdaw.sendCommand("duplicate_audio_clip", { trackId, clipId });
+            },
+            onFadeChange: (fadePatch) => {
+              scdaw.sendCommand("set_clip_fades", {
+                trackId,
+                clipId,
+                ...fadePatch,
+              });
+            },
+            onMuteToggle: () => {
+              scdaw.sendCommand("silence_audio_clip", { trackId, clipId });
+            },
+            getPlayheadBeat: () =>
+              (scdaw.getState?.().positionPpqn || 0) / PPQN.Quarter,
           });
         }
       });

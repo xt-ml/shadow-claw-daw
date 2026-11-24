@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "scdaw_process_audio_clip",
+  "description": "Apply PCM DSP effects (peak normalize, amplify, EBU R128 loudness, DC offset removal, invert, reverse, click/pop removal, fade bake) or generate synthesized audio clips (tone/chirp, white/pink/brownian noise, DTMF, silence) with lossless undo.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "effect": {
+        "type": "string",
+        "enum": [
+          "normalize",
+          "amplify",
+          "loudness",
+          "remove_dc",
+          "invert",
+          "reverse",
+          "click_removal",
+          "fade_in",
+          "fade_out",
+          "bake_fades",
+          "generate_tone",
+          "generate_noise",
+          "generate_dtmf",
+          "generate_silence"
+        ],
+        "description": "DSP processor or audio generator to execute"
+      },
+      "trackId": {
+        "type": "string",
+        "description": "Target audio track ID"
+      },
+      "clipId": {
+        "type": "string",
+        "description": "Target audio clip ID (required for processing effects)"
+      },
+      "startSec": {
+        "type": "number",
+        "description": "Optional sub-range start time in seconds within clip buffer"
+      },
+      "endSec": {
+        "type": "number",
+        "description": "Optional sub-range end time in seconds within clip buffer"
+      },
+      "time": {
+        "type": "number",
+        "description": "Start beat position for generated clips (default 0)"
+      },
+      "name": {
+        "type": "string",
+        "description": "Optional clip name for generated clips"
+      },
+      "params": {
+        "type": "object",
+        "description": "Effect/generator options (e.g. targetDb, gainDb, targetLufs, threshold, waveform, frequency, endFrequency, type, sequence, durationSec)"
+      }
+    },
+    "required": ["effect"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": false,
+    "consequentialHint": false
+  },
+  "execution": {
+    "type": "javascript",
+    "code": "let toolParams = {};\ntry {\n  toolParams = typeof input !== \"undefined\" && input && typeof input === \"object\"\n    ? input\n    : (typeof $PIPE_DATA !== \"undefined\" && $PIPE_DATA ? (typeof $PIPE_DATA === \"string\" ? JSON.parse($PIPE_DATA) : $PIPE_DATA) : (typeof data !== \"undefined\" && data ? (typeof data === \"string\" ? JSON.parse(data) : data) : {}));\n} catch (_) {}\n\nconst cmdCh = new BroadcastChannel(\"scdaw-commands\");\nconst resCh = new BroadcastChannel(\"scdaw-results\");\nconst reqId = \"req_\" + Math.random().toString(36).slice(2);\n\nconst timeout = new Promise((_, reject) =>\n  setTimeout(() => {\n    cmdCh.close();\n    resCh.close();\n    reject(new Error(\"Timeout awaiting DAW response for scdaw_process_audio_clip. Ensure workbench is open at /pages/main/scdaw.html.\"));\n  }, 5000)\n);\n\nconst reply = new Promise((resolve, reject) => {\n  const handler = (e) => {\n    if (e.data && e.data.requestId === reqId) {\n      if (e.data.ack) return;\n      resCh.removeEventListener(\"message\", handler);\n      cmdCh.close();\n      resCh.close();\n      if (e.data.error) reject(new Error(e.data.error));\n      else resolve(e.data.result);\n    }\n  };\n  resCh.addEventListener(\"message\", handler);\n  cmdCh.postMessage({ type: \"scdaw_process_audio_clip\", requestId: reqId, params: toolParams || {} });\n});\n\nreturn await Promise.race([reply, timeout]);"
+  }
+}

@@ -8,7 +8,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
 
 - **Assistant Name**: `ShadowClaw DAW` (`Daw`)
 - **Prefix Isolation**:
-  - Tools prefix: `scdaw_*` (45 declarative tools)
+  - Tools prefix: `scdaw_*` (47 declarative tools)
   - Custom Elements prefix: `scdaw-*` (13 modular Web Components)
   - Broadcast Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
   - Pinned workbench: `pages/main/index.html` (`/main/`)
@@ -47,7 +47,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
    - When checking Web IDL interfaces such as `LaunchParams`, always test property existence with `"files" in window.LaunchParams.prototype` rather than invoking prototype getters directly.
 
 5. **Declarative Tools & WebMCP**:
-   - Single source of truth for all 45 tools is `bin/tool-manifest.mjs`.
+   - Single source of truth for all 47 tools is `bin/tool-manifest.mjs`.
    - Generated into `.agents/tools/*.json` via `npm run build:tools` (`bin/generate-tools.mjs`).
    - Dynamically registered into `document.modelContext` by `scdaw-adapter.js` with WebMCP boolean annotations (`readOnlyHint`, `consequentialHint`) for full client discovery and execution.
 

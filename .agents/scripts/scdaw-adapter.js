@@ -389,6 +389,47 @@ export async function handleToolDispatch(name, params) {
       return await scdaw.sendCommand("set_audio_clip", params);
     }
 
+    case "scdaw_edit_audio_clip": {
+      const action = params.action;
+      switch (action) {
+        case "split":
+          return await scdaw.sendCommand("split_audio_clip", params);
+        case "trim":
+          return await scdaw.sendCommand("trim_audio_clip", params);
+        case "duplicate":
+          return await scdaw.sendCommand("duplicate_audio_clip", params);
+        case "join":
+          return await scdaw.sendCommand("join_audio_clips", params);
+        case "crossfade":
+          return await scdaw.sendCommand("crossfade_audio_clips", params);
+        case "set_fades":
+          return await scdaw.sendCommand("set_clip_fades", params);
+        case "set_envelope":
+          return await scdaw.sendCommand("set_clip_gain_envelope", params);
+        case "silence_range":
+          return await scdaw.sendCommand("silence_clip_range", params);
+        case "mute":
+          return await scdaw.sendCommand("silence_audio_clip", params);
+        case "remove":
+          return await scdaw.sendCommand("remove_audio_clip", params);
+        default:
+          throw new Error(
+            `Unsupported scdaw_edit_audio_clip action: ${action}`,
+          );
+      }
+    }
+
+    case "scdaw_process_audio_clip": {
+      const effect = String(params.effect || "");
+      if (effect.startsWith("generate_")) {
+        return await scdaw.sendCommand("generate_audio_clip", {
+          ...params,
+          generator: effect.replace(/^generate_/, ""),
+        });
+      }
+      return await scdaw.sendCommand("process_audio_clip", params);
+    }
+
     case "scdaw_set_track_send": {
       return await scdaw.sendCommand("set_track_send", params);
     }

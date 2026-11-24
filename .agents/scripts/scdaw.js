@@ -1073,6 +1073,121 @@ export function normalizeNotes(units, notes, signature = [4, 4]) {
   });
 }
 
+export const VALID_FADE_TYPES = Object.freeze([
+  "linear",
+  "logarithmic",
+  "scurve",
+]);
+
+function normalizeFadeType(type) {
+  const t = String(type || "linear").toLowerCase();
+  return VALID_FADE_TYPES.includes(t) ? t : "linear";
+}
+
+function makeClipId() {
+  return `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function normalizeGainEnvelope(points, maxSec = Infinity) {
+  if (!Array.isArray(points)) return [];
+  const cleaned = [];
+  for (const pt of points) {
+    if (!pt || typeof pt !== "object") continue;
+    const rawT = Number(pt.time);
+    const rawV = Number(pt.value);
+    if (!Number.isFinite(rawT) || !Number.isFinite(rawV)) continue;
+    const clampedT = Number.isFinite(maxSec)
+      ? Math.max(0, Math.min(maxSec, rawT))
+      : Math.max(0, rawT);
+    const clampedV = Math.max(0, Math.min(2, rawV));
+    cleaned.push({
+      time: Number(clampedT.toFixed(6)),
+      value: Number(clampedV.toFixed(6)),
+    });
+  }
+  cleaned.sort((a, b) => a.time - b.time);
+  const deduped = [];
+  for (const pt of cleaned) {
+    if (
+      deduped.length > 0 &&
+      Math.abs(deduped[deduped.length - 1].time - pt.time) <= 1e-4
+    ) {
+      deduped[deduped.length - 1] = pt;
+    } else {
+      deduped.push(pt);
+    }
+  }
+  return deduped;
+}
+
+function evaluateGainPointsAt(points, relSec) {
+  if (!Array.isArray(points) || points.length === 0) return 1.0;
+  const sorted =
+    points.length === 1
+      ? points
+      : [...points].sort((a, b) => (a.time || 0) - (b.time || 0));
+  if (relSec <= sorted[0].time) return sorted[0].value;
+  if (relSec >= sorted[sorted.length - 1].time) {
+    return sorted[sorted.length - 1].value;
+  }
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (relSec >= a.time && relSec <= b.time) {
+      const span = b.time - a.time;
+      if (span <= 1e-9) return b.value;
+      const t = (relSec - a.time) / span;
+      return a.value + (b.value - a.value) * t;
+    }
+  }
+  return 1.0;
+}
+
+function evaluateFadeCurve(u, type = "linear") {
+  const t = Math.max(0, Math.min(1, u));
+  if (type === "logarithmic") {
+    return Math.sin(t * Math.PI * 0.5);
+  }
+  if (type === "scurve") {
+    return 0.5 - 0.5 * Math.cos(t * Math.PI);
+  }
+  return t;
+}
+
+export function evaluateClipGainEnvelope(clip, relSec, clipDurSec) {
+  if (!clip || clip.muted) return 0;
+  const baseGain = Math.max(0, Math.min(2, Number(clip.gain ?? 1.0)));
+  if (!Number.isFinite(clipDurSec) || clipDurSec <= 0) {
+    return baseGain;
+  }
+  const t = Math.max(0, Math.min(clipDurSec, Number(relSec) || 0));
+
+  let fadeIn = Math.max(0, Number(clip.fadeIn) || 0);
+  let fadeOut = Math.max(0, Number(clip.fadeOut) || 0);
+  if (fadeIn + fadeOut > clipDurSec) {
+    const scale = clipDurSec / (fadeIn + fadeOut);
+    fadeIn *= scale;
+    fadeOut *= scale;
+  }
+
+  let gain = baseGain;
+  if (fadeIn > 0 && t < fadeIn) {
+    gain *= evaluateFadeCurve(t / fadeIn, normalizeFadeType(clip.fadeInType));
+  }
+  if (fadeOut > 0 && t > clipDurSec - fadeOut) {
+    gain *= evaluateFadeCurve(
+      (clipDurSec - t) / fadeOut,
+      normalizeFadeType(clip.fadeOutType),
+    );
+  }
+
+  if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+    gain *= evaluateGainPointsAt(clip.gainEnvelope, t);
+  }
+
+  return Math.max(0, Math.min(4, gain));
+}
+
 export function automationValueAt(
   track,
   paramName,
@@ -2082,15 +2197,40 @@ export function applyCommand(project, name, params = {}) {
       const clipId =
         rawClip.id ||
         `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const bpm = next.bpm || 120;
+      const duration = Math.max(0.0625, Number(rawClip.duration ?? 4));
+      const clipDurSec = (duration * 60) / bpm;
       const clip = {
         id: clipId,
         name: rawClip.name || "Audio Clip",
         sample: rawClip.sample || "",
-        time: Number(rawClip.time ?? 0),
-        duration: Number(rawClip.duration ?? 4),
-        offset: Number(rawClip.offset ?? 0),
-        gain: Number(rawClip.gain ?? 1.0),
+        time: Math.max(0, Number(rawClip.time ?? 0)),
+        duration,
+        offset: Math.max(0, Number(rawClip.offset ?? 0)),
+        gain: Math.max(0, Math.min(2.0, Number(rawClip.gain ?? 1.0))),
       };
+      if (rawClip.fadeIn !== undefined)
+        clip.fadeIn = Math.max(
+          0,
+          Math.min(clipDurSec, Number(rawClip.fadeIn) || 0),
+        );
+      if (rawClip.fadeOut !== undefined)
+        clip.fadeOut = Math.max(
+          0,
+          Math.min(clipDurSec, Number(rawClip.fadeOut) || 0),
+        );
+      if (rawClip.fadeInType !== undefined)
+        clip.fadeInType = normalizeFadeType(rawClip.fadeInType);
+      if (rawClip.fadeOutType !== undefined)
+        clip.fadeOutType = normalizeFadeType(rawClip.fadeOutType);
+      if (Array.isArray(rawClip.gainEnvelope))
+        clip.gainEnvelope = normalizeGainEnvelope(
+          rawClip.gainEnvelope,
+          clipDurSec,
+        );
+      if (rawClip.muted !== undefined) clip.muted = Boolean(rawClip.muted);
+      if (rawClip.color !== undefined) clip.color = String(rawClip.color);
+      if (rawClip.groupId !== undefined) clip.groupId = rawClip.groupId;
 
       track.audioClips.push(clip);
       track.audioClips.sort((a, b) => a.time - b.time);
@@ -2113,19 +2253,52 @@ export function applyCommand(project, name, params = {}) {
       if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
 
       if (params.patch && typeof params.patch === "object") {
+        const bpm = next.bpm || 120;
         if (params.patch.name !== undefined)
           clip.name = String(params.patch.name);
         if (params.patch.sample !== undefined)
           clip.sample = String(params.patch.sample);
         if (params.patch.time !== undefined)
-          clip.time = Number(params.patch.time);
+          clip.time = Math.max(0, Number(params.patch.time));
         if (params.patch.duration !== undefined)
-          clip.duration = Number(params.patch.duration);
+          clip.duration = Math.max(0.0625, Number(params.patch.duration));
         if (params.patch.offset !== undefined)
-          clip.offset = Number(params.patch.offset);
+          clip.offset = Math.max(0, Number(params.patch.offset));
         if (params.patch.gain !== undefined)
           clip.gain = Math.max(0, Math.min(2.0, Number(params.patch.gain)));
+
+        const clipDurSec = ((clip.duration || 4) * 60) / bpm;
+        if (params.patch.fadeIn !== undefined)
+          clip.fadeIn = Math.max(
+            0,
+            Math.min(clipDurSec, Number(params.patch.fadeIn) || 0),
+          );
+        if (params.patch.fadeOut !== undefined)
+          clip.fadeOut = Math.max(
+            0,
+            Math.min(clipDurSec, Number(params.patch.fadeOut) || 0),
+          );
+        if (params.patch.fadeInType !== undefined)
+          clip.fadeInType = normalizeFadeType(params.patch.fadeInType);
+        if (params.patch.fadeOutType !== undefined)
+          clip.fadeOutType = normalizeFadeType(params.patch.fadeOutType);
+        if (Array.isArray(params.patch.gainEnvelope))
+          clip.gainEnvelope = normalizeGainEnvelope(
+            params.patch.gainEnvelope,
+            clipDurSec,
+          );
+        if (params.patch.muted !== undefined)
+          clip.muted = Boolean(params.patch.muted);
+        if (params.patch.color !== undefined)
+          clip.color = String(params.patch.color);
+        if (params.patch.groupId !== undefined)
+          clip.groupId = params.patch.groupId;
+
         track.audioClips.sort((a, b) => a.time - b.time);
+        ensureProjectCoversPulses(
+          next,
+          (clip.time + clip.duration) * PPQN.Quarter,
+        );
       }
 
       return {
@@ -2146,6 +2319,527 @@ export function applyCommand(project, name, params = {}) {
       return {
         project: next,
         result: { ok: true, trackId: track.id, clipId: params.clipId },
+      };
+    }
+
+    case "split_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const idx = track.audioClips.findIndex((c) => c.id === params.clipId);
+      if (idx === -1) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const clip = track.audioClips[idx];
+      const clipStart = Number(clip.time || 0);
+      const clipDur = Number(clip.duration || 4);
+      const clipEnd = clipStart + clipDur;
+      const splitBeat = Number(params.splitBeat);
+
+      if (
+        !Number.isFinite(splitBeat) ||
+        splitBeat <= clipStart ||
+        splitBeat >= clipEnd
+      ) {
+        throw new Error(
+          `splitBeat (${params.splitBeat}) must lie strictly inside clip bounds (${clipStart}, ${clipEnd})`,
+        );
+      }
+
+      const bpm = next.bpm || 120;
+      const secPerBeat = 60 / bpm;
+      const leftDurBeats = splitBeat - clipStart;
+      const rightDurBeats = clipEnd - splitBeat;
+      const splitRelSec = leftDurBeats * secPerBeat;
+      const leftDurSec = splitRelSec;
+      const rightDurSec = rightDurBeats * secPerBeat;
+
+      const leftClip = structuredClone(clip);
+      leftClip.duration = leftDurBeats;
+      leftClip.fadeOut = 0;
+      if (leftClip.fadeIn !== undefined) {
+        leftClip.fadeIn = Math.min(leftClip.fadeIn, leftDurSec);
+      }
+
+      const rightClip = structuredClone(clip);
+      rightClip.id = makeClipId();
+      rightClip.time = splitBeat;
+      rightClip.duration = rightDurBeats;
+      rightClip.offset = Number(clip.offset || 0) + splitRelSec;
+      rightClip.fadeIn = 0;
+      if (rightClip.fadeOut !== undefined) {
+        rightClip.fadeOut = Math.min(rightClip.fadeOut, rightDurSec);
+      }
+
+      if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+        const boundaryVal = evaluateGainPointsAt(
+          clip.gainEnvelope,
+          splitRelSec,
+        );
+        const leftEnv = clip.gainEnvelope
+          .filter((pt) => pt.time < splitRelSec - 1e-6)
+          .map((pt) => ({ ...pt }));
+        leftEnv.push({
+          time: Number(splitRelSec.toFixed(6)),
+          value: boundaryVal,
+        });
+        leftClip.gainEnvelope = normalizeGainEnvelope(leftEnv, leftDurSec);
+
+        const rightEnv = [
+          { time: 0, value: boundaryVal },
+          ...clip.gainEnvelope
+            .filter((pt) => pt.time > splitRelSec + 1e-6)
+            .map((pt) => ({
+              time: Number((pt.time - splitRelSec).toFixed(6)),
+              value: pt.value,
+            })),
+        ];
+        rightClip.gainEnvelope = normalizeGainEnvelope(rightEnv, rightDurSec);
+      }
+
+      track.audioClips.splice(idx, 1, leftClip, rightClip);
+      track.audioClips.sort((a, b) => a.time - b.time);
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          clips: [leftClip, rightClip],
+        },
+      };
+    }
+
+    case "trim_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const oldStart = Number(clip.time || 0);
+      const oldDur = Number(clip.duration || 4);
+      const oldEnd = oldStart + oldDur;
+      const newStart =
+        params.startBeat !== undefined
+          ? Math.max(0, Number(params.startBeat))
+          : oldStart;
+      const newEnd =
+        params.endBeat !== undefined ? Number(params.endBeat) : oldEnd;
+
+      if (
+        !Number.isFinite(newStart) ||
+        !Number.isFinite(newEnd) ||
+        newEnd - newStart < 0.0625
+      ) {
+        throw new Error(
+          `Invalid trim range [${newStart}, ${newEnd}] for clip ${clip.id}`,
+        );
+      }
+
+      const bpm = next.bpm || 120;
+      const secPerBeat = 60 / bpm;
+      const deltaStartBeats = newStart - oldStart;
+      const deltaStartSec = deltaStartBeats * secPerBeat;
+      const newDuration = newEnd - newStart;
+      const newDurSec = newDuration * secPerBeat;
+
+      clip.time = newStart;
+      clip.duration = newDuration;
+      clip.offset = Math.max(0, Number(clip.offset || 0) + deltaStartSec);
+      if (clip.fadeIn !== undefined) {
+        clip.fadeIn = Math.max(0, Math.min(newDurSec, clip.fadeIn));
+      }
+      if (clip.fadeOut !== undefined) {
+        clip.fadeOut = Math.max(0, Math.min(newDurSec, clip.fadeOut));
+      }
+      if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+        const shifted = clip.gainEnvelope.map((pt) => ({
+          time: Number((pt.time - deltaStartSec).toFixed(6)),
+          value: pt.value,
+        }));
+        clip.gainEnvelope = normalizeGainEnvelope(
+          shifted.filter((pt) => pt.time >= 0 && pt.time <= newDurSec),
+          newDurSec,
+        );
+      }
+
+      track.audioClips.sort((a, b) => a.time - b.time);
+      ensureProjectCoversPulses(
+        next,
+        (clip.time + clip.duration) * PPQN.Quarter,
+      );
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "duplicate_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const clone = structuredClone(clip);
+      clone.id = makeClipId();
+      clone.time =
+        params.time !== undefined
+          ? Math.max(0, Number(params.time))
+          : Number(clip.time || 0) + Number(clip.duration || 4);
+
+      track.audioClips.push(clone);
+      track.audioClips.sort((a, b) => a.time - b.time);
+      ensureProjectCoversPulses(
+        next,
+        (clone.time + clone.duration) * PPQN.Quarter,
+      );
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clone.id, clip: clone },
+      };
+    }
+
+    case "join_audio_clips": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+
+      const clipIds = Array.isArray(params.clipIds) ? params.clipIds : [];
+      if (clipIds.length < 2) {
+        throw new Error("join_audio_clips requires at least 2 clipIds");
+      }
+
+      const targets = clipIds.map((id) => {
+        const found = track.audioClips.find((c) => c.id === id);
+        if (!found) throw new Error(`Audio clip not found: ${id}`);
+        return found;
+      });
+      targets.sort((a, b) => (a.time || 0) - (b.time || 0));
+
+      const baseSample = targets[0].sample;
+      for (const c of targets) {
+        if (c.sample !== baseSample) {
+          throw new Error(
+            `Cannot join clips with different sample sources ('${baseSample}' vs '${c.sample}')`,
+          );
+        }
+      }
+
+      const first = targets[0];
+      const last = targets[targets.length - 1];
+      const minStart = Number(first.time || 0);
+      const maxEnd = Math.max(
+        ...targets.map((c) => Number(c.time || 0) + Number(c.duration || 4)),
+      );
+      const joinedDur = maxEnd - minStart;
+      const bpm = next.bpm || 120;
+      const secPerBeat = 60 / bpm;
+      const joinedDurSec = joinedDur * secPerBeat;
+
+      const mergedEnv = [];
+      for (const c of targets) {
+        if (Array.isArray(c.gainEnvelope) && c.gainEnvelope.length > 0) {
+          const shiftSec = (Number(c.time || 0) - minStart) * secPerBeat;
+          for (const pt of c.gainEnvelope) {
+            mergedEnv.push({
+              time: Number((pt.time + shiftSec).toFixed(6)),
+              value: pt.value,
+            });
+          }
+        }
+      }
+
+      const joinedClip = {
+        ...structuredClone(first),
+        time: minStart,
+        duration: joinedDur,
+        offset: Number(first.offset || 0),
+        fadeIn: Number(first.fadeIn || 0),
+        fadeOut: Number(last.fadeOut || 0),
+        fadeOutType: last.fadeOutType || first.fadeOutType || "linear",
+      };
+      if (mergedEnv.length > 0) {
+        joinedClip.gainEnvelope = normalizeGainEnvelope(
+          mergedEnv,
+          joinedDurSec,
+        );
+      } else {
+        delete joinedClip.gainEnvelope;
+      }
+
+      const removeSet = new Set(clipIds);
+      track.audioClips = track.audioClips.filter((c) => !removeSet.has(c.id));
+      track.audioClips.push(joinedClip);
+      track.audioClips.sort((a, b) => a.time - b.time);
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          clipId: joinedClip.id,
+          clip: joinedClip,
+        },
+      };
+    }
+
+    case "crossfade_audio_clips": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+
+      const clipA = track.audioClips.find((c) => c.id === params.clipIdA);
+      const clipB = track.audioClips.find((c) => c.id === params.clipIdB);
+      if (!clipA || !clipB) {
+        throw new Error(
+          `Crossfade requires valid clipIdA and clipIdB on track ${track.id}`,
+        );
+      }
+
+      const first = (clipA.time || 0) <= (clipB.time || 0) ? clipA : clipB;
+      const second = first === clipA ? clipB : clipA;
+      const firstEnd = Number(first.time || 0) + Number(first.duration || 4);
+      const existingOverlap = firstEnd - Number(second.time || 0);
+
+      let overlapBeats =
+        params.durationBeats !== undefined
+          ? Math.max(0.0625, Number(params.durationBeats))
+          : existingOverlap > 0.01
+            ? existingOverlap
+            : 1.0;
+
+      const maxOverlap = Math.min(
+        Number(first.duration || 4),
+        Number(second.duration || 4),
+      );
+      overlapBeats = Math.min(overlapBeats, maxOverlap);
+
+      if (Math.abs(existingOverlap - overlapBeats) > 1e-4) {
+        second.time = Math.max(0, firstEnd - overlapBeats);
+      }
+
+      const bpm = next.bpm || 120;
+      const fadeSec = Number(((overlapBeats * 60) / bpm).toFixed(6));
+      const fadeType = normalizeFadeType(params.fadeType || "logarithmic");
+
+      first.fadeOut = fadeSec;
+      first.fadeOutType = fadeType;
+      second.fadeIn = fadeSec;
+      second.fadeInType = fadeType;
+
+      track.audioClips.sort((a, b) => a.time - b.time);
+
+      return {
+        project: next,
+        result: {
+          ok: true,
+          trackId: track.id,
+          overlapBeats,
+          fadeSec,
+          clips: [first, second],
+        },
+      };
+    }
+
+    case "set_clip_fades": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const bpm = next.bpm || 120;
+      const clipDurSec = ((clip.duration || 4) * 60) / bpm;
+
+      if (params.fadeIn !== undefined) {
+        clip.fadeIn = Math.max(
+          0,
+          Math.min(clipDurSec, Number(params.fadeIn) || 0),
+        );
+      }
+      if (params.fadeOut !== undefined) {
+        clip.fadeOut = Math.max(
+          0,
+          Math.min(clipDurSec, Number(params.fadeOut) || 0),
+        );
+      }
+      if (params.fadeInType !== undefined) {
+        clip.fadeInType = normalizeFadeType(params.fadeInType);
+      }
+      if (params.fadeOutType !== undefined) {
+        clip.fadeOutType = normalizeFadeType(params.fadeOutType);
+      }
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "set_clip_gain_envelope": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const bpm = next.bpm || 120;
+      const clipDurSec = ((clip.duration || 4) * 60) / bpm;
+      let pts = Array.isArray(clip.gainEnvelope) ? [...clip.gainEnvelope] : [];
+
+      if (Array.isArray(params.points)) {
+        pts = params.points;
+      } else if (params.removeTime !== undefined) {
+        const targetTime = Number(params.removeTime);
+        pts = pts.filter((pt) => Math.abs(pt.time - targetTime) > 1e-4);
+      } else if (params.point && typeof params.point === "object") {
+        const ptTime = Math.max(
+          0,
+          Math.min(clipDurSec, Number(params.point.time ?? 0)),
+        );
+        const ptVal = Math.max(0, Math.min(2, Number(params.point.value ?? 1)));
+        pts = pts.filter((pt) => Math.abs(pt.time - ptTime) > 1e-4);
+        pts.push({ time: ptTime, value: ptVal });
+      }
+
+      clip.gainEnvelope = normalizeGainEnvelope(pts, clipDurSec);
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "silence_audio_clip": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const clip = track.audioClips.find((c) => c.id === params.clipId);
+      if (!clip) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      clip.muted =
+        params.muted !== undefined
+          ? Boolean(params.muted)
+          : !Boolean(clip.muted);
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clipId: clip.id, clip },
+      };
+    }
+
+    case "silence_clip_range": {
+      const track = next.tracks.find((t) => t.id === params.trackId);
+      if (!track) throw new Error(`Track not found: ${params.trackId}`);
+      track.audioClips = track.audioClips || [];
+      const idx = track.audioClips.findIndex((c) => c.id === params.clipId);
+      if (idx === -1) throw new Error(`Audio clip not found: ${params.clipId}`);
+
+      const clip = track.audioClips[idx];
+      const clipStart = Number(clip.time || 0);
+      const clipDur = Number(clip.duration || 4);
+      const clipEnd = clipStart + clipDur;
+
+      const reqStart = Number(params.startBeat);
+      const reqEnd = Number(params.endBeat);
+      if (
+        !Number.isFinite(reqStart) ||
+        !Number.isFinite(reqEnd) ||
+        reqEnd <= reqStart
+      ) {
+        throw new Error(
+          `Invalid silence range [${params.startBeat}, ${params.endBeat}]`,
+        );
+      }
+
+      const cutStart = Math.max(clipStart, reqStart);
+      const cutEnd = Math.min(clipEnd, reqEnd);
+      if (cutEnd <= cutStart) {
+        return {
+          project: next,
+          result: {
+            ok: true,
+            trackId: track.id,
+            clips: [clip],
+            unchanged: true,
+          },
+        };
+      }
+
+      const bpm = next.bpm || 120;
+      const secPerBeat = 60 / bpm;
+      const replacement = [];
+
+      // Left remaining segment
+      if (cutStart - clipStart >= 0.0625) {
+        const leftClip = structuredClone(clip);
+        leftClip.duration = cutStart - clipStart;
+        const leftDurSec = leftClip.duration * secPerBeat;
+        leftClip.fadeOut = 0;
+        if (leftClip.fadeIn !== undefined) {
+          leftClip.fadeIn = Math.min(leftClip.fadeIn, leftDurSec);
+        }
+        if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+          const boundaryVal = evaluateGainPointsAt(
+            clip.gainEnvelope,
+            leftDurSec,
+          );
+          const leftEnv = clip.gainEnvelope
+            .filter((pt) => pt.time < leftDurSec - 1e-6)
+            .map((pt) => ({ ...pt }));
+          leftEnv.push({
+            time: Number(leftDurSec.toFixed(6)),
+            value: boundaryVal,
+          });
+          leftClip.gainEnvelope = normalizeGainEnvelope(leftEnv, leftDurSec);
+        }
+        replacement.push(leftClip);
+      }
+
+      // Right remaining segment
+      if (clipEnd - cutEnd >= 0.0625) {
+        const rightClip = structuredClone(clip);
+        if (replacement.length > 0) {
+          rightClip.id = makeClipId();
+        }
+        const cutEndRelBeats = cutEnd - clipStart;
+        const cutEndRelSec = cutEndRelBeats * secPerBeat;
+        rightClip.time = cutEnd;
+        rightClip.duration = clipEnd - cutEnd;
+        rightClip.offset = Number(clip.offset || 0) + cutEndRelSec;
+        const rightDurSec = rightClip.duration * secPerBeat;
+        rightClip.fadeIn = 0;
+        if (rightClip.fadeOut !== undefined) {
+          rightClip.fadeOut = Math.min(rightClip.fadeOut, rightDurSec);
+        }
+        if (Array.isArray(clip.gainEnvelope) && clip.gainEnvelope.length > 0) {
+          const boundaryVal = evaluateGainPointsAt(
+            clip.gainEnvelope,
+            cutEndRelSec,
+          );
+          const rightEnv = [
+            { time: 0, value: boundaryVal },
+            ...clip.gainEnvelope
+              .filter((pt) => pt.time > cutEndRelSec + 1e-6)
+              .map((pt) => ({
+                time: Number((pt.time - cutEndRelSec).toFixed(6)),
+                value: pt.value,
+              })),
+          ];
+          rightClip.gainEnvelope = normalizeGainEnvelope(rightEnv, rightDurSec);
+        }
+        replacement.push(rightClip);
+      }
+
+      track.audioClips.splice(idx, 1, ...replacement);
+      track.audioClips.sort((a, b) => a.time - b.time);
+
+      return {
+        project: next,
+        result: { ok: true, trackId: track.id, clips: replacement },
       };
     }
 

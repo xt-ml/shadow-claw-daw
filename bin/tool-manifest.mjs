@@ -1754,4 +1754,200 @@ export const TOOLS = [
       code: makeBroadcastCode("scdaw_design_sound"),
     },
   },
+  {
+    name: "scdaw_edit_audio_clip",
+    description:
+      "Perform non-destructive editing on audio clips: split, trim, duplicate, join, equal-power crossfade, set fade-in/fade-out curves, edit clip gain envelopes, silence ranges, mute, or remove.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: [
+            "split",
+            "trim",
+            "duplicate",
+            "join",
+            "crossfade",
+            "set_fades",
+            "set_envelope",
+            "silence_range",
+            "mute",
+            "remove",
+          ],
+          description: "Clip editing operation to execute",
+        },
+        trackId: { type: "string", description: "Target audio track ID" },
+        clipId: {
+          type: "string",
+          description: "Target audio clip ID",
+        },
+        clipIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "List of clip IDs to join (for action='join')",
+        },
+        clipIdA: {
+          type: "string",
+          description: "First clip ID (for action='crossfade')",
+        },
+        clipIdB: {
+          type: "string",
+          description: "Second clip ID (for action='crossfade')",
+        },
+        splitBeat: {
+          type: "number",
+          description: "Beat position where clip is split (for action='split')",
+        },
+        startBeat: {
+          type: "number",
+          description:
+            "Start beat (for action='trim' or action='silence_range')",
+        },
+        endBeat: {
+          type: "number",
+          description: "End beat (for action='trim' or action='silence_range')",
+        },
+        time: {
+          type: "number",
+          description: "Destination start beat (for action='duplicate')",
+        },
+        durationBeats: {
+          type: "number",
+          description:
+            "Crossfade overlap duration in beats (for action='crossfade')",
+        },
+        fadeIn: {
+          type: "number",
+          description: "Fade-in duration in seconds",
+        },
+        fadeOut: {
+          type: "number",
+          description: "Fade-out duration in seconds",
+        },
+        fadeInType: {
+          type: "string",
+          enum: ["linear", "logarithmic", "scurve"],
+          description: "Fade-in curve shape",
+        },
+        fadeOutType: {
+          type: "string",
+          enum: ["linear", "logarithmic", "scurve"],
+          description: "Fade-out curve shape",
+        },
+        fadeType: {
+          type: "string",
+          enum: ["linear", "logarithmic", "scurve"],
+          description:
+            "Crossfade curve shape (defaults to 'logarithmic' equal-power)",
+        },
+        points: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              time: { type: "number" },
+              value: { type: "number" },
+            },
+          },
+          description:
+            "Full replacement gain envelope points [{ time, value }]",
+        },
+        point: {
+          type: "object",
+          properties: {
+            time: { type: "number" },
+            value: { type: "number" },
+          },
+          description: "Single gain envelope point { time, value } to upsert",
+        },
+        removeTime: {
+          type: "number",
+          description: "Relative time in seconds of envelope point to remove",
+        },
+        muted: {
+          type: "boolean",
+          description: "Clip mute state (for action='mute')",
+        },
+      },
+      required: ["action", "trackId"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_edit_audio_clip"),
+    },
+  },
+  {
+    name: "scdaw_process_audio_clip",
+    description:
+      "Apply PCM DSP effects (peak normalize, amplify, EBU R128 loudness, DC offset removal, invert, reverse, click/pop removal, fade bake) or generate synthesized audio clips (tone/chirp, white/pink/brownian noise, DTMF, silence) with lossless undo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        effect: {
+          type: "string",
+          enum: [
+            "normalize",
+            "amplify",
+            "loudness",
+            "remove_dc",
+            "invert",
+            "reverse",
+            "click_removal",
+            "fade_in",
+            "fade_out",
+            "bake_fades",
+            "generate_tone",
+            "generate_noise",
+            "generate_dtmf",
+            "generate_silence",
+          ],
+          description: "DSP processor or audio generator to execute",
+        },
+        trackId: { type: "string", description: "Target audio track ID" },
+        clipId: {
+          type: "string",
+          description: "Target audio clip ID (required for processing effects)",
+        },
+        startSec: {
+          type: "number",
+          description:
+            "Optional sub-range start time in seconds within clip buffer",
+        },
+        endSec: {
+          type: "number",
+          description:
+            "Optional sub-range end time in seconds within clip buffer",
+        },
+        time: {
+          type: "number",
+          description: "Start beat position for generated clips (default 0)",
+        },
+        name: {
+          type: "string",
+          description: "Optional clip name for generated clips",
+        },
+        params: {
+          type: "object",
+          description:
+            "Effect/generator options (e.g. targetDb, gainDb, targetLufs, threshold, waveform, frequency, endFrequency, type, sequence, durationSec)",
+        },
+      },
+      required: ["effect"],
+      additionalProperties: false,
+    },
+    annotations: {
+      readOnlyHint: false,
+      consequentialHint: false,
+    },
+    execution: {
+      type: "javascript",
+      code: makeBroadcastCode("scdaw_process_audio_clip"),
+    },
+  },
 ];
