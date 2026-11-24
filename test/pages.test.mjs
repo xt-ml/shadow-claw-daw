@@ -123,7 +123,14 @@ test("Pages: main index.html hosts scdaw-workbench directly as the root DAW with
 
   const indexContent = readFileSync(indexPath, "utf8");
   assert.match(indexContent, /title:\s*["']ShadowClaw DAW["']/);
-  assert.match(indexContent, /<scdaw-workbench><\/scdaw-workbench>/);
+  assert.match(
+    indexContent,
+    /<div\s+class=["']scdaw-workbench-page["'][^>]*\bdata-no-swipe=["']true["'][^>]*\bdata-no-nav=["']true["']/,
+  );
+  assert.match(
+    indexContent,
+    /<scdaw-workbench[\s\S]*?\bdata-no-swipe=["']true["'][\s\S]*?\bdata-no-nav=["']true["'][\s\S]*?><\/scdaw-workbench>/,
+  );
   assert.doesNotMatch(indexContent, /Launch Interactive Workbench/);
   assert.doesNotMatch(indexContent, /portal-container/);
 
@@ -450,10 +457,7 @@ test("Documentation Links: all relative file links resolve on disk, use HTTPS, a
       if (!existsSync(resolved)) {
         brokenRelative.push(`${relDoc} -> ${target}`);
       }
-      if (
-        relDoc.startsWith("pages/main/~/content/") &&
-        /\.md$/i.test(target)
-      ) {
+      if (relDoc.startsWith("pages/main/~/content/") && /\.md$/i.test(target)) {
         siblingMdInContent.push(`${relDoc} -> ${target}`);
       }
     }

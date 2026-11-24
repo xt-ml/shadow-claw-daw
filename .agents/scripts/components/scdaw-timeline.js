@@ -1959,7 +1959,7 @@ export class DawTimelineElement extends BaseElement {
           opacity: 1;
         }
       </style>
-      <div class="scdaw-timeline daw-panel" role="region" aria-label="Arrangement Timeline and Tracks">
+      <div class="scdaw-timeline daw-panel" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Arrangement Timeline and Tracks">
         <div class="scdaw-timeline__header timeline-header">
           <div class="scdaw-timeline__title-group">
             <span style="font-weight:700; font-size:0.8rem;">⏱ Timeline</span>

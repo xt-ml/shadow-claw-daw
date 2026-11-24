@@ -17,6 +17,7 @@ import {
   resolveWorkbenchPanels,
 } from "../.agents/scripts/components/scdaw-workbench.js";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import { installPageSwipeGuard } from "../.agents/scripts/components/scdaw-styles.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
@@ -272,4 +273,124 @@ test("Phase 3.3: Workbench audio tab, audio-full layout, render_surface, and mob
   assert.match(workbenchSrc, /id=["']center-editor-audio-btn["']/);
   assert.match(workbenchSrc, /id=["']mode-audio-full-btn["']/);
   assert.match(workbenchSrc, /<scdaw-wave-editor><\/scdaw-wave-editor>/);
+});
+
+test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/data-no-nav and restores cleanly", async () => {
+  const makeNode = () => {
+    const attrs = new Map();
+    return {
+      _closestMap: {},
+      setAttribute(k, v) {
+        attrs.set(k, String(v));
+      },
+      getAttribute(k) {
+        return attrs.has(k) ? attrs.get(k) : null;
+      },
+      removeAttribute(k) {
+        attrs.delete(k);
+      },
+      closest(sel) {
+        return this._closestMap[sel] || null;
+      },
+    };
+  };
+
+  const viewer = makeNode();
+  const rendered = makeNode();
+  const pageWrapper = makeNode();
+  const host1 = makeNode();
+  const host2 = makeNode();
+
+  for (const host of [host1, host2]) {
+    host._closestMap = {
+      ".scdaw-workbench-page": pageWrapper,
+      ".pages__rendered": rendered,
+      ".pages__viewer": viewer,
+    };
+  }
+
+  const cleanup1 = installPageSwipeGuard(host1);
+  for (const el of [host1, pageWrapper, rendered, viewer]) {
+    assert.equal(el.getAttribute("data-no-swipe"), "true");
+    assert.equal(el.getAttribute("data-no-nav"), "true");
+  }
+
+  // Overlapping mount keeps shared ancestor guards active after cleanup1
+  const cleanup2 = installPageSwipeGuard(host2);
+  cleanup1();
+  assert.equal(rendered.getAttribute("data-no-swipe"), "true");
+  assert.equal(viewer.getAttribute("data-no-swipe"), "true");
+  assert.equal(rendered.getAttribute("data-no-nav"), "true");
+  assert.equal(viewer.getAttribute("data-no-nav"), "true");
+
+  // Duplicate cleanup1 call must not underflow
+  cleanup1();
+  assert.equal(viewer.getAttribute("data-no-swipe"), "true");
+
+  cleanup2();
+  for (const el of [pageWrapper, rendered, viewer]) {
+    assert.equal(el.getAttribute("data-no-swipe"), null);
+    assert.equal(el.getAttribute("data-no-nav"), null);
+  }
+
+  // Pre-existing attributes must be restored rather than removed
+  viewer.setAttribute("data-no-swipe", "preexisting");
+  const cleanup3 = installPageSwipeGuard(host1);
+  assert.equal(viewer.getAttribute("data-no-swipe"), "true");
+  cleanup3();
+  assert.equal(viewer.getAttribute("data-no-swipe"), "preexisting");
+
+  // Verify workbench, wave-editor, and timeline wire swipe/drag navigation guards
+  const [wbSrc, waveSrc, timelineSrc] = await Promise.all([
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-workbench.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-wave-editor.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-timeline.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(wbSrc, /installPageSwipeGuard/);
+  assert.match(
+    wbSrc,
+    /this\._cleanupSwipeGuard\s*=\s*installPageSwipeGuard\(this\)/,
+  );
+  assert.match(
+    wbSrc,
+    /scdaw-workbench[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+  );
+
+  assert.match(waveSrc, /installPageSwipeGuard/);
+  assert.match(
+    waveSrc,
+    /this\._cleanupSwipeGuard\s*=\s*installPageSwipeGuard\(this\)/,
+  );
+  assert.match(
+    waveSrc,
+    /class=["']scdaw-wave["'][^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+  );
+  assert.match(
+    waveSrc,
+    /id=["']wave-stage["'][^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+  );
+
+  assert.match(
+    timelineSrc,
+    /scdaw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+  );
 });

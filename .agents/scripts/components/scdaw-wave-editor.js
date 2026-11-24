@@ -5,7 +5,7 @@
  * Ported from Audacity 4 waveform/envelope interaction models & builtin DSP collection.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES, installPageSwipeGuard } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { evaluateClipGainEnvelope } from "../scdaw.js";
@@ -414,6 +414,8 @@ export class DawWaveEditorElement extends BaseElement {
   }
 
   connectedCallback() {
+    this._cleanupSwipeGuard?.();
+    this._cleanupSwipeGuard = installPageSwipeGuard(this);
     this.render();
     this._dispose = effect(() => {
       scdaw.project.get();
@@ -424,6 +426,10 @@ export class DawWaveEditorElement extends BaseElement {
   }
 
   disconnectedCallback() {
+    if (this._cleanupSwipeGuard) {
+      this._cleanupSwipeGuard();
+      this._cleanupSwipeGuard = null;
+    }
     if (this._dispose) this._dispose();
   }
 
@@ -657,7 +663,7 @@ export class DawWaveEditorElement extends BaseElement {
           }
         }
       </style>
-      <section class="scdaw-wave" role="region" aria-label="Waveform and Audio Clip Editor">
+      <section class="scdaw-wave" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Waveform and Audio Clip Editor">
         <div class="scdaw-wave__header">
           <div class="scdaw-wave__controls-row">
             <strong>🌊 Wave Editor</strong>
@@ -702,7 +708,7 @@ export class DawWaveEditorElement extends BaseElement {
           </div>
         </div>
 
-        <div id="wave-stage" class="scdaw-wave__stage" tabindex="0" role="region" aria-label="Interactive audio waveform canvas">
+        <div id="wave-stage" class="scdaw-wave__stage" data-no-swipe="true" data-no-nav="true" tabindex="0" role="region" aria-label="Interactive audio waveform canvas">
           ${stageBodyHtml}
         </div>
 

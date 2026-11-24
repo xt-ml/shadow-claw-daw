@@ -7,7 +7,7 @@
  * resize handles (<scdaw-resize-handle>), and responsive mobile-first full-width views.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES, installPageSwipeGuard } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { shouldHandleSoftwareKeyboardEvent } from "../scdaw-midi-io.js";
 import { serializeProject } from "../scdaw.js";
@@ -573,6 +573,8 @@ export class DawWorkbenchElement extends BaseElement {
   }
 
   connectedCallback() {
+    this._cleanupSwipeGuard?.();
+    this._cleanupSwipeGuard = installPageSwipeGuard(this);
     this._measureContainerWidth();
     this._renderSkeleton();
     this._initFullscreen();
@@ -632,6 +634,10 @@ export class DawWorkbenchElement extends BaseElement {
   }
 
   disconnectedCallback() {
+    if (this._cleanupSwipeGuard) {
+      this._cleanupSwipeGuard();
+      this._cleanupSwipeGuard = null;
+    }
     if (
       this._onHashChange &&
       typeof window !== "undefined" &&
@@ -1320,7 +1326,7 @@ export class DawWorkbenchElement extends BaseElement {
           outline-offset: 2px;
         }
       </style>
-      <div class="scdaw-workbench">
+      <div class="scdaw-workbench" data-no-swipe="true" data-no-nav="true">
         <header class="scdaw-workbench__header" role="banner">
           <div class="scdaw-workbench__title-bar">
             <div class="scdaw-workbench__title-group">
