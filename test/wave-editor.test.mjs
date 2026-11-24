@@ -10,7 +10,10 @@ import {
   applyEnvelopePointDrag,
   computeWaveViewport,
   renderWaveformSvg,
+  extractClipDisplayWindow,
+  computeWavePlayheadState,
 } from "../.agents/scripts/components/scdaw-wave-editor.js";
+import { PPQN } from "../.agents/scripts/scdaw.js";
 import {
   resolveWorkbenchResponsiveLayout,
   resolveWorkbenchButtonStates,
@@ -393,4 +396,121 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
     timelineSrc,
     /scdaw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
   );
+});
+
+test("Wave Editor: extractClipDisplayWindow slices trimmed clip offset/duration & computeWavePlayheadState tracks playback cursor", async () => {
+  const sr = 1000;
+  const fullPcm = new Float32Array(sr * 4); // 4s = 8 beats @ 120 BPM
+  fullPcm.fill(0.1, 0, sr * 1); // [0, 1s): 0.1
+  fullPcm.fill(0.8, sr * 1, sr * 3); // [1, 3s): 0.8 (trimmed region)
+  fullPcm.fill(0.1, sr * 3, sr * 4); // [3, 4s): 0.1
+  const sampleBuf = {
+    numberOfChannels: 1,
+    length: fullPcm.length,
+    sampleRate: sr,
+    duration: 4.0,
+    getChannelData: () => fullPcm,
+  };
+
+  // Trimmed to beats [2, 6) => clip.time = 2, duration = 4 (2.0s @ 120 BPM), offset = 1.0s
+  const trimmedClip = {
+    id: "clip_trimmed",
+    name: "Trimmed Vox",
+    time: 2,
+    duration: 4,
+    offset: 1.0,
+  };
+  const win = extractClipDisplayWindow(sampleBuf, trimmedClip, 120);
+  assert.equal(win.durationSec, 2.0);
+  assert.equal(win.offsetSec, 1.0);
+  assert.equal(win.sampleRate, sr);
+  assert.equal(win.channels.length, 1);
+  assert.equal(win.channels[0].length, sr * 2);
+  assert.ok(
+    Math.abs(win.channels[0][0] - 0.8) < 1e-4 &&
+      Math.abs(win.channels[0][win.channels[0].length - 1] - 0.8) < 1e-4,
+    "Sliced display window must contain only the trimmed [1s, 3s) PCM samples",
+  );
+
+  // Waveform buckets on sliced channels should show ~0.8 throughout
+  const buckets = computeWaveformEnvelope(win.channels[0], 10);
+  assert.ok(buckets.every((b) => Math.abs(b.max - 0.8) < 1e-4));
+
+  // Playhead state: stopped -> hidden
+  assert.equal(
+    computeWavePlayheadState({
+      playing: false,
+      positionPpqn: 4 * PPQN.Quarter,
+      clip: trimmedClip,
+      bpm: 120,
+      viewStartSec: 0,
+      viewEndSec: 2,
+    }).visible,
+    false,
+  );
+
+  // Playhead before clip.time -> hidden
+  assert.equal(
+    computeWavePlayheadState({
+      playing: true,
+      positionPpqn: 1 * PPQN.Quarter,
+      clip: trimmedClip,
+      bpm: 120,
+      viewStartSec: 0,
+      viewEndSec: 2,
+    }).visible,
+    false,
+  );
+
+  // Playhead halfway through clip (beat 4 of [2, 6) => clipTimeSec = 1.0s of 2.0s)
+  const midCursor = computeWavePlayheadState({
+    playing: true,
+    positionPpqn: 4 * PPQN.Quarter,
+    clip: trimmedClip,
+    bpm: 120,
+    viewStartSec: 0,
+    viewEndSec: 2,
+  });
+  assert.equal(midCursor.visible, true);
+  assert.equal(midCursor.clipTimeSec, 1.0);
+  assert.equal(midCursor.leftPct, 50);
+
+  // Zoomed viewport [0.5, 1.5] keeps cursor centered at 50%
+  const zoomedIn = computeWavePlayheadState({
+    playing: true,
+    positionPpqn: 4 * PPQN.Quarter,
+    clip: trimmedClip,
+    bpm: 120,
+    viewStartSec: 0.5,
+    viewEndSec: 1.5,
+  });
+  assert.equal(zoomedIn.visible, true);
+  assert.equal(zoomedIn.leftPct, 50);
+
+  // Out-of-viewport zoom [1.2, 2.0] hides cursor
+  const zoomedOut = computeWavePlayheadState({
+    playing: true,
+    positionPpqn: 4 * PPQN.Quarter,
+    clip: trimmedClip,
+    bpm: 120,
+    viewStartSec: 1.2,
+    viewEndSec: 2.0,
+  });
+  assert.equal(zoomedOut.visible, false);
+
+  // Verify scdaw-wave-editor.js wires extractClipDisplayWindow, trim refresh, and #wave-playhead RAF loop
+  const waveSrc = await fs.readFile(
+    new URL(
+      "../.agents/scripts/components/scdaw-wave-editor.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(waveSrc, /extractClipDisplayWindow\(/);
+  assert.match(waveSrc, /id=["']wave-playhead["']/);
+  assert.match(waveSrc, /\.scdaw-wave__playhead/);
+  assert.match(waveSrc, /_startPlayheadLoop\(/);
+  assert.match(waveSrc, /_updatePlayhead\(/);
+  assert.match(waveSrc, /cancelAnimationFrame\(/);
+  assert.match(waveSrc, /this\.render\(\)/);
 });

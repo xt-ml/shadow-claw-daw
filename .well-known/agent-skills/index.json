@@ -1163,7 +1163,7 @@
       "name": "scdaw-wave-editor",
       "description": "Portable ESM engine logic and tool execution handler for scdaw-wave-editor.",
       "url": "../../.agents/scripts/components/scdaw-wave-editor.js",
-      "digest": "sha256:420c54758ca713002e04006354dcadc7a1e714462b0b4f8836c88e7f16a87551"
+      "digest": "sha256:99c77d365d75a8e1e9aa2541fc4d14d33327898a8e1467e033129406edebe079"
     },
     {
       "name": "scdaw-workbench",

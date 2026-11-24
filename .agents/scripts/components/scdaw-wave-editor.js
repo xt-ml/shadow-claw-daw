@@ -8,7 +8,7 @@
 import { SHARED_STYLES, installPageSwipeGuard } from "./scdaw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import { evaluateClipGainEnvelope } from "../scdaw.js";
+import { evaluateClipGainEnvelope, PPQN } from "../scdaw.js";
 import { findNearestZeroCrossing } from "../scdaw-audio-dsp.js";
 import { extractDroppedAudioFiles } from "./scdaw-timeline.js";
 import {
@@ -197,6 +197,94 @@ export function applyEnvelopePointDrag(
   return {
     points: cleanPoints,
     draggedIndex: draggedIndex === -1 ? 0 : draggedIndex,
+  };
+}
+
+/**
+ * Slice a sample AudioBuffer down to the active non-destructive clip window
+ * `[clip.offset, clip.offset + clipDurationSec]` so trim/split edits refresh the waveform.
+ */
+export function extractClipDisplayWindow(sampleBuf, clip, bpm = 120) {
+  const sr = sampleBuf?.sampleRate || 44100;
+  const offsetSec = Math.max(0, Number(clip?.offset) || 0);
+  const bpmSafe = Math.max(1, Number(bpm) || 120);
+  const clipDurSec = clip
+    ? Math.max(0.01, ((Number(clip.duration) || 4) * 60) / bpmSafe)
+    : 1;
+
+  if (!sampleBuf || typeof sampleBuf.getChannelData !== "function") {
+    return {
+      channels: [],
+      durationSec: clipDurSec,
+      offsetSec,
+      sampleRate: sr,
+    };
+  }
+
+  const numCh = Math.max(1, sampleBuf.numberOfChannels || 1);
+  const bufLen = sampleBuf.length || sampleBuf.getChannelData(0)?.length || 0;
+  const startFrame = Math.max(0, Math.min(bufLen, Math.round(offsetSec * sr)));
+  const rawEndFrame = Math.round((offsetSec + clipDurSec) * sr);
+  const endFrame = Math.max(startFrame, Math.min(bufLen, rawEndFrame));
+
+  const channels = Array.from({ length: numCh }, (_, i) => {
+    const ch = sampleBuf.getChannelData(i);
+    if (!ch || typeof ch.subarray !== "function") return new Float32Array(0);
+    return ch.subarray(startFrame, Math.min(ch.length, endFrame));
+  });
+
+  return {
+    channels,
+    durationSec: clipDurSec,
+    offsetSec,
+    sampleRate: sr,
+  };
+}
+
+/**
+ * Compute wave editor playback cursor visibility and horizontal percentage inside the visible viewport.
+ */
+export function computeWavePlayheadState({
+  playing = false,
+  positionPpqn = 0,
+  clip = null,
+  bpm = 120,
+  viewStartSec = 0,
+  viewEndSec = 1,
+} = {}) {
+  if (!playing || !clip) {
+    return { visible: false, leftPct: 0, clipTimeSec: 0 };
+  }
+  const playheadBeat = (Number(positionPpqn) || 0) / PPQN.Quarter;
+  const clipStartBeat = Number(clip.time) || 0;
+  const clipDurBeats = Math.max(0, Number(clip.duration) || 0);
+  const clipEndBeat = clipStartBeat + clipDurBeats;
+  const bpmSafe = Math.max(1, Number(bpm) || 120);
+  const clipTimeSec = ((playheadBeat - clipStartBeat) * 60) / bpmSafe;
+
+  const visible =
+    playheadBeat >= clipStartBeat &&
+    playheadBeat <= clipEndBeat &&
+    clipTimeSec >= viewStartSec &&
+    clipTimeSec <= viewEndSec;
+
+  if (!visible) {
+    return {
+      visible: false,
+      leftPct: 0,
+      clipTimeSec: Number(clipTimeSec.toFixed(6)),
+    };
+  }
+
+  const span = Math.max(0.001, viewEndSec - viewStartSec);
+  const leftPct = Math.max(
+    0,
+    Math.min(100, ((clipTimeSec - viewStartSec) / span) * 100),
+  );
+  return {
+    visible: true,
+    leftPct: Number(leftPct.toFixed(4)),
+    clipTimeSec: Number(clipTimeSec.toFixed(6)),
   };
 }
 
@@ -411,6 +499,8 @@ export class DawWaveEditorElement extends BaseElement {
     this._showSpectrum = false;
     this._selection = null;
     this._statusMessage = "";
+    this._rafId = null;
+    this._lastView = null;
   }
 
   connectedCallback() {
@@ -423,14 +513,71 @@ export class DawWaveEditorElement extends BaseElement {
       scdaw.liveRevision?.get?.();
       this.render();
     });
+    if (typeof requestAnimationFrame === "function") {
+      this._startPlayheadLoop();
+    }
   }
 
   disconnectedCallback() {
+    if (this._rafId && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
     if (this._cleanupSwipeGuard) {
       this._cleanupSwipeGuard();
       this._cleanupSwipeGuard = null;
     }
     if (this._dispose) this._dispose();
+  }
+
+  _startPlayheadLoop() {
+    let lastPpqn = -1;
+    let lastPlaying = null;
+    const update = () => {
+      const s = scdaw.getState();
+      const ppqn =
+        s.playing && typeof scdaw.getExactPlayheadPpqn === "function"
+          ? scdaw.getExactPlayheadPpqn()
+          : s.positionPpqn || 0;
+      if (ppqn !== lastPpqn || s.playing !== lastPlaying) {
+        lastPpqn = ppqn;
+        lastPlaying = s.playing;
+        this._updatePlayhead(s, ppqn);
+      }
+      this._rafId = requestAnimationFrame(update);
+    };
+    this._rafId = requestAnimationFrame(update);
+  }
+
+  _updatePlayhead(stateOverride = null, ppqnOverride = null) {
+    const marker = this.shadowRoot?.getElementById("wave-playhead");
+    if (!marker) return;
+    if (!this._lastView || !this._lastView.clip) {
+      marker.style.display = "none";
+      return;
+    }
+    const s = stateOverride || scdaw.getState();
+    const ppqn =
+      ppqnOverride !== null
+        ? ppqnOverride
+        : s.playing && typeof scdaw.getExactPlayheadPpqn === "function"
+          ? scdaw.getExactPlayheadPpqn()
+          : s.positionPpqn || 0;
+    const { clip, bpm, vp } = this._lastView;
+    const cursor = computeWavePlayheadState({
+      playing: Boolean(s.playing),
+      positionPpqn: ppqn,
+      clip,
+      bpm,
+      viewStartSec: vp.viewStartSec,
+      viewEndSec: vp.viewEndSec,
+    });
+    if (cursor.visible) {
+      marker.style.display = "block";
+      marker.style.left = `${cursor.leftPct}%`;
+    } else {
+      marker.style.display = "none";
+    }
   }
 
   _resolveActiveClip() {
@@ -475,21 +622,18 @@ export class DawWaveEditorElement extends BaseElement {
     const p = scdaw.getProject();
     const { track, clip, clips } = this._resolveActiveClip();
     const sampleBuf = clip ? scdaw.getSample?.(clip.sample) : null;
-    const sr = sampleBuf?.sampleRate || 44100;
-    const channels = sampleBuf
-      ? Array.from({ length: sampleBuf.numberOfChannels || 1 }, (_, i) =>
-          sampleBuf.getChannelData(i),
-        )
-      : [];
     const bpm = p.bpm || 120;
-    const clipDurSec = clip
-      ? sampleBuf?.duration || ((clip.duration || 4) * 60) / bpm
-      : 1;
+    const {
+      channels,
+      durationSec: clipDurSec,
+      sampleRate: sr,
+    } = extractClipDisplayWindow(sampleBuf, clip, bpm);
     const vp = computeWaveViewport({
       durationSec: clipDurSec,
       zoom: this._zoom,
       scrollFrac: this._scrollFrac,
     });
+    this._lastView = { clip, bpm, vp };
     const waveSvgHtml = clip
       ? renderWaveformSvg({
           channels,
@@ -603,6 +747,17 @@ export class DawWaveEditorElement extends BaseElement {
           height: 100%;
           display: block;
         }
+        .scdaw-wave__playhead {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: var(--shadow-claw-accent, #80d4db);
+          box-shadow: 0 0 6px rgba(128, 212, 219, 0.75);
+          pointer-events: none;
+          z-index: 4;
+          transform: translateX(-1px);
+        }
         .scdaw-wave__empty {
           display: flex;
           align-items: center;
@@ -710,6 +865,7 @@ export class DawWaveEditorElement extends BaseElement {
 
         <div id="wave-stage" class="scdaw-wave__stage" data-no-swipe="true" data-no-nav="true" tabindex="0" role="region" aria-label="Interactive audio waveform canvas">
           ${stageBodyHtml}
+          <div id="wave-playhead" class="scdaw-wave__playhead" aria-hidden="true" style="display:none;left:0%;"></div>
         </div>
 
         <div class="scdaw-wave__toolbar" role="toolbar" aria-label="Audio clip editing and DSP actions">
@@ -752,6 +908,7 @@ export class DawWaveEditorElement extends BaseElement {
     `;
 
     this._attachListeners({ track, clip, channels, sr, clipDurSec, vp, bpm });
+    this._updatePlayhead();
   }
 
   _attachListeners({ track, clip, channels, sr, clipDurSec, vp, bpm }) {
@@ -879,37 +1036,40 @@ export class DawWaveEditorElement extends BaseElement {
               splitBeat: Number((clip.time + secToBeat(splitSec)).toFixed(3)),
             });
           } else if (op === "trim" && this._selection?.lengthSec) {
+            const sel = this._selection;
+            this._selection = null;
+            this._zoom = 1;
+            this._scrollFrac = 0;
             await scdaw.sendCommand("trim_audio_clip", {
               trackId: track.id,
               clipId: clip.id,
               startBeat: Number(
-                (clip.time + secToBeat(this._selection.startSec)).toFixed(3),
+                (clip.time + secToBeat(sel.startSec)).toFixed(3),
               ),
-              endBeat: Number(
-                (clip.time + secToBeat(this._selection.endSec)).toFixed(3),
-              ),
+              endBeat: Number((clip.time + secToBeat(sel.endSec)).toFixed(3)),
             });
-            this._selection = null;
+            this.render();
           } else if (op === "silence_range" && this._selection?.lengthSec) {
+            const sel = this._selection;
+            this._selection = null;
             await scdaw.sendCommand("silence_clip_range", {
               trackId: track.id,
               clipId: clip.id,
               startBeat: Number(
-                (clip.time + secToBeat(this._selection.startSec)).toFixed(3),
+                (clip.time + secToBeat(sel.startSec)).toFixed(3),
               ),
-              endBeat: Number(
-                (clip.time + secToBeat(this._selection.endSec)).toFixed(3),
-              ),
+              endBeat: Number((clip.time + secToBeat(sel.endSec)).toFixed(3)),
             });
-            this._selection = null;
+            this.render();
           } else if (op === "split_at_silences") {
+            this._selection = null;
             await scdaw.sendCommand("split_at_silences", {
               trackId: track.id,
               clipId: clip.id,
               thresholdDb: -40,
               minDurationSec: 0.25,
             });
-            this._selection = null;
+            this.render();
           } else if (op === "duplicate") {
             await scdaw.sendCommand("duplicate_audio_clip", {
               trackId: track.id,
