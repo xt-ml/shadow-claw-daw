@@ -826,6 +826,7 @@ export const TOOLS_METADATA = [
             "browser",
             "timeline",
             "editor",
+            "wave-editor",
             "devices",
             "statusbar",
             "knob",

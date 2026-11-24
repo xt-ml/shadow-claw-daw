@@ -67,6 +67,47 @@ import { AudioRecorder } from "./scdaw-recorder.js";
 import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
 import { createMidiIo } from "./scdaw-midi-io.js";
 
+export function formatUserError(err, context = "") {
+  const name = String(err?.name || "");
+  const rawMsg = String(err?.message || err || "An unexpected error occurred");
+  let friendly = rawMsg;
+
+  if (
+    name === "NotFoundError" ||
+    name === "DevicesNotFoundError" ||
+    /requested device not found/i.test(rawMsg)
+  ) {
+    friendly =
+      "No microphone or audio input device was found. Connect an audio input device and try again.";
+  } else if (
+    name === "NotAllowedError" ||
+    name === "PermissionDeniedError" ||
+    /permission denied/i.test(rawMsg)
+  ) {
+    friendly =
+      "Microphone permission was denied. Allow audio input access in your browser settings and try again.";
+  } else if (
+    name === "NotReadableError" ||
+    name === "TrackStartError" ||
+    /could not start audio source/i.test(rawMsg)
+  ) {
+    friendly =
+      "Audio input device is busy or unavailable. Close other apps using the microphone and retry.";
+  } else if (name === "OverconstrainedError") {
+    friendly =
+      "Audio input device does not meet the requested recording constraints.";
+  } else if (name === "SecurityError") {
+    friendly =
+      "Audio recording requires a secure (HTTPS or localhost) context.";
+  }
+
+  const prefix = String(context || "").trim();
+  if (prefix && !friendly.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return `${prefix}: ${friendly}`;
+  }
+  return friendly;
+}
+
 export function scheduleClipGainAutomation(
   gainParam,
   clip,
@@ -446,6 +487,25 @@ export class DawEngine extends EventTarget {
   _updateState(patch) {
     const current = this.state.get();
     this.state.set({ ...current, ...patch });
+  }
+
+  reportError(err, { title = "Error", context = "", severity = "error" } = {}) {
+    const detail = {
+      title: String(title || "Error"),
+      message: formatUserError(err, context),
+      code: String(err?.name || "Error"),
+      severity,
+      timestamp: Date.now(),
+    };
+    this._updateState({ lastError: detail });
+    if (typeof CustomEvent !== "undefined") {
+      this.dispatchEvent(new CustomEvent("scdaw-error", { detail }));
+    }
+    return detail;
+  }
+
+  clearError() {
+    this._updateState({ lastError: null });
   }
 
   getState() {

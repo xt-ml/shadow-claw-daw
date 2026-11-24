@@ -1,0 +1,274 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import { DawEngine, formatUserError } from "../.agents/scripts/scdaw-engine.js";
+import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
+import {
+  computeWaveformEnvelope,
+  clampWaveSelection,
+  snapSelectionToZeroCrossings,
+  applyEnvelopePointDrag,
+  computeWaveViewport,
+  renderWaveformSvg,
+} from "../.agents/scripts/components/scdaw-wave-editor.js";
+import {
+  resolveWorkbenchResponsiveLayout,
+  resolveWorkbenchButtonStates,
+  resolveWorkbenchPanels,
+} from "../.agents/scripts/components/scdaw-workbench.js";
+import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
+
+function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
+  const len = Math.round(sampleRate * durationSec);
+  const out = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    out[i] = amp * Math.sin((2 * Math.PI * freq * i) / sampleRate);
+  }
+  return out;
+}
+
+test("Phase 3.1: Systemic error surfacing (formatUserError, reportError, clearError, statusbar, transport, workbench)", async () => {
+  const notFoundMsg = formatUserError(
+    { name: "NotFoundError", message: "Requested device not found" },
+    "Recording",
+  );
+  assert.match(notFoundMsg, /microphone|audio input device/i);
+  assert.match(notFoundMsg, /^Recording:/);
+
+  const notAllowedMsg = formatUserError(
+    { name: "NotAllowedError", message: "Permission denied" },
+    "Recording",
+  );
+  assert.match(notAllowedMsg, /permission/i);
+
+  const notReadableMsg = formatUserError(
+    { name: "NotReadableError", message: "Could not start audio source" },
+    "Recording",
+  );
+  assert.match(notReadableMsg, /busy|unavailable/i);
+
+  const engine = new DawEngine({ audioContext: new FakeAudioContext() });
+  const events = [];
+  engine.addEventListener("scdaw-error", (e) => events.push(e.detail));
+
+  const reported = engine.reportError(
+    { name: "NotFoundError", message: "Requested device not found" },
+    { title: "Recording Error", context: "Recording" },
+  );
+  assert.equal(reported.title, "Recording Error");
+  assert.equal(reported.code, "NotFoundError");
+  assert.equal(events.length, 1);
+  assert.equal(engine.getState().lastError.title, "Recording Error");
+
+  const telemetry = formatTelemetryStatus(
+    engine.getState(),
+    engine.getProject(),
+  );
+  assert.ok(telemetry.errorText.includes("Recording Error"));
+  assert.match(telemetry.errorText, /microphone|audio input device/i);
+
+  engine.clearError();
+  assert.equal(engine.getState().lastError, null);
+  assert.equal(
+    formatTelemetryStatus(engine.getState(), engine.getProject()).errorText,
+    "",
+  );
+
+  // Source checks across transport, statusbar, and workbench
+  const [transportSrc, statusbarSrc, workbenchSrc] = await Promise.all([
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-transport.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-statusbar.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-workbench.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.doesNotMatch(transportSrc, /scdaw\.requestDialog\?\./);
+  const reportMatches =
+    transportSrc.match(/scdaw\.reportError(?:\?\.)?\(/g) || [];
+  assert.ok(
+    reportMatches.length >= 4,
+    `Expected all recording error blocks in scdaw-transport.js to call scdaw.reportError, found ${reportMatches.length}`,
+  );
+  assert.match(statusbarSrc, /id=["']error-stat["']/);
+  assert.match(
+    workbenchSrc,
+    /id=["']scdaw-error-banner["'][^>]*role=["']alert["']/,
+  );
+  assert.match(workbenchSrc, /id=["']scdaw-error-dismiss["']/);
+});
+
+test("Phase 3.2: Wave editor pure helpers (envelope, selection, zero-crossing snap, Audacity drag eat/restore, viewport, SVG)", () => {
+  const sr = 44100;
+  const sine = makeSine(220, sr, 0.2, 0.8);
+
+  // 1. computeWaveformEnvelope
+  const env = computeWaveformEnvelope(sine, 20);
+  assert.equal(env.length, 20);
+  const maxPeak = Math.max(
+    ...env.map((b) => Math.max(Math.abs(b.min), Math.abs(b.max))),
+  );
+  assert.ok(Math.abs(maxPeak - 0.8) < 0.05);
+  assert.ok(Math.abs(env[0].rms - 0.8 / Math.SQRT2) < 0.12);
+  assert.deepEqual(computeWaveformEnvelope(new Float32Array(0), 10), []);
+
+  // 2. clampWaveSelection sorts reversed bounds and clamps
+  const sel = clampWaveSelection({
+    startSec: 1.5,
+    endSec: 0.4,
+    durationSec: 1.2,
+  });
+  assert.equal(sel.startSec, 0.4);
+  assert.equal(sel.endSec, 1.2);
+  assert.ok(Math.abs(sel.lengthSec - 0.8) < 1e-6);
+
+  // 3. snapSelectionToZeroCrossings
+  const snapped = snapSelectionToZeroCrossings(
+    [sine],
+    { startSec: 0.02, endSec: 0.1 },
+    sr,
+  );
+  const sIdx = Math.round(snapped.startSec * sr);
+  const eIdx = Math.round(snapped.endSec * sr);
+  assert.ok(sine[sIdx - 1] <= 0 && sine[sIdx] >= 0);
+  assert.ok(sine[eIdx - 1] <= 0 && sine[eIdx] >= 0);
+
+  // 4. applyEnvelopePointDrag: Audacity 4 eat/restore semantics
+  const origPts = [
+    { time: 0.5, value: 1.0 },
+    { time: 1.0, value: 0.5 },
+    { time: 2.0, value: 1.0 },
+  ];
+  // Drag point 0 rightward past point 1 (to t=1.4) -> consumes point 1
+  const eaten = applyEnvelopePointDrag(origPts, {
+    index: 0,
+    timeSec: 1.4,
+    value: 1.2,
+    durationSec: 4.0,
+    originalPoints: origPts,
+  });
+  assert.equal(eaten.points.length, 2);
+  assert.equal(eaten.draggedIndex, 0);
+  assert.equal(eaten.points[0].time, 1.4);
+  assert.equal(eaten.points[0].value, 1.2);
+
+  // Drag back leftward to t=0.6 -> restores point 1 from originalPoints
+  const restored = applyEnvelopePointDrag(eaten.points, {
+    index: eaten.draggedIndex,
+    timeSec: 0.6,
+    value: 1.1,
+    durationSec: 4.0,
+    originalPoints: origPts,
+  });
+  assert.equal(restored.points.length, 3);
+  assert.equal(restored.points[1].time, 1.0);
+  assert.equal(restored.points[1].value, 0.5);
+
+  // 5. computeWaveViewport
+  const vp = computeWaveViewport({ durationSec: 10, zoom: 4, scrollFrac: 0.5 });
+  assert.equal(vp.viewDurSec, 2.5);
+  assert.equal(vp.viewStartSec, 3.75);
+  assert.equal(vp.viewEndSec, 6.25);
+
+  // 6. renderWaveformSvg
+  const svg = renderWaveformSvg({
+    channels: [sine],
+    durationSec: 0.2,
+    viewStartSec: 0,
+    viewEndSec: 0.2,
+    selection: { startSec: 0.05, endSec: 0.15, lengthSec: 0.1 },
+    clip: {
+      id: "c1",
+      name: "Vox",
+      fadeIn: 0.04,
+      fadeOut: 0.04,
+      gainEnvelope: [{ time: 0.1, value: 0.7 }],
+    },
+  });
+  assert.match(svg, /<svg/);
+  assert.match(svg, /scdaw-wave__selection/);
+  assert.match(svg, /scdaw-wave__env-point/);
+  assert.match(svg, /role=["']slider["']/);
+});
+
+test("Phase 3.3: Workbench audio tab, audio-full layout, render_surface, and mobile-first ARIA CSS", async () => {
+  const audioFull = resolveWorkbenchResponsiveLayout({
+    containerWidth: 390,
+    viewMode: "audio-full",
+  });
+  assert.equal(audioFull.isFullWidth, true);
+  assert.equal(audioFull.activeFocus, "audio");
+  assert.equal(audioFull.showBrowser, false);
+  assert.equal(audioFull.showMixer, false);
+
+  const btnStates = resolveWorkbenchButtonStates({
+    viewMode: "audio-full",
+    isMobile: true,
+  });
+  assert.equal(btnStates.audioFull.active, true);
+  assert.equal(btnStates.studio.active, false);
+
+  const panels = resolveWorkbenchPanels(true, true, "audio");
+  assert.equal(panels.editorMode, "audio");
+
+  const surface = await handleToolDispatch("scdaw_render_surface", {
+    element: "wave-editor",
+  });
+  assert.equal(surface.element, "<scdaw-wave-editor></scdaw-wave-editor>");
+
+  const [waveSrc, workbenchSrc] = await Promise.all([
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-wave-editor.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/scdaw-workbench.js",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(waveSrc, /container-name:\s*scdaw-wave-editor/);
+  assert.match(
+    waveSrc,
+    /@container scdaw-wave-editor\s*\(\s*min-width:\s*640px\s*\)/,
+  );
+  assert.match(
+    waveSrc,
+    /@supports\s+not\s*\(\s*container-type:\s*inline-size\s*\)/,
+  );
+  assert.match(waveSrc, /@media\s*\(\s*pointer:\s*coarse\s*\)/);
+  assert.match(waveSrc, /min-height:\s*44px/);
+  assert.doesNotMatch(waveSrc, /:host-context\(/);
+  assert.match(waveSrc, /font:\s*inherit/);
+  assert.match(waveSrc, /role=["']region["']/);
+  assert.match(waveSrc, /role=["']toolbar["']/);
+  assert.match(waveSrc, /aria-live=["']polite["']/);
+  assert.match(waveSrc, /customElements\.define\(\s*["']scdaw-wave-editor["']/);
+
+  assert.match(workbenchSrc, /id=["']center-editor-audio-btn["']/);
+  assert.match(workbenchSrc, /id=["']mode-audio-full-btn["']/);
+  assert.match(workbenchSrc, /<scdaw-wave-editor><\/scdaw-wave-editor>/);
+});

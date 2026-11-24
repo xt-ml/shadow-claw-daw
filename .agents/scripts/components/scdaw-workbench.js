@@ -30,6 +30,7 @@ import "./scdaw-transport.js";
 import "./scdaw-browser.js";
 import "./scdaw-timeline.js";
 import "./scdaw-editor.js";
+import "./scdaw-wave-editor.js";
 import "./scdaw-sequencer.js";
 import "./scdaw-synth.js";
 import "./scdaw-devices.js";
@@ -150,6 +151,7 @@ export function resolveWorkbenchResponsiveLayout({
     viewMode === "piano-roll-full" ||
     viewMode === "sequencer-full" ||
     viewMode === "synth-full" ||
+    viewMode === "audio-full" ||
     viewMode === "mixer-full";
 
   let activeFocus = "studio";
@@ -157,6 +159,7 @@ export function resolveWorkbenchResponsiveLayout({
   else if (viewMode === "piano-roll-full") activeFocus = "piano-roll";
   else if (viewMode === "sequencer-full") activeFocus = "sequencer";
   else if (viewMode === "synth-full") activeFocus = "synth";
+  else if (viewMode === "audio-full") activeFocus = "audio";
   else if (viewMode === "mixer-full") activeFocus = "mixer";
 
   if (isFullWidth || isMobile) {
@@ -220,7 +223,9 @@ export function resolveWorkbenchPanels(showBrowser, showMixer, editorMode) {
         ? "step-sequencer"
         : editorMode === "synth"
           ? "synth"
-          : "piano-roll",
+          : editorMode === "audio"
+            ? "audio"
+            : "piano-roll",
     gridColumns:
       showBrowser && showMixer
         ? "240px 1fr 280px"
@@ -273,6 +278,10 @@ export function resolveWorkbenchButtonStates({
     },
     synthFull: {
       active: viewMode === "synth-full",
+      disabled: false,
+    },
+    audioFull: {
+      active: viewMode === "audio-full",
       disabled: false,
     },
     mixerFull: {
@@ -588,6 +597,10 @@ export class DawWorkbenchElement extends BaseElement {
       const p = scdaw.project.get();
       this._syncProject(p);
     });
+    this._disposeError = effect(() => {
+      const s = scdaw.state.get();
+      this._syncErrorBanner(s?.lastError || null);
+    });
 
     if (typeof ResizeObserver !== "undefined" && this.shadowRoot) {
       this._resizeObserver = new ResizeObserver((entries) => {
@@ -632,6 +645,7 @@ export class DawWorkbenchElement extends BaseElement {
       this._midiKeyboardController = null;
     }
     if (this._dispose) this._dispose();
+    if (this._disposeError) this._disposeError();
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
       this._resizeObserver = null;
@@ -1261,9 +1275,49 @@ export class DawWorkbenchElement extends BaseElement {
           .scdaw-workbench__toolbar .btn,
           .scdaw-workbench__editor-bar .btn,
           .scdaw-dialog__actions .btn,
-          .scdaw-file-item {
+          .scdaw-file-item,
+          .scdaw-error-banner__dismiss {
             min-height: 44px;
+            min-width: 44px;
           }
+        }
+        .scdaw-error-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.55rem 0.75rem;
+          margin-bottom: 0.6rem;
+          border-radius: 6px;
+          border: 1px solid rgba(248, 113, 113, 0.7);
+          background: rgba(127, 29, 29, 0.45);
+          color: #fee2e2;
+          font-size: 0.82rem;
+        }
+        .scdaw-error-banner.hidden,
+        .scdaw-error-banner[hidden] {
+          display: none !important;
+        }
+        .scdaw-error-banner__body {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 0.4rem;
+          min-width: 0;
+        }
+        .scdaw-error-banner__dismiss {
+          font: inherit;
+          color: inherit;
+          background: rgba(255, 255, 255, 0.12);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 4px;
+          padding: 0.2rem 0.55rem;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .scdaw-error-banner__dismiss:focus-visible {
+          outline: 2px solid #ffffff;
+          outline-offset: 2px;
         }
       </style>
       <div class="scdaw-workbench">
@@ -1319,6 +1373,7 @@ export class DawWorkbenchElement extends BaseElement {
               <button id="mode-piano-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
               <button id="mode-seq-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
               <button id="mode-synth-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Synthesizer Workbench" aria-pressed="false" aria-selected="false">🎛️ Synth (Full)</button>
+              <button id="mode-audio-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Wave Audio Editor" aria-pressed="false" aria-selected="false">🌊 Audio (Full)</button>
             </div>
           </nav>
         </header>
@@ -1326,6 +1381,14 @@ export class DawWorkbenchElement extends BaseElement {
         <section class="scdaw-workbench__transport" style="margin-bottom:0.6rem;" aria-label="Audio Transport">
           <scdaw-transport></scdaw-transport>
         </section>
+
+        <div id="scdaw-error-banner" role="alert" aria-live="assertive" aria-atomic="true" class="scdaw-error-banner hidden" hidden>
+          <div class="scdaw-error-banner__body">
+            <strong id="scdaw-error-title">Error</strong>
+            <span id="scdaw-error-message"></span>
+          </div>
+          <button id="scdaw-error-dismiss" type="button" class="scdaw-error-banner__dismiss" aria-label="Dismiss error notification">✕ Dismiss</button>
+        </div>
 
         <main id="dock-grid" class="scdaw-workbench__dock-grid" role="main">
           <!-- Left: Browser Panel -->
@@ -1346,6 +1409,7 @@ export class DawWorkbenchElement extends BaseElement {
                 <button id="center-editor-piano-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Show Piano Roll Note Editor in Studio">🎹 Piano Roll</button>
                 <button id="center-editor-seq-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show 16-Step Drum Matrix in Studio">🥁 Step Sequencer</button>
                 <button id="center-editor-synth-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show Synthesizer Workbench in Studio">🎛️ Synth</button>
+                <button id="center-editor-audio-btn" type="button" class="btn btn-icon" aria-pressed="false" title="Show Wave Audio Editor in Studio">🌊 Audio</button>
               </div>
               <button id="center-toggle-devices-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Toggle Track Device Chain Rack">🎛️ Device Rack</button>
             </div>
@@ -1357,6 +1421,9 @@ export class DawWorkbenchElement extends BaseElement {
             </div>
             <div id="synth-container" class="scdaw-workbench__section scdaw-workbench__section--synth hidden" hidden>
               <scdaw-synth></scdaw-synth>
+            </div>
+            <div id="wave-container" class="scdaw-workbench__section scdaw-workbench__section--wave hidden" hidden>
+              <scdaw-wave-editor></scdaw-wave-editor>
             </div>
             <div id="devices-container" class="scdaw-workbench__section scdaw-workbench__section--devices">
               <scdaw-devices></scdaw-devices>
@@ -1579,6 +1646,18 @@ export class DawWorkbenchElement extends BaseElement {
         this._updatePanels();
       });
     this.shadowRoot
+      .getElementById("mode-audio-full-btn")
+      ?.addEventListener("click", () => {
+        this._viewMode = "audio-full";
+        this._editorMode = "audio";
+        this._updatePanels();
+      });
+    this.shadowRoot
+      .getElementById("scdaw-error-dismiss")
+      ?.addEventListener("click", () => {
+        scdaw.clearError?.();
+      });
+    this.shadowRoot
       .getElementById("mode-browser-full-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "browser-full";
@@ -1624,6 +1703,12 @@ export class DawWorkbenchElement extends BaseElement {
       .getElementById("center-editor-synth-btn")
       ?.addEventListener("click", () => {
         this._editorMode = "synth";
+        this._updatePanels();
+      });
+    this.shadowRoot
+      .getElementById("center-editor-audio-btn")
+      ?.addEventListener("click", () => {
+        this._editorMode = "audio";
         this._updatePanels();
       });
     this.shadowRoot
@@ -1804,6 +1889,10 @@ export class DawWorkbenchElement extends BaseElement {
         importModal?.close();
       } catch (err) {
         console.error("Failed to load project from conversation:", err);
+        scdaw.reportError?.(err, {
+          title: "Open Project Error",
+          context: "Open Project",
+        });
       } finally {
         if (importSubmitBtn) importSubmitBtn.textContent = "Open Project";
       }
@@ -1867,6 +1956,10 @@ export class DawWorkbenchElement extends BaseElement {
         }
       } catch (err) {
         console.error("Import error:", err);
+        scdaw.reportError?.(err, {
+          title: "Import Error",
+          context: "Import",
+        });
       } finally {
         fileInput.value = "";
       }
@@ -2125,6 +2218,10 @@ export class DawWorkbenchElement extends BaseElement {
           }
         } catch (err) {
           console.error("Save/Export error:", err);
+          scdaw.reportError?.(err, {
+            title: "Export Error",
+            context: "Save/Export",
+          });
           if (submitBtn) {
             submitBtn.textContent = "Error saving!";
             setTimeout(() => {
@@ -2272,6 +2369,10 @@ export class DawWorkbenchElement extends BaseElement {
           }
         } catch (err) {
           console.error("Context-sensitive drop handling failed:", err);
+          scdaw.reportError?.(err, {
+            title: "Drop Import Error",
+            context: "File Drop",
+          });
         }
       });
     }
@@ -2512,6 +2613,7 @@ export class DawWorkbenchElement extends BaseElement {
     const edCont = this.shadowRoot.getElementById("editor-container");
     const seqCont = this.shadowRoot.getElementById("seq-container");
     const synthCont = this.shadowRoot.getElementById("synth-container");
+    const waveCont = this.shadowRoot.getElementById("wave-container");
     const devCont = this.shadowRoot.getElementById("devices-container");
 
     if (centerStack) {
@@ -2553,6 +2655,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(edCont, true);
       setVisible(seqCont, false);
       setVisible(synthCont, false);
+      setVisible(waveCont, false);
       setVisible(devCont, false);
     } else if (this._viewMode === "sequencer-full") {
       setVisible(bCont, false);
@@ -2565,6 +2668,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(edCont, false);
       setVisible(seqCont, true);
       setVisible(synthCont, false);
+      setVisible(waveCont, false);
       setVisible(devCont, false);
     } else if (this._viewMode === "synth-full") {
       setVisible(bCont, false);
@@ -2577,6 +2681,20 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(edCont, false);
       setVisible(seqCont, false);
       setVisible(synthCont, true);
+      setVisible(waveCont, false);
+      setVisible(devCont, false);
+    } else if (this._viewMode === "audio-full") {
+      setVisible(bCont, false);
+      setVisible(bHandle, false, "inline-flex");
+      setVisible(mCont, false);
+      setVisible(mHandle, false, "inline-flex");
+      setVisible(centerStack, true, "flex");
+      setVisible(timelineCont, true);
+      setVisible(editorBar, false, "flex");
+      setVisible(edCont, false);
+      setVisible(seqCont, false);
+      setVisible(synthCont, false);
+      setVisible(waveCont, true);
       setVisible(devCont, false);
     } else if (this._viewMode === "browser-full") {
       setVisible(bCont, true, "flex");
@@ -2585,6 +2703,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(mHandle, false, "inline-flex");
       setVisible(centerStack, false, "flex");
       setVisible(synthCont, false);
+      setVisible(waveCont, false);
     } else if (this._viewMode === "mixer-full") {
       setVisible(bCont, false);
       setVisible(bHandle, false, "inline-flex");
@@ -2592,6 +2711,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(mHandle, false, "inline-flex");
       setVisible(centerStack, false, "flex");
       setVisible(synthCont, false);
+      setVisible(waveCont, false);
     } else {
       // Studio layout: On mobile, side docks are hidden by default to prioritize workspace
       const showBrowser = btnStates.browser.visible;
@@ -2606,6 +2726,7 @@ export class DawWorkbenchElement extends BaseElement {
       setVisible(edCont, this._editorMode === "piano-roll");
       setVisible(seqCont, this._editorMode === "step-sequencer");
       setVisible(synthCont, this._editorMode === "synth");
+      setVisible(waveCont, this._editorMode === "audio");
       setVisible(devCont, this._showDevices);
     }
 
@@ -2618,6 +2739,9 @@ export class DawWorkbenchElement extends BaseElement {
     );
     const centerSynthBtn = this.shadowRoot.getElementById(
       "center-editor-synth-btn",
+    );
+    const centerAudioBtn = this.shadowRoot.getElementById(
+      "center-editor-audio-btn",
     );
     const centerDevBtn = this.shadowRoot.getElementById(
       "center-toggle-devices-btn",
@@ -2640,6 +2764,12 @@ export class DawWorkbenchElement extends BaseElement {
       centerSynthBtn.classList.toggle("scdaw-workbench__btn--active", isSynth);
       centerSynthBtn.setAttribute("aria-pressed", String(isSynth));
     }
+    if (centerAudioBtn) {
+      const isAudio = this._editorMode === "audio";
+      centerAudioBtn.classList.toggle("btn-primary", isAudio);
+      centerAudioBtn.classList.toggle("scdaw-workbench__btn--active", isAudio);
+      centerAudioBtn.setAttribute("aria-pressed", String(isAudio));
+    }
     if (centerDevBtn) {
       centerDevBtn.classList.toggle("btn-primary", this._showDevices);
       centerDevBtn.classList.toggle(
@@ -2657,6 +2787,7 @@ export class DawWorkbenchElement extends BaseElement {
     const modePiano = this.shadowRoot.getElementById("mode-piano-full-btn");
     const modeSeq = this.shadowRoot.getElementById("mode-seq-full-btn");
     const modeSynth = this.shadowRoot.getElementById("mode-synth-full-btn");
+    const modeAudio = this.shadowRoot.getElementById("mode-audio-full-btn");
     const modeMixer = this.shadowRoot.getElementById("mode-mixer-full-btn");
     const bBtn = this.shadowRoot.getElementById("toggle-browser-btn");
     const mBtn = this.shadowRoot.getElementById("toggle-mixer-btn");
@@ -2758,6 +2889,26 @@ export class DawWorkbenchElement extends BaseElement {
         String(btnStates.synthFull.active),
       );
     }
+    if (modeAudio) {
+      modeAudio.disabled = btnStates.audioFull.disabled;
+      modeAudio.setAttribute(
+        "aria-disabled",
+        String(btnStates.audioFull.disabled),
+      );
+      modeAudio.classList.toggle("btn-primary", btnStates.audioFull.active);
+      modeAudio.classList.toggle(
+        "scdaw-workbench__btn--active",
+        btnStates.audioFull.active,
+      );
+      modeAudio.setAttribute(
+        "aria-pressed",
+        String(btnStates.audioFull.active),
+      );
+      modeAudio.setAttribute(
+        "aria-selected",
+        String(btnStates.audioFull.active),
+      );
+    }
     if (modeMixer) {
       modeMixer.disabled = btnStates.mixerFull.disabled;
       modeMixer.setAttribute(
@@ -2819,6 +2970,33 @@ export class DawWorkbenchElement extends BaseElement {
     }
     if (bpm) {
       bpm.textContent = `${p.bpm} BPM`;
+    }
+  }
+
+  _syncErrorBanner(lastError) {
+    if (!this.shadowRoot) return;
+    const banner = this.shadowRoot.getElementById("scdaw-error-banner");
+    const titleEl = this.shadowRoot.getElementById("scdaw-error-title");
+    const msgEl = this.shadowRoot.getElementById("scdaw-error-message");
+    if (!banner) return;
+    if (lastError) {
+      if (titleEl) {
+        titleEl.textContent =
+          typeof lastError === "string" ? "Error" : lastError.title || "Error";
+      }
+      if (msgEl) {
+        msgEl.textContent =
+          typeof lastError === "string"
+            ? lastError
+            : lastError.message || "An unexpected error occurred";
+      }
+      banner.hidden = false;
+      banner.classList.remove("hidden");
+    } else {
+      if (titleEl) titleEl.textContent = "";
+      if (msgEl) msgEl.textContent = "";
+      banner.hidden = true;
+      banner.classList.add("hidden");
     }
   }
 

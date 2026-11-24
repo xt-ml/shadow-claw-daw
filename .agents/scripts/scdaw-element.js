@@ -24,6 +24,7 @@ export { DawTransportElement } from "./components/scdaw-transport.js";
 export { DawBrowserElement } from "./components/scdaw-browser.js";
 export { DawTimelineElement } from "./components/scdaw-timeline.js";
 export { DawEditorElement } from "./components/scdaw-editor.js";
+export { DawWaveEditorElement } from "./components/scdaw-wave-editor.js";
 export { DawSequencerElement } from "./components/scdaw-sequencer.js";
 export { DawSynthElement } from "./components/scdaw-synth.js";
 export { DawDevicesElement } from "./components/scdaw-devices.js";

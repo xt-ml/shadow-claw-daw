@@ -512,6 +512,7 @@ export async function handleToolDispatch(name, params) {
         browser: "<scdaw-browser></scdaw-browser>",
         timeline: "<scdaw-timeline></scdaw-timeline>",
         editor: "<scdaw-editor></scdaw-editor>",
+        "wave-editor": "<scdaw-wave-editor></scdaw-wave-editor>",
         sequencer: "<scdaw-sequencer></scdaw-sequencer>",
         synth: "<scdaw-synth></scdaw-synth>",
         devices: "<scdaw-devices></scdaw-devices>",

@@ -890,6 +890,7 @@ export const TOOLS = [
             "browser",
             "timeline",
             "editor",
+            "wave-editor",
             "devices",
             "statusbar",
             "knob",

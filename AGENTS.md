@@ -9,7 +9,7 @@ In-browser Digital Audio Workstation (DAW) workbench, Web Audio API synthesis en
 - **Assistant Name**: `ShadowClaw DAW` (`Daw`)
 - **Prefix Isolation**:
   - Tools prefix: `scdaw_*` (47 declarative tools)
-  - Custom Elements prefix: `scdaw-*` (13 modular Web Components)
+  - Custom Elements prefix: `scdaw-*` (14 modular Web Components)
   - Broadcast Channels: `scdaw-commands`, `scdaw-results`, `scdaw-state`
   - Pinned workbench: `pages/main/index.html` (`/main/`)
 

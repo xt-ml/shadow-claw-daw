@@ -1449,6 +1449,10 @@ export class DawTransportElement extends BaseElement {
           renderMidiDialogBody();
         } catch (err) {
           console.error("Failed to import MIDI mappings:", err);
+          scdaw.reportError?.(err, {
+            title: "MIDI Import Error",
+            context: "MIDI Mappings",
+          });
         } finally {
           target.value = "";
         }
@@ -1637,6 +1641,10 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
+            scdaw.reportError?.(err, {
+              title: "Recording Error",
+              context: "Recording",
+            });
           }
         }
       });
@@ -1652,6 +1660,10 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
+            scdaw.reportError?.(err, {
+              title: "Recording Error",
+              context: "Recording",
+            });
           }
         }
       });
@@ -1667,6 +1679,10 @@ export class DawTransportElement extends BaseElement {
             });
           } catch (err) {
             console.error("Recording error:", err);
+            scdaw.reportError?.(err, {
+              title: "Recording Error",
+              context: "Recording",
+            });
           }
         }
       });
@@ -1736,9 +1752,9 @@ export class DawTransportElement extends BaseElement {
             await scdaw.startRecording(targetTrack?.id);
           } catch (err) {
             console.error("Recording error:", err);
-            scdaw.requestDialog?.({
+            scdaw.reportError?.(err, {
               title: "Recording Error",
-              body: err.message || "Failed to start audio recording",
+              context: "Recording",
             });
           }
         }

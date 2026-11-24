@@ -51,7 +51,8 @@
       "scdaw-knob",
       "scdaw-statusbar",
       "scdaw-resize-handle",
-      "scdaw-midi-keyboard"
+      "scdaw-midi-keyboard",
+      "scdaw-wave-editor"
     ],
     "allowedDomains": ["localhost", "127.0.0.1", "cdn.jsdelivr.net", "esm.sh"],
     "scripts": [
