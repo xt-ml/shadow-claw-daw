@@ -1,11 +1,11 @@
 /**
- * .agents/scripts/components/scdaw-spectrum.js
+ * .agents/scripts/components/shadow-claw-daw-spectrum.js
  *
- * Mobile-First, Responsive, ARIA-Compliant Plot Spectrum Analyzer Web Component (<scdaw-spectrum>).
+ * Mobile-First, Responsive, ARIA-Compliant Plot Spectrum Analyzer Web Component (<shadow-claw-daw-spectrum>).
  * Ported from Audacity PlotSpectrumBase & FreqWindow.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import {
@@ -14,7 +14,10 @@ import {
   freqToNoteName,
 } from "../scdaw-spectral-dsp.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 /**
  * Find nearest frequency bin in power spectrum arrays.
@@ -148,7 +151,7 @@ export function renderSpectrumSvg({
   `.trim();
 }
 
-export class DawSpectrumElement extends BaseElement {
+export class ShadowClawDawSpectrum extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -228,7 +231,7 @@ export class DawSpectrumElement extends BaseElement {
           width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-spectrum;
+          container-name: shadow-claw-daw-spectrum;
         }
         .scdaw-spectrum {
           display: flex;
@@ -274,7 +277,7 @@ export class DawSpectrumElement extends BaseElement {
           font-size: 0.74rem;
           color: var(--shadow-claw-text-secondary, #94a3b8);
         }
-        @container scdaw-spectrum (min-width: 640px) {
+        @container shadow-claw-daw-spectrum (min-width: 640px) {
           .scdaw-spectrum__header {
             flex-direction: row;
             justify-content: space-between;
@@ -301,7 +304,7 @@ export class DawSpectrumElement extends BaseElement {
           }
         }
       </style>
-      <section class="scdaw-spectrum" role="region" aria-label="Plot Spectrum Frequency Analyzer">
+      <section class="shadow-claw-daw-spectrum" role="region" aria-label="Plot Spectrum Frequency Analyzer">
         <div class="scdaw-spectrum__header">
           <strong>📊 Plot Spectrum</strong>
           <div class="scdaw-spectrum__controls">
@@ -386,9 +389,4 @@ export class DawSpectrumElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-spectrum")
-) {
-  customElements.define("scdaw-spectrum", DawSpectrumElement);
-}
+defineElement("shadow-claw-daw-spectrum", ShadowClawDawSpectrum);

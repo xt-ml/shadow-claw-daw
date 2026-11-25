@@ -5,23 +5,23 @@ import {
   buildPianoKeys,
   pitchToNoteName,
   resolveKeyElementFromPoint,
-  DawMidiKeyboardElement,
-} from "../.agents/scripts/components/scdaw-midi-keyboard.js";
+  ShadowClawDawMidiKeyboard,
+} from "../.agents/scripts/components/shadow-claw-daw-midi-keyboard.js";
 import { scdaw } from "../.agents/scripts/scdaw-engine.js";
-import { setupWorkbenchMidiKeyboard } from "../.agents/scripts/components/scdaw-workbench.js";
-import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
+import { setupWorkbenchMidiKeyboard } from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
+import { formatTelemetryStatus } from "../.agents/scripts/components/shadow-claw-daw-status-bar.js";
 import {
   formatMidiStatusBadge,
   formatCaptureButtonState,
-} from "../.agents/scripts/components/scdaw-transport.js";
+} from "../.agents/scripts/components/shadow-claw-daw-transport.js";
 import {
   pitchToPianoRollRow,
   pianoRollRowToPitch,
   resolvePianoRollKeyFromPoint,
   setupPianoRollKeyAudition,
-} from "../.agents/scripts/components/scdaw-editor.js";
+} from "../.agents/scripts/components/shadow-claw-daw-editor.js";
 
-test("scdaw-midi-keyboard: buildPianoKeys and pitchToNoteName generate accessible key descriptors", () => {
+test("shadow-claw-daw-midi-keyboard: buildPianoKeys and pitchToNoteName generate accessible key descriptors", () => {
   assert.equal(pitchToNoteName(60), "C4");
   assert.equal(pitchToNoteName(61), "C#4");
   assert.equal(pitchToNoteName(69), "A4");
@@ -33,12 +33,12 @@ test("scdaw-midi-keyboard: buildPianoKeys and pitchToNoteName generate accessibl
   assert.equal(keys[0].isBlack, false);
   assert.equal(keys[1].pitch, 61);
   assert.equal(keys[1].isBlack, true);
-  assert.equal(typeof DawMidiKeyboardElement, "function");
+  assert.equal(typeof ShadowClawDawMidiKeyboard, "function");
 });
 
-test("scdaw-midi-keyboard: source uses @container queries, coarse pointer hit targets, and ARIA", async () => {
+test("shadow-claw-daw-midi-keyboard: source uses @container queries, coarse pointer hit targets, and ARIA", async () => {
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-midi-keyboard.js",
+    ".agents/scripts/components/shadow-claw-daw-midi-keyboard.js",
     "utf8",
   );
   assert.match(src, /@container/);
@@ -51,7 +51,7 @@ test("scdaw-midi-keyboard: source uses @container queries, coarse pointer hit ta
   assert.match(src, /activeLivePitches/);
 });
 
-test("scdaw-statusbar: formatTelemetryStatus includes MIDI status when provided", () => {
+test("shadow-claw-daw-status-bar: formatTelemetryStatus includes MIDI status when provided", () => {
   const res = formatTelemetryStatus(
     { playing: false, audio: "running", bar: 1, beat: 1, bpm: 120 },
     { name: "Demo", bpm: 120, tracks: [] },
@@ -67,7 +67,7 @@ test("scdaw-statusbar: formatTelemetryStatus includes MIDI status when provided"
   assert.match(unsupported.midiSummary, /MIDI:\s*Keys/i);
 });
 
-test("scdaw-transport: formatMidiStatusBadge and native <dialog> compliance", async () => {
+test("shadow-claw-daw-transport: formatMidiStatusBadge and native <dialog> compliance", async () => {
   assert.equal(
     formatMidiStatusBadge({ status: "ready", inputs: [{ id: "1" }] }).label,
     "MIDI (1)",
@@ -78,7 +78,7 @@ test("scdaw-transport: formatMidiStatusBadge and native <dialog> compliance", as
   );
 
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-transport.js",
+    ".agents/scripts/components/shadow-claw-daw-transport.js",
     "utf8",
   );
   const midiDialogMatch = src.match(
@@ -109,9 +109,9 @@ test("scdaw-transport: formatMidiStatusBadge and native <dialog> compliance", as
   assert.doesNotMatch(captureDialogMatch[0], /aria-modal/);
 });
 
-test("scdaw-timeline: renders record-arm-btn for synth/drums tracks too", async () => {
+test("shadow-claw-daw-timeline: renders record-arm-btn for synth/drums tracks too", async () => {
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-timeline.js",
+    ".agents/scripts/components/shadow-claw-daw-timeline.js",
     "utf8",
   );
   // Ensure record-arm-btn is no longer restricted solely to t.kind === "audio"
@@ -121,17 +121,17 @@ test("scdaw-timeline: renders record-arm-btn for synth/drums tracks too", async 
   );
 });
 
-test("scdaw-workbench: mounts scdaw-midi-keyboard", async () => {
+test("shadow-claw-daw-workbench: mounts shadow-claw-daw-midi-keyboard", async () => {
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-workbench.js",
+    ".agents/scripts/components/shadow-claw-daw-workbench.js",
     "utf8",
   );
-  assert.match(src, /<scdaw-midi-keyboard/);
+  assert.match(src, /<shadow-claw-daw-midi-keyboard/);
 });
 
-test("scdaw-browser: search input updates item-list in-place without full re-render", async () => {
+test("shadow-claw-daw-browser: search input updates item-list in-place without full re-render", async () => {
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-browser.js",
+    ".agents/scripts/components/shadow-claw-daw-browser.js",
     "utf8",
   );
   const inputHandler = src.match(
@@ -142,7 +142,7 @@ test("scdaw-browser: search input updates item-list in-place without full re-ren
   assert.doesNotMatch(inputHandler[0], /this\.render\(\)/);
 });
 
-test("scdaw-editor: supports all MIDI octaves (0..127) without clamping and renders full range", async () => {
+test("shadow-claw-daw-editor: supports all MIDI octaves (0..127) without clamping and renders full range", async () => {
   const rowB6 = pitchToPianoRollRow(95);
   assert.equal(pianoRollRowToPitch(rowB6), 95);
   const rowC_1 = pitchToPianoRollRow(0);
@@ -151,7 +151,7 @@ test("scdaw-editor: supports all MIDI octaves (0..127) without clamping and rend
   assert.equal(pianoRollRowToPitch(rowG9), 127);
 
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-editor.js",
+    ".agents/scripts/components/shadow-claw-daw-editor.js",
     "utf8",
   );
   assert.match(
@@ -208,7 +208,7 @@ function createMockShadowRoot({ keys, hitTest }) {
   return root;
 }
 
-test("scdaw-midi-keyboard: resolveKeyElementFromPoint resolves shadow keys, child nodes, and filters outside nodes", () => {
+test("shadow-claw-daw-midi-keyboard: resolveKeyElementFromPoint resolves shadow keys, child nodes, and filters outside nodes", () => {
   const key60 = createMockKey({ selector: ".piano-key", pitch: 60 });
   const childSpan = { closest: (sel) => (sel === ".piano-key" ? key60 : null) };
   const outsideKey = createMockKey({ selector: ".piano-key", pitch: 72 });
@@ -232,7 +232,7 @@ test("scdaw-midi-keyboard: resolveKeyElementFromPoint resolves shadow keys, chil
   assert.equal(resolveKeyElementFromPoint(null, 10, 20, ".piano-key"), null);
 });
 
-test("scdaw-midi-keyboard: pointer drag glissando transitions notes cleanly across keys, gaps, and multi-touch", () => {
+test("shadow-claw-daw-midi-keyboard: pointer drag glissando transitions notes cleanly across keys, gaps, and multi-touch", () => {
   const key59 = createMockKey({ selector: ".piano-key", pitch: 59 });
   const key60 = createMockKey({ selector: ".piano-key", pitch: 60 });
   const key61 = createMockKey({ selector: ".piano-key", pitch: 61 });
@@ -254,7 +254,7 @@ test("scdaw-midi-keyboard: pointer drag glissando transitions notes cleanly acro
   };
 
   const root = createMockShadowRoot({ keys, hitTest: (x) => hitByX(x) });
-  const kbd = new DawMidiKeyboardElement();
+  const kbd = new ShadowClawDawMidiKeyboard();
   kbd.shadowRoot = root;
   kbd._bindEvents();
 
@@ -486,9 +486,9 @@ test("scdaw-midi-keyboard: pointer drag glissando transitions notes cleanly acro
   }
 });
 
-test("scdaw-midi-keyboard: CSS includes Safari user-select fallback, preserves touch-action rules, and avoids :active stickiness", async () => {
+test("shadow-claw-daw-midi-keyboard: CSS includes Safari user-select fallback, preserves touch-action rules, and avoids :active stickiness", async () => {
   const src = await fs.readFile(
-    ".agents/scripts/components/scdaw-midi-keyboard.js",
+    ".agents/scripts/components/shadow-claw-daw-midi-keyboard.js",
     "utf8",
   );
   assert.match(src, /-webkit-user-select:\s*none;\s*\n\s*user-select:\s*none;/);
@@ -498,7 +498,7 @@ test("scdaw-midi-keyboard: CSS includes Safari user-select fallback, preserves t
   assert.doesNotMatch(src, /\.piano-key--black:active/);
 });
 
-test("scdaw-editor: Piano Roll .pr-key audition supports drag glissando, click deduplication, keyboard activation, and CSS rules", async () => {
+test("shadow-claw-daw-editor: Piano Roll .pr-key audition supports drag glissando, click deduplication, keyboard activation, and CSS rules", async () => {
   const key60 = createMockKey({ selector: ".pr-key[data-pitch]", pitch: 60 });
   const key62 = createMockKey({ selector: ".pr-key[data-pitch]", pitch: 62 });
   const key64 = createMockKey({ selector: ".pr-key[data-pitch]", pitch: 64 });
@@ -698,7 +698,7 @@ test("scdaw-editor: Piano Roll .pr-key audition supports drag glissando, click d
 
   // 6. CSS checks
   const editorSrc = await fs.readFile(
-    ".agents/scripts/components/scdaw-editor.js",
+    ".agents/scripts/components/shadow-claw-daw-editor.js",
     "utf8",
   );
   assert.match(
@@ -711,7 +711,7 @@ test("scdaw-editor: Piano Roll .pr-key audition supports drag glissando, click d
   );
 });
 
-test("scdaw-midi-keyboard: buildPianoKeys and render() expose QWERTY shortcuts, layout toggle, and dynamic hint", () => {
+test("shadow-claw-daw-midi-keyboard: buildPianoKeys and render() expose QWERTY shortcuts, layout toggle, and dynamic hint", () => {
   const abletonKeys = buildPianoKeys(4, 2, "ableton");
   assert.equal(abletonKeys.length, 24);
   assert.equal(abletonKeys[0].shortcut, "A");
@@ -725,7 +725,7 @@ test("scdaw-midi-keyboard: buildPianoKeys and render() expose QWERTY shortcuts, 
   assert.equal(twoOctKeys[12].shortcut, "Q");
   assert.equal(twoOctKeys[23].shortcut, "U");
 
-  const kbd = new DawMidiKeyboardElement();
+  const kbd = new ShadowClawDawMidiKeyboard();
   kbd.shadowRoot = {
     innerHTML: "",
     querySelectorAll: () => [],
@@ -757,7 +757,7 @@ test("scdaw-midi-keyboard: buildPianoKeys and render() expose QWERTY shortcuts, 
   );
 });
 
-test("scdaw-midi-keyboard: QWERTY key playback, Z/X and -/= octave shift, layout toggle, Hold mode, and close cleanup", () => {
+test("shadow-claw-daw-midi-keyboard: QWERTY key playback, Z/X and -/= octave shift, layout toggle, Hold mode, and close cleanup", () => {
   const keys = buildPianoKeys(4, 2, "ableton").map((k) =>
     createMockKey({ selector: ".piano-key", pitch: k.pitch }),
   );
@@ -765,7 +765,7 @@ test("scdaw-midi-keyboard: QWERTY key playback, Z/X and -/= octave shift, layout
   root.innerHTML = "";
   const dispatched = [];
 
-  const kbd = new DawMidiKeyboardElement();
+  const kbd = new ShadowClawDawMidiKeyboard();
   kbd.shadowRoot = root;
   kbd.dispatchEvent = (evt) => dispatched.push(evt);
   kbd._bindEvents();
@@ -995,7 +995,7 @@ test("scdaw-midi-keyboard: QWERTY key playback, Z/X and -/= octave shift, layout
   }
 });
 
-test("scdaw-workbench: setupWorkbenchMidiKeyboard routes QWERTY events safely, handles blur/close sync, and disposes cleanly", () => {
+test("shadow-claw-daw-workbench: setupWorkbenchMidiKeyboard routes QWERTY events safely, handles blur/close sync, and disposes cleanly", () => {
   const mkTarget = () => {
     const map = new Map();
     return {
@@ -1051,7 +1051,8 @@ test("scdaw-workbench: setupWorkbenchMidiKeyboard routes QWERTY events safely, h
   const shadowRoot = {
     ...mkTarget(),
     getElementById: (id) => (id === "midi-keyboard" ? kbd : null),
-    querySelector: (sel) => (sel === "scdaw-transport" ? transport : null),
+    querySelector: (sel) =>
+      sel === "shadow-claw-daw-transport" ? transport : null,
   };
 
   const controller = setupWorkbenchMidiKeyboard({ shadowRoot, windowObj });
@@ -1124,7 +1125,7 @@ test("scdaw-workbench: setupWorkbenchMidiKeyboard routes QWERTY events safely, h
   assert.equal(kbd.hidden, true);
   assert.equal(calls.transient, 2);
 
-  // 7. Keyboard "close" event syncs scdaw-transport #keys-btn aria-pressed="false"
+  // 7. Keyboard "close" event syncs shadow-claw-daw-transport #keys-btn aria-pressed="false"
   shadowRoot.dispatch("close", { target: kbd });
   assert.equal(keysBtn.getAttribute("aria-pressed"), "false");
 

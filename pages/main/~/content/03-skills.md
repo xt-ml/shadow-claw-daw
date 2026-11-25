@@ -67,4 +67,4 @@ Diagnoses common environment faults, browser autoplay lockouts, or missing leade
 
 ### 15. `/audio-editing`
 
-Performs end-to-end non-destructive and offline audio editing workflows: importing base64 audio (`scdaw_import_audio`), splitting/trimming/crossfading/enveloping (`scdaw_edit_audio_clip`), normalizing loudness/removing clicks/reducing noise/stretching time or pitch (`scdaw_process_audio_clip`), running FFT spectrum/clipping/silence/beat analysis (`scdaw_analyze_audio_clip`), managing point/region/spectral label tracks (`scdaw_manage_labels`), and inspecting `<scdaw-wave-editor>` or `<scdaw-spectrum>`.
+Performs end-to-end non-destructive and offline audio editing workflows: importing base64 audio (`scdaw_import_audio`), splitting/trimming/crossfading/enveloping (`scdaw_edit_audio_clip`), normalizing loudness/removing clicks/reducing noise/stretching time or pitch (`scdaw_process_audio_clip`), running FFT spectrum/clipping/silence/beat analysis (`scdaw_analyze_audio_clip`), managing point/region/spectral label tracks (`scdaw_manage_labels`), and inspecting `<shadow-claw-daw-wave-editor>` or `<shadow-claw-daw-spectrum>`.

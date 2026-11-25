@@ -9,105 +9,15 @@
 import { scdaw } from "./scdaw-engine.js";
 import { MIN_BPM, MAX_BPM, projectToScoreView, beatsPerBar } from "./scdaw.js";
 import { TOOLS_METADATA } from "./scdaw-tools-metadata.js";
-import "./scdaw-element.js";
-
-let cmdChannel = null;
-let resChannel = null;
-let stateChannel = null;
-let initialized = false;
-let isLeader = false;
-
-export async function init(container) {
-  if (initialized) return;
-  initialized = true;
-
-  // Initialize state broadcast channel for UI synchronization across all documents
-  stateChannel = new BroadcastChannel("scdaw-state");
-
-  // Leader Election via Web Locks
-  if (
-    typeof navigator !== "undefined" &&
-    navigator.locks &&
-    typeof navigator.locks.request === "function"
-  ) {
-    try {
-      navigator.locks.request(
-        "scdaw-engine",
-        { ifAvailable: true },
-        async (lock) => {
-          if (!lock) {
-            // Another tab is the leader; this document operates in follower/remote client mode
-            scdaw._updateState({ isLeader: false });
-            return;
-          }
-          isLeader = true;
-          scdaw._updateState({ isLeader: true });
-          setupLeaderBridge();
-
-          // Hold lock until window unloads
-          return new Promise(() => {});
-        },
-      );
-    } catch (_) {
-      // If Web Locks fails, operate standalone
-      isLeader = true;
-      scdaw._updateState({ isLeader: true });
-      setupLeaderBridge();
-    }
-  } else {
-    // Environments without Web Locks (e.g. Node or older testbeds)
-    isLeader = true;
-    scdaw._updateState({ isLeader: true });
-    setupLeaderBridge();
-  }
-
-  // Register Native WebMCP when supported
-  await registerNativeWebMcp();
-}
-
-function setupLeaderBridge() {
-  // Explicit string literals are required for ShadowClaw iframe proxy matching
-  cmdChannel = new BroadcastChannel("scdaw-commands");
-  resChannel = new BroadcastChannel("scdaw-results");
-
-  cmdChannel.addEventListener("message", async (event) => {
-    const msg = event.data;
-    if (!msg || !msg.requestId || !msg.type) return;
-
-    // Send immediate ACK to satisfy worker race condition
-    resChannel.postMessage({
-      requestId: msg.requestId,
-      ack: true,
-    });
-
-    try {
-      const result = await handleToolDispatch(msg.type, msg.params || {});
-      resChannel.postMessage({
-        requestId: msg.requestId,
-        result,
-      });
-      // Broadcast state update to all UI surfaces
-      broadcastState();
-    } catch (err) {
-      resChannel.postMessage({
-        requestId: msg.requestId,
-        error: err.message || String(err),
-      });
-    }
-  });
-
-  // Start periodic telemetry broadcast (10 Hz)
-  setInterval(() => {
-    if (scdaw.getState().playing) {
-      broadcastState();
-    }
-  }, 100);
-}
+import "./shadow-claw-daw-element.js";
+import {
+  createToolAdapterBridge,
+  registerNativeWebMcp as registerWebMcpTools,
+} from "shadow-claw/utils/tool-adapter-bridge";
 
 let lastBroadcastProjectRef = null;
 
-function broadcastState() {
-  if (!stateChannel) return;
+function buildSnapshotPayload() {
   const projRef = scdaw.project.get();
   const payload = {
     type: "snapshot",
@@ -117,7 +27,26 @@ function broadcastState() {
     lastBroadcastProjectRef = projRef;
     payload.project = scdaw.getProject();
   }
-  stateChannel.postMessage(payload);
+  return payload;
+}
+
+const bridge = createToolAdapterBridge({
+  lockName: "scdaw-engine",
+  commandsChannel: "scdaw-commands",
+  resultsChannel: "scdaw-results",
+  stateChannel: "scdaw-state",
+  tools: TOOLS_METADATA,
+  dispatch: (name, params) => handleToolDispatch(name, params),
+  getStateSnapshot: () => buildSnapshotPayload(),
+  shouldBroadcastIntervalSnapshot: () => Boolean(scdaw.getState().playing),
+  snapshotIntervalMs: 100,
+  onLeadershipChange: (isLeader) => {
+    scdaw._updateState({ isLeader });
+  },
+});
+
+export async function init(_container) {
+  return await bridge.init();
 }
 
 export async function handleToolDispatch(name, params) {
@@ -547,26 +476,29 @@ export async function handleToolDispatch(name, params) {
     case "scdaw_render_surface": {
       const el = params.element || "workbench";
       const tagMap = {
-        workbench: "<scdaw-workbench></scdaw-workbench>",
-        mixer: "<scdaw-mixer></scdaw-mixer>",
-        sequencer: "<scdaw-sequencer></scdaw-sequencer>",
-        transport: "<scdaw-transport></scdaw-transport>",
-        browser: "<scdaw-browser></scdaw-browser>",
-        timeline: "<scdaw-timeline></scdaw-timeline>",
-        editor: "<scdaw-editor></scdaw-editor>",
-        "wave-editor": "<scdaw-wave-editor></scdaw-wave-editor>",
-        spectrum: "<scdaw-spectrum></scdaw-spectrum>",
-        sequencer: "<scdaw-sequencer></scdaw-sequencer>",
-        synth: "<scdaw-synth></scdaw-synth>",
-        devices: "<scdaw-devices></scdaw-devices>",
-        statusbar: "<scdaw-statusbar></scdaw-statusbar>",
-        knob: "<scdaw-knob></scdaw-knob>",
-        "resize-handle": "<scdaw-resize-handle></scdaw-resize-handle>",
+        workbench: "<shadow-claw-daw-workbench></shadow-claw-daw-workbench>",
+        mixer: "<shadow-claw-daw-mixer></shadow-claw-daw-mixer>",
+        sequencer: "<shadow-claw-daw-sequencer></shadow-claw-daw-sequencer>",
+        transport: "<shadow-claw-daw-transport></shadow-claw-daw-transport>",
+        browser: "<shadow-claw-daw-browser></shadow-claw-daw-browser>",
+        timeline: "<shadow-claw-daw-timeline></shadow-claw-daw-timeline>",
+        editor: "<shadow-claw-daw-editor></shadow-claw-daw-editor>",
+        "wave-editor":
+          "<shadow-claw-daw-wave-editor></shadow-claw-daw-wave-editor>",
+        spectrum: "<shadow-claw-daw-spectrum></shadow-claw-daw-spectrum>",
+        synth: "<shadow-claw-daw-synth></shadow-claw-daw-synth>",
+        devices: "<shadow-claw-daw-devices></shadow-claw-daw-devices>",
+        statusbar: "<shadow-claw-daw-status-bar></shadow-claw-daw-status-bar>",
+        knob: "<shadow-claw-daw-knob></shadow-claw-daw-knob>",
+        "resize-handle":
+          "<shadow-claw-daw-resize-handle></shadow-claw-daw-resize-handle>",
       };
       return {
         ok: true,
         rendered: true,
-        element: tagMap[el] || "<scdaw-workbench></scdaw-workbench>",
+        element:
+          tagMap[el] ||
+          "<shadow-claw-daw-workbench></shadow-claw-daw-workbench>",
       };
     }
 
@@ -576,17 +508,6 @@ export async function handleToolDispatch(name, params) {
 }
 
 export async function registerNativeWebMcp() {
-  const modelContext =
-    typeof document !== "undefined" && document.modelContext
-      ? document.modelContext
-      : typeof navigator !== "undefined" && navigator.modelContext
-        ? navigator.modelContext
-        : null;
-
-  if (!modelContext || typeof modelContext.registerTool !== "function") {
-    return;
-  }
-
   const toolsToRegister =
     Array.isArray(TOOLS_METADATA) && TOOLS_METADATA.length > 0
       ? TOOLS_METADATA
@@ -622,24 +543,7 @@ export async function registerNativeWebMcp() {
           },
         ];
 
-  for (const tool of toolsToRegister) {
-    try {
-      const res = modelContext.registerTool({
-        name: tool.name,
-        title: tool.title || tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema ||
-          tool.input_schema || { type: "object", properties: {} },
-        annotations: tool.annotations || {
-          readOnlyHint: false,
-          consequentialHint: false,
-        },
-        execute: async (input) =>
-          await handleToolDispatch(tool.name, input || {}),
-      });
-      if (res && typeof res.catch === "function") {
-        await res.catch(() => {});
-      }
-    } catch (_) {}
-  }
+  return await registerWebMcpTools(toolsToRegister, (name, input) =>
+    handleToolDispatch(name, input),
+  );
 }

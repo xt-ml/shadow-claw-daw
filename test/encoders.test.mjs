@@ -292,7 +292,7 @@ test("Workbench export modal & scdaw_bounce manifest expose FFmpeg audio export 
   const [wbSrc] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf8",

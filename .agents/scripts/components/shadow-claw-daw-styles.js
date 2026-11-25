@@ -1,9 +1,11 @@
 /**
- * .agents/scripts/components/scdaw-styles.js
+ * .agents/scripts/components/shadow-claw-daw-styles.js
  *
  * Shared CSS stylesheet tokens and utility classes for ShadowClaw DAW components.
  * Matches openDAW dark-studio aesthetic (cyan accents, dark slate elevated surfaces).
  */
+
+import { installPageSwipeGuard as installSharedPageSwipeGuard } from "shadow-claw/utils/page-swipe-guard";
 
 export const SHARED_STYLES = `
 :host {
@@ -152,73 +154,8 @@ export const SHARED_STYLES = `
 }
 `;
 
-const SWIPE_GUARD_ATTRS = ["data-no-swipe", "data-no-nav"];
-const ancestorRefCounts = new WeakMap();
-
-/**
- * Suppresses ShadowClaw Pages horizontal swipe and arrow-key navigation across
- * the workbench/editor host and its enclosing page viewer containers while mounted.
- * Uses WeakMap reference counting on shared ancestors so concurrent mounts or
- * view transitions keep protection intact and clean teardown restores prior state.
- *
- * @param {HTMLElement} host
- * @returns {() => void}
- */
 export function installPageSwipeGuard(host) {
-  if (host && typeof host.setAttribute === "function") {
-    for (const attr of SWIPE_GUARD_ATTRS) {
-      host.setAttribute(attr, "true");
-    }
-  }
-
-  const tracked = [];
-  if (host && typeof host.closest === "function") {
-    const ancestors = new Set([
-      host.closest(".scdaw-workbench-page"),
-      host.closest(".pages__rendered"),
-      host.closest(".pages__viewer"),
-    ]);
-    for (const el of ancestors) {
-      if (!el || typeof el.setAttribute !== "function") continue;
-      let entry = ancestorRefCounts.get(el);
-      if (!entry) {
-        const prev = {};
-        for (const attr of SWIPE_GUARD_ATTRS) {
-          prev[attr] =
-            typeof el.getAttribute === "function"
-              ? el.getAttribute(attr)
-              : null;
-        }
-        entry = { count: 0, prev };
-      }
-      entry.count += 1;
-      ancestorRefCounts.set(el, entry);
-      for (const attr of SWIPE_GUARD_ATTRS) {
-        el.setAttribute(attr, "true");
-      }
-      tracked.push(el);
-    }
-  }
-
-  let cleaned = false;
-  return () => {
-    if (cleaned) return;
-    cleaned = true;
-    for (const el of tracked) {
-      const entry = ancestorRefCounts.get(el);
-      if (!entry) continue;
-      entry.count -= 1;
-      if (entry.count <= 0) {
-        ancestorRefCounts.delete(el);
-        for (const attr of SWIPE_GUARD_ATTRS) {
-          const prevVal = entry.prev[attr];
-          if (prevVal !== null && prevVal !== undefined) {
-            el.setAttribute(attr, prevVal);
-          } else if (typeof el.removeAttribute === "function") {
-            el.removeAttribute(attr);
-          }
-        }
-      }
-    }
-  };
+  return installSharedPageSwipeGuard(host, {
+    extraSelectors: [".scdaw-workbench-page"],
+  });
 }

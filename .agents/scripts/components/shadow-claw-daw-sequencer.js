@@ -1,18 +1,21 @@
 /**
- * .agents/scripts/components/scdaw-sequencer.js
+ * .agents/scripts/components/shadow-claw-daw-sequencer.js
  *
- * 16-Step Pattern Step Sequencer Web Component (<scdaw-sequencer>).
+ * 16-Step Pattern Step Sequencer Web Component (<shadow-claw-daw-sequencer>).
  * Ported concepts from openDAW Pattern Sequencer with step-memory fixes.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { pitchToName, ppqnToStep, stepsPerBar } from "../scdaw.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
-export class DawSequencerElement extends BaseElement {
+export class ShadowClawDawSequencer extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -205,7 +208,7 @@ export class DawSequencerElement extends BaseElement {
           width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-sequencer;
+          container-name: shadow-claw-daw-sequencer;
         }
         /* Mobile-First Base Styles */
         .scdaw-sequencer__grid,
@@ -274,7 +277,7 @@ export class DawSequencerElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Wide Sequencer (>= 601px) */
-        @container scdaw-sequencer (min-width: 601px) {
+        @container shadow-claw-daw-sequencer (min-width: 601px) {
           .scdaw-sequencer__grid,
           .grid-container {
             padding: 0.75rem;
@@ -386,9 +389,4 @@ export class DawSequencerElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-sequencer")
-) {
-  customElements.define("scdaw-sequencer", DawSequencerElement);
-}
+defineElement("shadow-claw-daw-sequencer", ShadowClawDawSequencer);

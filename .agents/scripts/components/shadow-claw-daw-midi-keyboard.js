@@ -1,7 +1,7 @@
 /**
- * .agents/scripts/components/scdaw-midi-keyboard.js
+ * .agents/scripts/components/shadow-claw-daw-midi-keyboard.js
  *
- * Accessible, mobile-first, responsive Software MIDI Keyboard (<scdaw-midi-keyboard>).
+ * Accessible, mobile-first, responsive Software MIDI Keyboard (<shadow-claw-daw-midi-keyboard>).
  * Supports multi-touch pointer play, drag glissando, Hold (latch) mode,
  * Sustain toggle, QWERTY shortcut playback, and real-time 3D depressed key feedback.
  */
@@ -9,7 +9,7 @@
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { QWERTY_LAYOUTS, getQwertyKeyMapForLayout } from "../scdaw-midi-io.js";
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 
 const NOTE_NAMES = [
   "C",
@@ -27,7 +27,10 @@ const NOTE_NAMES = [
 ];
 const BLACK_SEMITONES = new Set([1, 3, 6, 8, 10]);
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function pitchToNoteName(pitch) {
   const p = Math.max(0, Math.min(127, Math.round(Number(pitch) || 0)));
@@ -84,7 +87,7 @@ export function resolveKeyElementFromPoint(
   return keyEl;
 }
 
-export class DawMidiKeyboardElement extends BaseElement {
+export class ShadowClawDawMidiKeyboard extends BaseElement {
   constructor() {
     super();
     this.attachShadow?.({ mode: "open" });
@@ -479,7 +482,7 @@ export class DawMidiKeyboardElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-midi-keyboard;
+          container-name: shadow-claw-daw-midi-keyboard;
           background: var(--bg-card, rgb(26, 33, 33));
           border-top: 1px solid var(--border, rgb(63, 72, 73));
           -webkit-user-select: none;
@@ -606,7 +609,7 @@ export class DawMidiKeyboardElement extends BaseElement {
           color: var(--on-accent, rgb(0, 54, 58));
           box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.65), 0 0 10px rgba(128, 212, 219, 0.55);
         }
-        @container scdaw-midi-keyboard (min-width: 600px) {
+        @container shadow-claw-daw-midi-keyboard (min-width: 600px) {
           .piano-key {
             height: 96px;
           }
@@ -681,9 +684,4 @@ export class DawMidiKeyboardElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-midi-keyboard")
-) {
-  customElements.define("scdaw-midi-keyboard", DawMidiKeyboardElement);
-}
+defineElement("shadow-claw-daw-midi-keyboard", ShadowClawDawMidiKeyboard);

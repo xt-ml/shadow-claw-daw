@@ -115,10 +115,10 @@ test("scdaw-url-param: clearUrlParam removes file param from both search and has
   }
 });
 
-test("scdaw-workbench: includes Press a URL button, #press-url-modal, and ?file/#file param loader", async () => {
+test("shadow-claw-daw-workbench: includes Press a URL button, #press-url-modal, and ?file/#file param loader", async () => {
   const workbenchPath = join(
     __dirname,
-    "../.agents/scripts/components/scdaw-workbench.js",
+    "../.agents/scripts/components/shadow-claw-daw-workbench.js",
   );
   const content = await readFile(workbenchPath, "utf8");
 
@@ -129,9 +129,9 @@ test("scdaw-workbench: includes Press a URL button, #press-url-modal, and ?file/
   assert.match(content, /hashchange/);
 });
 
-test("scdaw-workbench: confirmDialog resolves via explicit button clicks even without form returnValue", async () => {
-  const { DawWorkbenchElement } =
-    await import("../.agents/scripts/components/scdaw-workbench.js");
+test("shadow-claw-daw-workbench: confirmDialog resolves via explicit button clicks even without form returnValue", async () => {
+  const { ShadowClawDawWorkbench } =
+    await import("../.agents/scripts/components/shadow-claw-daw-workbench.js");
 
   function createMockDialog() {
     const listeners = new Map();
@@ -217,7 +217,7 @@ test("scdaw-workbench: confirmDialog resolves via explicit button clicks even wi
   }
 
   const { fakeThis, confirmBtn, cancelBtn } = createMockDialog();
-  const p1 = DawWorkbenchElement.prototype.confirmDialog.call(fakeThis, {
+  const p1 = ShadowClawDawWorkbench.prototype.confirmDialog.call(fakeThis, {
     title: "Load Song from URL",
     message: "Load?",
     confirmText: "Load Song",
@@ -226,7 +226,7 @@ test("scdaw-workbench: confirmDialog resolves via explicit button clicks even wi
   confirmBtn.click();
   assert.equal(await p1, true);
 
-  const p2 = DawWorkbenchElement.prototype.confirmDialog.call(fakeThis, {
+  const p2 = ShadowClawDawWorkbench.prototype.confirmDialog.call(fakeThis, {
     title: "Load Song from URL",
     message: "Load?",
     confirmText: "Load Song",
@@ -236,10 +236,10 @@ test("scdaw-workbench: confirmDialog resolves via explicit button clicks even wi
   assert.equal(await p2, false);
 });
 
-test("scdaw-workbench: _checkFileUrlParam guards re-entrancy and handles import errors gracefully", async () => {
+test("shadow-claw-daw-workbench: _checkFileUrlParam guards re-entrancy and handles import errors gracefully", async () => {
   const workbenchPath = join(
     __dirname,
-    "../.agents/scripts/components/scdaw-workbench.js",
+    "../.agents/scripts/components/shadow-claw-daw-workbench.js",
   );
   const content = await readFile(workbenchPath, "utf8");
 
@@ -274,10 +274,10 @@ test("scdaw-url-param: getUrlParam reads autoplay from query string or hash frag
   );
 });
 
-test("scdaw-workbench: _checkFileUrlParam supports ?autoplay=true with and without #file=", async () => {
+test("shadow-claw-daw-workbench: _checkFileUrlParam supports ?autoplay=true with and without #file=", async () => {
   const workbenchPath = join(
     __dirname,
-    "../.agents/scripts/components/scdaw-workbench.js",
+    "../.agents/scripts/components/shadow-claw-daw-workbench.js",
   );
   const content = await readFile(workbenchPath, "utf8");
 

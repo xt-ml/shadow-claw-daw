@@ -11,7 +11,7 @@ import {
   AudioRecorder,
   computeWaveformPeaks,
 } from "../.agents/scripts/scdaw-recorder.js";
-import { computeClipOverlapLayout } from "../.agents/scripts/components/scdaw-timeline.js";
+import { computeClipOverlapLayout } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 
 test("AudioRecorder: tracks recording lifecycle, gathers PCM, and encodes WAV", async () => {
   const fakeCtx = new FakeAudioContext();

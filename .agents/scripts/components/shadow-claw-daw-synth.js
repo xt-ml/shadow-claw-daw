@@ -1,14 +1,14 @@
 /**
- * .agents/scripts/components/scdaw-synth.js
+ * .agents/scripts/components/shadow-claw-daw-synth.js
  *
- * Dedicated Multi-Engine Synthesizer Workbench (<scdaw-synth>).
+ * Dedicated Multi-Engine Synthesizer Workbench (<shadow-claw-daw-synth>).
  * Supports Vaporisateur (30-param subtractive), Tubular (6-Op / 32-Algo DX7 FM + .syx),
  * PSG (YM2149 chiptune), Cubed (303), 808, Pluck, Neon, Korpus, Noise Pad, Nano,
  * SoundFont, live AnalyserNode oscilloscope, and per-step parameter locks.
  * Mobile-first, container-query responsive, BEM & WCAG 2.1 AA ARIA compliant.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { INSTRUMENT_SCHEMAS, getDefaultParams } from "../scdaw-schema.js";
@@ -20,9 +20,12 @@ import {
   parseDx7Sysex,
   encodeDx7SysexVoice,
 } from "../scdaw-syx.js";
-import "./scdaw-knob.js";
+import "./shadow-claw-daw-knob.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export const SYNTH_ENGINES = Object.freeze([
   { id: "synth", label: "Vaporisateur (Subtractive)" },
@@ -58,7 +61,7 @@ export function getSynthSectionsForInstrument(instrument = "synth") {
 }
 
 /**
- * Determines whether the existing <scdaw-synth> DOM can be synchronized in-place
+ * Determines whether the existing <shadow-claw-daw-synth> DOM can be synchronized in-place
  * without rebuilding Shadow DOM (preserves active knob pointer drags & scroll).
  *
  * @param {object} opts
@@ -302,7 +305,7 @@ const SHORT_LABELS = Object.freeze({
   materialB: "Material B",
 });
 
-export class DawSynthElement extends BaseElement {
+export class ShadowClawDawSynth extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -503,7 +506,7 @@ export class DawSynthElement extends BaseElement {
     if (!this.shadowRoot || !track) return;
     const params = { ...getDefaultParams(inst), ...(track.params || {}) };
 
-    this.shadowRoot.querySelectorAll("scdaw-knob").forEach((knob) => {
+    this.shadowRoot.querySelectorAll("shadow-claw-daw-knob").forEach((knob) => {
       const param = knob.dataset.param;
       if (!param || knob._isDragging) return;
       const nextVal = params[param];
@@ -587,7 +590,7 @@ export class DawSynthElement extends BaseElement {
       `;
     }
     return `
-      <scdaw-knob
+      <shadow-claw-daw-knob
         label="${label}"
         min="${spec.min ?? 0}"
         max="${spec.max ?? 1}"
@@ -597,7 +600,7 @@ export class DawSynthElement extends BaseElement {
         value="${value ?? spec.default ?? 0}"
         default="${spec.default ?? 0}"
         data-param="${key}"
-      ></scdaw-knob>
+      ></shadow-claw-daw-knob>
     `;
   }
 
@@ -825,7 +828,7 @@ export class DawSynthElement extends BaseElement {
                   )
                   .join("")}
               </select>
-              <scdaw-knob label="FB" min="0" max="7" step="1" unit="" value="${params.feedback ?? 4}" default="4" data-param="feedback"></scdaw-knob>
+              <shadow-claw-daw-knob label="FB" min="0" max="7" step="1" unit="" value="${params.feedback ?? 4}" default="4" data-param="feedback"></shadow-claw-daw-knob>
             </div>
             <div class="scdaw-synth__svg-wrap">
               ${renderAlgorithmSvg(params.algorithm ?? 1, this._activeOp)}
@@ -856,7 +859,7 @@ export class DawSynthElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-synth;
+          container-name: shadow-claw-daw-synth;
           overflow-x: hidden;
         }
         /* 1. Mobile-First Base Styles (< 640px) */
@@ -1066,7 +1069,7 @@ export class DawSynthElement extends BaseElement {
         }
 
         /* 2. Progressive Enhancement: Tablet (>= 640px) */
-        @container scdaw-synth (min-width: 640px) {
+        @container shadow-claw-daw-synth (min-width: 640px) {
           .scdaw-synth__selectors {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
@@ -1092,7 +1095,7 @@ export class DawSynthElement extends BaseElement {
         }
 
         /* 3. Progressive Enhancement: Desktop (>= 1024px) */
-        @container scdaw-synth (min-width: 1024px) {
+        @container shadow-claw-daw-synth (min-width: 1024px) {
           .scdaw-synth__header {
             flex-direction: row;
             align-items: flex-end;
@@ -1124,7 +1127,7 @@ export class DawSynthElement extends BaseElement {
           }
         }
       </style>
-      <div class="scdaw-synth daw-panel" role="region" aria-label="Synthesizer Workbench">
+      <div class="shadow-claw-daw-synth daw-panel" role="region" aria-label="Synthesizer Workbench">
         <div class="scdaw-synth__header">
           <div class="scdaw-synth__selectors">
             <label class="scdaw-synth__field">
@@ -1294,7 +1297,7 @@ export class DawSynthElement extends BaseElement {
       });
 
     // Knobs: live ramp on input, commit on change, reset on reset
-    this.shadowRoot.querySelectorAll("scdaw-knob").forEach((knob) => {
+    this.shadowRoot.querySelectorAll("shadow-claw-daw-knob").forEach((knob) => {
       knob.addEventListener("input", (e) => {
         if (!trackId) return;
         const param = knob.dataset.param;
@@ -1484,9 +1487,4 @@ export class DawSynthElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-synth")
-) {
-  customElements.define("scdaw-synth", DawSynthElement);
-}
+defineElement("shadow-claw-daw-synth", ShadowClawDawSynth);

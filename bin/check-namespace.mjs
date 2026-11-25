@@ -6,7 +6,7 @@
  *
  * Validates:
  * - All tools start with "scdaw_"
- * - All custom elements start with "scdaw-"
+ * - All custom elements start with "shadow-claw-daw-"
  * - All broadcast channels start with "scdaw-"
  * - Pinned workbench page is "/pages/main/index.html"
  */
@@ -48,10 +48,10 @@ export function checkNamespaceIsolation() {
   // 2. Custom Elements Namespaces
   report.elements = dawConfig.customElements?.allowedElements || [];
   for (const el of report.elements) {
-    if (!el.startsWith("scdaw-")) {
+    if (!el.startsWith("shadow-claw-daw-")) {
       report.namingViolations.push(el);
       issues.push(
-        `Custom element naming violation: "${el}" must start with "scdaw-".`,
+        `Custom element naming violation: "${el}" must start with "shadow-claw-daw-".`,
       );
     }
   }
@@ -72,7 +72,7 @@ export function checkNamespaceIsolation() {
     if (!ch.startsWith("scdaw-")) {
       report.namingViolations.push(ch);
       issues.push(
-        `Broadcast channel naming violation: "${ch}" must start with "scdaw-".`,
+        `Broadcast channel naming violation: "${ch}" must start with "shadow-claw-daw-".`,
       );
     }
   }

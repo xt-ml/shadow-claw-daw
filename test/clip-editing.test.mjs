@@ -14,7 +14,7 @@ import {
   calculateClipFadeHandleDrag,
   renderClipFadeOverlaySvg,
   setupClipInteraction,
-} from "../.agents/scripts/components/scdaw-timeline.js";
+} from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
 import {
   FakeAudioContext,
@@ -499,7 +499,10 @@ test("Phase 1.4: Timeline fade drag helper, SVG overlay, keyboard split/duplicat
   ]);
 
   const timelineSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-timeline.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-timeline.js",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.match(timelineSrc, /scdaw-timeline__fade-handle--in/);

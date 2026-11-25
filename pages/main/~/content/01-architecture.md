@@ -38,6 +38,6 @@ Daw is built upon a 4-tier modular architecture designed for maximum performance
    - `scdaw-state` event broadcasting keeping detached UI surfaces synchronized at 10 Hz.
    - Native ModelContext API registration for all 50 `scdaw_*` tools.
 
-4. **Mobile-First Web Component Workbench (`scdaw-element.js`, `components/scdaw-*.js`)**:
-   - 15 encapsulated Custom Elements (`<scdaw-workbench>`, `<scdaw-transport>`, `<scdaw-browser>`, `<scdaw-timeline>`, `<scdaw-editor>`, `<scdaw-wave-editor>`, `<scdaw-spectrum>`, `<scdaw-sequencer>`, `<scdaw-synth>`, `<scdaw-devices>`, `<scdaw-mixer>`, `<scdaw-knob>`, `<scdaw-resize-handle>`, `<scdaw-statusbar>`, `<scdaw-midi-keyboard>`).
+4. **Mobile-First Web Component Workbench (`shadow-claw-daw-element.js`, `components/scdaw-*.js`)**:
+   - 15 encapsulated Custom Elements (`<shadow-claw-daw-workbench>`, `<shadow-claw-daw-transport>`, `<shadow-claw-daw-browser>`, `<shadow-claw-daw-timeline>`, `<shadow-claw-daw-editor>`, `<shadow-claw-daw-wave-editor>`, `<shadow-claw-daw-spectrum>`, `<shadow-claw-daw-sequencer>`, `<shadow-claw-daw-synth>`, `<shadow-claw-daw-devices>`, `<shadow-claw-daw-mixer>`, `<shadow-claw-daw-knob>`, `<shadow-claw-daw-resize-handle>`, `<shadow-claw-daw-status-bar>`, `<shadow-claw-daw-midi-keyboard>`).
    - Mobile-first responsive CSS Container Queries (`@container`), `@supports not (container-type: inline-size)` fallbacks, `@media (pointer: coarse)` 44×44px touch targets, strict BEM naming, WCAG 2.1 AA ARIA landmarks, and Shadow DOM styling using inherited `--shadow-claw-*` design tokens.

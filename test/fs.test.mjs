@@ -267,10 +267,10 @@ test("scdaw-engine: bounce, exportMidi, and bounceStems save to conversation OPF
   assert.ok(names.includes("track-stems.zip"));
 });
 
-test("scdaw-workbench UI: Save/Export dialog supports destination conversation selection & OPFS saving", async () => {
+test("shadow-claw-daw-workbench UI: Save/Export dialog supports destination conversation selection & OPFS saving", async () => {
   const workbenchSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -303,10 +303,10 @@ test("scdaw-workbench UI: Save/Export dialog supports destination conversation s
   );
 });
 
-test("scdaw-workbench UI: Open/Load dialog allows loading FROM any conversation's files", async () => {
+test("shadow-claw-daw-workbench UI: Open/Load dialog allows loading FROM any conversation's files", async () => {
   const workbenchSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -346,9 +346,12 @@ test("scdaw-workbench UI: Open/Load dialog allows loading FROM any conversation'
   );
 });
 
-test("scdaw-browser UI: contains Files tab for browsing conversation files", async () => {
+test("shadow-claw-daw-browser UI: contains Files tab for browsing conversation files", async () => {
   const browserSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-browser.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-browser.js",
+      import.meta.url,
+    ),
     "utf-8",
   );
 
@@ -381,6 +384,7 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
       },
     };
     globalThis.document = {
+      getElementById: () => null,
       querySelector: (selector) => {
         if (selector === "base[href]") {
           return {
@@ -396,11 +400,15 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
     assert.equal(getOpfsRootName(), "shadowclaw-shadow-claw-daw");
     assert.equal(getDbName(), "shadowclaw-shadow-claw-daw");
 
-    // 2. Without base tag but on subpath pathname
-    globalThis.document = { querySelector: () => null };
+    // 2. Without base tag but on single-segment subpath pathname
+    globalThis.__applyBasePathCacheReset?.();
+    globalThis.document = {
+      getElementById: () => null,
+      querySelector: () => null,
+    };
     globalThis.window = {
       location: {
-        pathname: "/shadow-claw-daw/index.html",
+        pathname: "/shadow-claw-daw/",
         origin: "https://xt-ml.github.io",
       },
     };
@@ -408,6 +416,7 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
     assert.equal(getOpfsRootName(), "shadowclaw-shadow-claw-daw");
 
     // 3. At root domain
+    globalThis.__applyBasePathCacheReset?.();
     globalThis.window = {
       location: {
         pathname: "/pages/main/index.html",
@@ -419,6 +428,7 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
     assert.equal(getDbName(), LEGACY_DB_NAME);
 
     // 4. Explicit deploy id override takes highest priority
+    globalThis.__applyBasePathCacheReset?.();
     globalThis.window = {
       __SHADOWCLAW_DEPLOY_ID__: "custom-deploy-site",
       location: {
@@ -429,6 +439,7 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
     assert.equal(getDeploymentNamespace(), "custom-deploy-site");
     assert.equal(getOpfsRootName(), "shadowclaw-custom-deploy-site");
   } finally {
+    globalThis.__applyBasePathCacheReset?.();
     globalThis.window = origWindow;
     globalThis.document = origDocument;
   }

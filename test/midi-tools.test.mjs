@@ -5,13 +5,15 @@ import { TOOLS } from "../bin/tool-manifest.mjs";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
 import { scdaw } from "../.agents/scripts/scdaw-engine.js";
 
-test("shadow-claw.config.json: registers scdaw-midi-keyboard and MIDI tools", async () => {
+test("shadow-claw.config.json: registers shadow-claw-daw-midi-keyboard and MIDI tools", async () => {
   const raw = await fs.readFile("shadow-claw.config.json", "utf8");
   const cfg = JSON.parse(raw);
 
   assert.ok(
-    cfg.customElements.allowedElements.includes("scdaw-midi-keyboard"),
-    "scdaw-midi-keyboard must be in allowedElements",
+    cfg.customElements.allowedElements.includes(
+      "shadow-claw-daw-midi-keyboard",
+    ),
+    "shadow-claw-daw-midi-keyboard must be in allowedElements",
   );
   for (const toolName of [
     "scdaw_get_midi_status",

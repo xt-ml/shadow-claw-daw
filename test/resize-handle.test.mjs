@@ -4,20 +4,20 @@ import {
   clampSize,
   computeKeyboardResize,
   getAriaAttributes,
-} from "../.agents/scripts/components/scdaw-resize-handle.js";
+} from "../.agents/scripts/components/shadow-claw-daw-resize-handle.js";
 import {
   resolveWorkbenchResponsiveLayout,
   resolveWorkbenchButtonStates,
-} from "../.agents/scripts/components/scdaw-workbench.js";
+} from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
 
-test("scdaw-resize-handle: clampSize clamps values within min and max boundaries", () => {
+test("shadow-claw-daw-resize-handle: clampSize clamps values within min and max boundaries", () => {
   assert.equal(clampSize(250, 150, 400), 250);
   assert.equal(clampSize(100, 150, 400), 150);
   assert.equal(clampSize(500, 150, 400), 400);
   assert.equal(clampSize(NaN, 150, 400), 150);
 });
 
-test("scdaw-resize-handle: computeKeyboardResize handles Arrow keys, Shift multipliers, and Home/End", () => {
+test("shadow-claw-daw-resize-handle: computeKeyboardResize handles Arrow keys, Shift multipliers, and Home/End", () => {
   const min = 160;
   const max = 500;
   const current = 250;
@@ -88,7 +88,7 @@ test("scdaw-resize-handle: computeKeyboardResize handles Arrow keys, Shift multi
   );
 });
 
-test("scdaw-resize-handle: getAriaAttributes generates compliant WCAG separator attributes", () => {
+test("shadow-claw-daw-resize-handle: getAriaAttributes generates compliant WCAG separator attributes", () => {
   const attrs = getAriaAttributes(
     "vertical",
     240,
@@ -105,7 +105,7 @@ test("scdaw-resize-handle: getAriaAttributes generates compliant WCAG separator 
   assert.equal(attrs["aria-label"], "Resize Browser panel");
 });
 
-test("scdaw-workbench: resolveWorkbenchResponsiveLayout adapts mobile-first and full-width views", () => {
+test("shadow-claw-daw-workbench: resolveWorkbenchResponsiveLayout adapts mobile-first and full-width views", () => {
   // 1. Mobile container (< 640px)
   const mobile = resolveWorkbenchResponsiveLayout({
     containerWidth: 420,
@@ -243,7 +243,7 @@ test("scdaw-workbench: resolveWorkbenchResponsiveLayout adapts mobile-first and 
   assert.equal(mixerFull.showMixerHandle, false);
 });
 
-test("scdaw-workbench: resolveWorkbenchButtonStates accurately tracks and disables Browser and Mixer buttons in full-width and mobile modes", () => {
+test("shadow-claw-daw-workbench: resolveWorkbenchButtonStates accurately tracks and disables Browser and Mixer buttons in full-width and mobile modes", () => {
   // 1. Studio layout with both Browser and Mixer docks enabled
   const studioBothOpen = resolveWorkbenchButtonStates({
     viewMode: "studio",
@@ -381,32 +381,32 @@ test("scdaw-workbench: resolveWorkbenchButtonStates accurately tracks and disabl
   assert.equal(defaults.mixer.disabled, false);
 });
 
-test("scdaw-workbench: mixer-handle specifies invert attribute so dragging left expands the right mixer panel", async () => {
+test("shadow-claw-daw-workbench: mixer-handle specifies invert attribute so dragging left expands the right mixer panel", async () => {
   const fs = await import("node:fs/promises");
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
   );
   assert.match(
     workbenchContent,
-    /<scdaw-resize-handle[^>]+id=["']mixer-handle["'][^>]*\sinvert/,
+    /<shadow-claw-daw-resize-handle[^>]+id=["']mixer-handle["'][^>]*\sinvert/,
     "mixer-handle must have the invert attribute to ensure dragging left expands the mixer and shrinks center stack",
   );
   assert.doesNotMatch(
     workbenchContent,
-    /<scdaw-resize-handle[^>]+id=["']browser-handle["'][^>]*\sinvert/,
+    /<shadow-claw-daw-resize-handle[^>]+id=["']browser-handle["'][^>]*\sinvert/,
     "browser-handle must not have the invert attribute because dragging right expands the browser",
   );
 });
 
-test("scdaw-workbench: avoids LaunchParams.prototype.files getter Illegal invocation and eliminates !important resize handle CSS overrides", async () => {
+test("shadow-claw-daw-workbench: avoids LaunchParams.prototype.files getter Illegal invocation and eliminates !important resize handle CSS overrides", async () => {
   const fs = await import("node:fs/promises");
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -424,11 +424,11 @@ test("scdaw-workbench: avoids LaunchParams.prototype.files getter Illegal invoca
     "Must check 'files' in window.LaunchParams.prototype using the 'in' operator",
   );
 
-  // 2. Must not force scdaw-resize-handle visible via display: inline-flex !important
+  // 2. Must not force shadow-claw-daw-resize-handle visible via display: inline-flex !important
   assert.doesNotMatch(
     workbenchContent,
-    /scdaw-resize-handle\s*\{\s*display:\s*inline-flex\s*!important/,
-    "scdaw-resize-handle must not use display: inline-flex !important, which overrides hidden state in Full views",
+    /shadow-claw-daw-resize-handle\s*\{\s*display:\s*inline-flex\s*!important/,
+    "shadow-claw-daw-resize-handle must not use display: inline-flex !important, which overrides hidden state in Full views",
   );
 
   // 3. Must not lock #mixer-container to var(--mixer-w) in CSS so Mixer (Full) can expand to 100% width
@@ -439,9 +439,9 @@ test("scdaw-workbench: avoids LaunchParams.prototype.files getter Illegal invoca
   );
 });
 
-test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Toggle Mixer/Browser, and Full views hide inactive panels and resize handles", async () => {
-  const { DawWorkbenchElement } =
-    await import("../.agents/scripts/components/scdaw-workbench.js");
+test("shadow-claw-daw-workbench: ShadowClawDawWorkbench lifecycle, initial Studio state, Toggle Mixer/Browser, and Full views hide inactive panels and resize handles", async () => {
+  const { ShadowClawDawWorkbench } =
+    await import("../.agents/scripts/components/shadow-claw-daw-workbench.js");
 
   // Simulate Chromium's Web IDL LaunchParams.prototype.files getter that throws Illegal invocation on prototype access
   const prevWindow = globalThis.window;
@@ -462,7 +462,7 @@ test("scdaw-workbench: DawWorkbenchElement lifecycle, initial Studio state, Togg
   };
 
   try {
-    const el = new DawWorkbenchElement();
+    const el = new ShadowClawDawWorkbench();
 
     // Minimal reactive DOM mock for shadowRoot elements
     const elements = new Map();

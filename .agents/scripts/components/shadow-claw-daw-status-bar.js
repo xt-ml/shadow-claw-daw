@@ -1,16 +1,19 @@
 /**
- * .agents/scripts/components/scdaw-statusbar.js
+ * .agents/scripts/components/shadow-claw-daw-status-bar.js
  *
- * Bottom Telemetry & Status Bar Web Component (<scdaw-statusbar>).
- * Ported concepts from openDAW Footer & PerformanceStats.
- * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
+ * Bottom Telemetry & Status Bar Web Component (<shadow-claw-daw-status-bar>).
+ * Composes ShadowClaw's shared `<shadow-claw-status-bar>` chrome while binding
+ * DAW audio telemetry, project summary, bounce readouts, MIDI status, and error banners.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import "shadow-claw/components/shadow-claw-status-bar";
+import {
+  ShadowClawElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 export function formatTelemetryStatus(
   state = {},
@@ -49,16 +52,14 @@ export function formatTelemetryStatus(
   };
 }
 
-export class DawStatusBarElement extends BaseElement {
+export class ShadowClawDawStatusBar extends ShadowClawElement {
   constructor() {
     super();
-    if (this.attachShadow) {
-      this.attachShadow({ mode: "open" });
-    }
-    this._rafId = null;
+    this._dispose = null;
   }
 
   connectedCallback() {
+    this.disposeCleanups();
     this.render();
     this._dispose = effect(() => {
       scdaw.state.get();
@@ -66,11 +67,20 @@ export class DawStatusBarElement extends BaseElement {
       scdaw.midi?.state?.get?.();
       this._sync();
     });
+    this.addCleanup(() => {
+      if (this._dispose) {
+        this._dispose();
+        this._dispose = null;
+      }
+    });
   }
 
   disconnectedCallback() {
-    if (this._rafId) cancelAnimationFrame(this._rafId);
-    if (this._dispose) this._dispose();
+    if (this._dispose) {
+      this._dispose();
+      this._dispose = null;
+    }
+    super.disconnectedCallback();
   }
 
   _sync() {
@@ -80,11 +90,21 @@ export class DawStatusBarElement extends BaseElement {
     const m = scdaw.midi?.state?.get?.();
     const formatted = formatTelemetryStatus(s, p, m);
 
+    const sb = this.shadowRoot.getElementById("scdaw-sb");
     const audioIndicator = this.shadowRoot.getElementById("audio-stat");
     const projIndicator = this.shadowRoot.getElementById("proj-stat");
     const bounceIndicator = this.shadowRoot.getElementById("bounce-stat");
     const midiIndicator = this.shadowRoot.getElementById("midi-stat");
     const errorIndicator = this.shadowRoot.getElementById("error-stat");
+
+    if (sb) {
+      const errMsg = formatted.errorText ? `⚠ ${formatted.errorText}` : "";
+      if (typeof sb.setAttribute === "function") {
+        sb.setAttribute("message", errMsg);
+      } else {
+        sb.message = errMsg;
+      }
+    }
 
     if (audioIndicator) {
       audioIndicator.textContent = `Audio: ${s.audio}`;
@@ -127,7 +147,7 @@ export class DawStatusBarElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-statusbar;
+          container-name: shadow-claw-daw-status-bar;
         }
 
         /* Mobile First Base Styles (Stacked rows) */
@@ -190,7 +210,7 @@ export class DawStatusBarElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Tablet and Desktop (>= 640px) */
-        @container scdaw-statusbar (min-width: 640px) {
+        @container shadow-claw-daw-status-bar (min-width: 640px) {
           .scdaw-statusbar,
           .statusbar {
             flex-direction: row;
@@ -222,21 +242,23 @@ export class DawStatusBarElement extends BaseElement {
           }
         }
       </style>
-      <div class="scdaw-statusbar statusbar" role="status" aria-label="Audio telemetry and project status" aria-live="polite">
-        <div class="scdaw-statusbar__group stat-item">
-          <span id="audio-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--audio" style="color:var(--warning); font-weight:700;">Audio: ${s.audio}</span>
-          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
-          <span id="proj-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--project">${p.name} · ${p.bpm} BPM</span>
+      <shadow-claw-status-bar id="scdaw-sb" label="Audio telemetry and project status" role="status">
+        <div slot="metrics" class="scdaw-statusbar statusbar" aria-live="polite">
+          <div class="scdaw-statusbar__group stat-item">
+            <span id="audio-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--audio" style="color:var(--warning); font-weight:700;">Audio: ${s.audio}</span>
+            <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+            <span id="proj-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--project">${p.name} · ${p.bpm} BPM</span>
+          </div>
+          <div class="scdaw-statusbar__group stat-item">
+            <button id="error-stat" type="button" class="scdaw-statusbar__error hidden" hidden aria-label="Dismiss active error"></button>
+            <span id="bounce-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--bounce">${s.lastBounce ? `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s` : "No Bounces"}</span>
+            <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+            <span id="midi-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--midi">MIDI: --</span>
+            <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
+            <span class="scdaw-statusbar__stat scdaw-statusbar__stat--lock" style="color:var(--accent);">Leader Lock OK</span>
+          </div>
         </div>
-        <div class="scdaw-statusbar__group stat-item">
-          <button id="error-stat" type="button" class="scdaw-statusbar__error hidden" hidden aria-label="Dismiss active error"></button>
-          <span id="bounce-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--bounce">${s.lastBounce ? `Last Bounce: ${s.lastBounce.durationSec.toFixed(1)}s` : "No Bounces"}</span>
-          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
-          <span id="midi-stat" class="scdaw-statusbar__stat scdaw-statusbar__stat--midi">MIDI: --</span>
-          <span class="scdaw-statusbar__sep" aria-hidden="true">|</span>
-          <span class="scdaw-statusbar__stat scdaw-statusbar__stat--lock" style="color:var(--accent);">Leader Lock OK</span>
-        </div>
-      </div>
+      </shadow-claw-status-bar>
     `;
     this.shadowRoot
       .getElementById("error-stat")
@@ -246,9 +268,4 @@ export class DawStatusBarElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-statusbar")
-) {
-  customElements.define("scdaw-statusbar", DawStatusBarElement);
-}
+defineElement("shadow-claw-daw-status-bar", ShadowClawDawStatusBar);

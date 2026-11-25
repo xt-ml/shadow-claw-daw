@@ -90,7 +90,7 @@ test("Workbench scripts: shadow-claw.config.json declares scdaw custom element s
   const scripts = config.customElements?.scripts || [];
 
   const elementScript = scripts.find((s) =>
-    s.src?.includes("scdaw-element.js"),
+    s.src?.includes("shadow-claw-daw-element.js"),
   );
   const adapterScript = scripts.find((s) =>
     s.src?.includes("scdaw-adapter.js"),
@@ -98,7 +98,7 @@ test("Workbench scripts: shadow-claw.config.json declares scdaw custom element s
 
   assert.ok(
     elementScript,
-    "scdaw-element.js must be in customElements.scripts",
+    "shadow-claw-daw-element.js must be in customElements.scripts",
   );
   assert.equal(elementScript.global, true);
   assert.equal(elementScript.autoload, true);
@@ -117,7 +117,7 @@ test("Workbench scripts: shadow-claw.config.json declares scdaw custom element s
   assert.equal(config.pages?.defaultPinnedPage, "/pages/main/index.html");
 });
 
-test("Pages: main index.html hosts scdaw-workbench directly as the root DAW without intermediate portal", () => {
+test("Pages: main index.html hosts shadow-claw-daw-workbench directly as the root DAW without intermediate portal", () => {
   const indexPath = resolve(ROOT, "pages/main/index.html");
   assert.ok(existsSync(indexPath), "pages/main/index.html must exist");
 
@@ -129,7 +129,7 @@ test("Pages: main index.html hosts scdaw-workbench directly as the root DAW with
   );
   assert.match(
     indexContent,
-    /<scdaw-workbench[\s\S]*?\bdata-no-swipe=["']true["'][\s\S]*?\bdata-no-nav=["']true["'][\s\S]*?><\/scdaw-workbench>/,
+    /<shadow-claw-daw-workbench[\s\S]*?\bdata-no-swipe=["']true["'][\s\S]*?\bdata-no-nav=["']true["'][\s\S]*?><\/shadow-claw-daw-workbench>/,
   );
   assert.doesNotMatch(indexContent, /Launch Interactive Workbench/);
   assert.doesNotMatch(indexContent, /portal-container/);
@@ -150,7 +150,7 @@ test("Pages: main index.html hosts scdaw-workbench directly as the root DAW with
 
   const workbenchPath = resolve(
     ROOT,
-    ".agents/scripts/components/scdaw-workbench.js",
+    ".agents/scripts/components/shadow-claw-daw-workbench.js",
   );
   const wbContent = readFileSync(workbenchPath, "utf8");
   assert.match(wbContent, /ShadowClaw DAW/);

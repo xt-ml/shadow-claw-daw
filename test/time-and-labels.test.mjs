@@ -22,7 +22,7 @@ import {
 } from "../.agents/scripts/scdaw.js";
 import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
-import { computeLabelLayout } from "../.agents/scripts/components/scdaw-timeline.js";
+import { computeLabelLayout } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,
@@ -445,7 +445,10 @@ test("Phase 5.4: Mobile-first ARIA Timeline label lane and Wave Editor Phase 5 c
   assert.equal(layout[1].isRegion, true);
 
   const timelineSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-timeline.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-timeline.js",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.match(timelineSrc, /scdaw-timeline__label-track/);
@@ -456,7 +459,7 @@ test("Phase 5.4: Mobile-first ARIA Timeline label lane and Wave Editor Phase 5 c
 
   const waveSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-wave-editor.js",
+      "../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
       import.meta.url,
     ),
     "utf8",

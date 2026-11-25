@@ -56,7 +56,7 @@ import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
 import {
   computeTimelineTicks,
   calculateTimelineSeekPpqn,
-} from "../.agents/scripts/components/scdaw-timeline.js";
+} from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 
 test("BPM Range (20-300): constants, validateProject, deserializeProject, and set_transport accept slow choral & fast compound tempos", () => {
   assert.equal(MIN_BPM, 20);

@@ -76,12 +76,18 @@ test("Adapter: handleToolDispatch dispatches status, project, transport, and sur
     element: "workbench",
   });
   assert.ok(surface.ok);
-  assert.equal(surface.element, "<scdaw-workbench></scdaw-workbench>");
+  assert.equal(
+    surface.element,
+    "<shadow-claw-daw-workbench></shadow-claw-daw-workbench>",
+  );
 
   const mixerSurface = await handleToolDispatch("scdaw_render_surface", {
     element: "mixer",
   });
-  assert.equal(mixerSurface.element, "<scdaw-mixer></scdaw-mixer>");
+  assert.equal(
+    mixerSurface.element,
+    "<shadow-claw-daw-mixer></shadow-claw-daw-mixer>",
+  );
 
   const presetRes = await handleToolDispatch("scdaw_apply_preset", {
     trackId: "trk_bass",

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { SHARED_STYLES } from "../.agents/scripts/components/scdaw-styles.js";
+import { SHARED_STYLES } from "../.agents/scripts/components/shadow-claw-daw-styles.js";
 import { scdaw } from "../.agents/scripts/scdaw-engine.js";
 import {
   mapNormalizedToValue,
@@ -10,11 +10,11 @@ import {
   calculateKnobValueFromPointer,
   calculateKnobValueFromWheel,
   setupKnobInteraction,
-} from "../.agents/scripts/components/scdaw-knob.js";
+} from "../.agents/scripts/components/shadow-claw-daw-knob.js";
 import {
   filterBrowserItems,
-  DawBrowserElement,
-} from "../.agents/scripts/components/scdaw-browser.js";
+  ShadowClawDawBrowser,
+} from "../.agents/scripts/components/shadow-claw-daw-browser.js";
 import {
   computeTimelineTicks,
   computeClipOverlapLayout,
@@ -24,7 +24,7 @@ import {
   setupClipInteraction,
   calculateTrackReorderIndex,
   setupTrackReorderInteraction,
-} from "../.agents/scripts/components/scdaw-timeline.js";
+} from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import {
   pitchToPianoRollRow,
   pianoRollRowToPitch,
@@ -33,13 +33,13 @@ import {
   resolveEditorScrollPosition,
   computeStepVelocity,
   calculateVelocityFromPointer,
-} from "../.agents/scripts/components/scdaw-editor.js";
+} from "../.agents/scripts/components/shadow-claw-daw-editor.js";
 import {
   getDeviceChainForTrack,
   renderDeviceControls,
   shouldPreserveDevicesDom,
-  DawDevicesElement,
-} from "../.agents/scripts/components/scdaw-devices.js";
+  ShadowClawDawDevices,
+} from "../.agents/scripts/components/shadow-claw-daw-devices.js";
 import {
   computeMeterSegments,
   formatDb,
@@ -47,7 +47,7 @@ import {
   calculateSliderValueFromWheel,
   shouldPreserveMixerDom,
   setupVolumeSlider,
-} from "../.agents/scripts/components/scdaw-mixer.js";
+} from "../.agents/scripts/components/shadow-claw-daw-mixer.js";
 import {
   formatPosition,
   calculateTransportWheelValue,
@@ -55,28 +55,28 @@ import {
   calculateBpmDragValue,
   setupBpmDragControl,
   shouldPromptRecordOptions,
-} from "../.agents/scripts/components/scdaw-transport.js";
-import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
+} from "../.agents/scripts/components/shadow-claw-daw-transport.js";
+import { formatTelemetryStatus } from "../.agents/scripts/components/shadow-claw-daw-status-bar.js";
 import {
   resolveWorkbenchPanels,
   resolveWorkbenchResponsiveLayout,
   resolveDropAction,
   resolveWorkbenchFullscreenState,
   setupWorkbenchFullscreen,
-} from "../.agents/scripts/components/scdaw-workbench.js";
+} from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
 import {
   getSynthSectionsForInstrument,
   shouldPreserveSynthDom,
   computeAdsrSvgPath,
-  DawSynthElement,
-} from "../.agents/scripts/components/scdaw-synth.js";
+  ShadowClawDawSynth,
+} from "../.agents/scripts/components/shadow-claw-daw-synth.js";
 import {
   clampSize,
   computeKeyboardResize,
   getAriaAttributes,
-} from "../.agents/scripts/components/scdaw-resize-handle.js";
+} from "../.agents/scripts/components/shadow-claw-daw-resize-handle.js";
 
-test("scdaw-knob: maps normalized 0-1 range to linear and exponential values accurately", () => {
+test("shadow-claw-daw-knob: maps normalized 0-1 range to linear and exponential values accurately", () => {
   // Linear volume fader (0 to 1.5)
   assert.equal(mapNormalizedToValue(0.0, 0, 1.5, "linear"), 0);
   assert.equal(mapNormalizedToValue(1.0, 0, 1.5, "linear"), 1.5);
@@ -96,7 +96,7 @@ test("scdaw-knob: maps normalized 0-1 range to linear and exponential values acc
   assert.equal(formatValueWithUnit(-6, "dB"), "-6 dB");
 });
 
-test("scdaw-knob: calculateKnobValueFromPointer computes linear and exponential adjustments from pointer drag", () => {
+test("shadow-claw-daw-knob: calculateKnobValueFromPointer computes linear and exponential adjustments from pointer drag", () => {
   // Linear upward drag (e.g. startY = 100, currentY = 80 -> deltaY = +20)
   // startNorm = 0.5, sensitivity = 0.005 -> newNorm = 0.5 + 20 * 0.005 = 0.6
   const valUp = calculateKnobValueFromPointer({
@@ -164,7 +164,7 @@ test("scdaw-knob: calculateKnobValueFromPointer computes linear and exponential 
   assert.equal(valNoCoords, 5);
 });
 
-test("scdaw-knob: calculateKnobValueFromWheel adjusts knob values with step, clamping, and shift fine-tuning", () => {
+test("shadow-claw-daw-knob: calculateKnobValueFromWheel adjusts knob values with step, clamping, and shift fine-tuning", () => {
   // Wheel up (deltaY < 0) increases value
   const nextUp = calculateKnobValueFromWheel({
     currentValue: 5,
@@ -214,7 +214,7 @@ test("scdaw-knob: calculateKnobValueFromWheel adjusts knob values with step, cla
   assert.ok(shiftDelta > 0 && shiftDelta < normalDelta);
 });
 
-test("scdaw-knob: setupKnobInteraction binds pointer dragging, pointer capture, touch prevention, and value updates", () => {
+test("shadow-claw-daw-knob: setupKnobInteraction binds pointer dragging, pointer capture, touch prevention, and value updates", () => {
   const events = [];
   const capturedPointerIds = [];
   const releasedPointerIds = [];
@@ -300,7 +300,7 @@ test("scdaw-knob: setupKnobInteraction binds pointer dragging, pointer capture, 
   cleanup?.();
 });
 
-test("scdaw-browser: filters presets, instruments, and FX items by category tab and query", () => {
+test("shadow-claw-daw-browser: filters presets, instruments, and FX items by category tab and query", () => {
   const items = [
     { id: "p1", name: "Techno Bass", type: "preset", category: "Bass" },
     { id: "p2", name: "Pop Pluck", type: "preset", category: "Pluck" },
@@ -324,8 +324,8 @@ test("scdaw-browser: filters presets, instruments, and FX items by category tab 
   assert.equal(queryMatch[0].name, "Techno Bass");
 });
 
-test("scdaw-browser: exposes Techno-Bass (Groove) Genre Template without duplicate Techno Bass Synth Preset", () => {
-  const browserItems = DawBrowserElement.prototype._getItems.call({
+test("shadow-claw-daw-browser: exposes Techno-Bass (Groove) Genre Template without duplicate Techno Bass Synth Preset", () => {
+  const browserItems = ShadowClawDawBrowser.prototype._getItems.call({
     _activeTab: "presets",
     _conversationFiles: [],
   });
@@ -345,7 +345,7 @@ test("scdaw-browser: exposes Techno-Bass (Groove) Genre Template without duplica
   assert.equal(genreTechno.category, "Genre Template");
 });
 
-test("scdaw-timeline: computes timeline bars and beat ticks based on signature", () => {
+test("shadow-claw-daw-timeline: computes timeline bars and beat ticks based on signature", () => {
   const ticks = computeTimelineTicks(2, [4, 4]);
   assert.equal(ticks.length, 8); // 2 bars * 4 quarter beats = 8 ticks
   assert.equal(ticks[0].bar, 1);
@@ -354,7 +354,7 @@ test("scdaw-timeline: computes timeline bars and beat ticks based on signature",
   assert.equal(ticks[4].beat, 1);
 });
 
-test("scdaw-timeline: calculateClipDragPosition moves and snaps clip to beats with shift-key fine tuning", () => {
+test("shadow-claw-daw-timeline: calculateClipDragPosition moves and snaps clip to beats with shift-key fine tuning", () => {
   // 400px lane, 16 beats total = 25px per beat
   const laneWidth = 400;
   const totalBeats = 16;
@@ -439,7 +439,7 @@ test("scdaw-timeline: calculateClipDragPosition moves and snaps clip to beats wi
   assert.equal(posShiftFree, 1.92);
 });
 
-test("scdaw-timeline: calculateClipResize resizes right duration and trims left start/offset", () => {
+test("shadow-claw-daw-timeline: calculateClipResize resizes right duration and trims left start/offset", () => {
   const laneWidth = 400;
   const totalBeats = 16; // 25 px/beat
 
@@ -598,7 +598,7 @@ test("scdaw-timeline: calculateClipResize resizes right duration and trims left 
   assert.equal(resShiftFree.duration, 4.92);
 });
 
-test("scdaw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift fine tuning, and alt resizing", () => {
+test("shadow-claw-daw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift fine tuning, and alt resizing", () => {
   // Move right 1 beat
   const n1 = calculateClipKeyboardNudge({
     currentBeat: 4,
@@ -661,7 +661,7 @@ test("scdaw-timeline: calculateClipKeyboardNudge supports arrow nudging, shift f
   assert.deepEqual(n6, { action: "move", time: 0 });
 });
 
-test("scdaw-timeline: setupClipInteraction binds pointer dragging, edge resizing, and keyboard actions", () => {
+test("shadow-claw-daw-timeline: setupClipInteraction binds pointer dragging, edge resizing, and keyboard actions", () => {
   const updates = [];
   let removeCalled = false;
   const classList = new Set();
@@ -775,7 +775,7 @@ test("scdaw-timeline: setupClipInteraction binds pointer dragging, edge resizing
   assert.equal(Object.keys(listeners).length, 0);
 });
 
-test("scdaw-timeline: calculateTrackReorderIndex and setupTrackReorderInteraction support touch drag, keyboard arrows, and boundary clamping", () => {
+test("shadow-claw-daw-timeline: calculateTrackReorderIndex and setupTrackReorderInteraction support touch drag, keyboard arrows, and boundary clamping", () => {
   // 1. calculateTrackReorderIndex math
   // rowHeight = 48, totalTracks = 4
   // Downward drag by 55px -> moves down 1 row
@@ -878,7 +878,7 @@ test("scdaw-timeline: calculateTrackReorderIndex and setupTrackReorderInteractio
   assert.equal(Object.keys(listeners).length, 0);
 });
 
-test("scdaw-editor: maps MIDI pitch to piano roll row and back", () => {
+test("shadow-claw-daw-editor: maps MIDI pitch to piano roll row and back", () => {
   // C4 = 60
   const rowC4 = pitchToPianoRollRow(60);
   assert.equal(pianoRollRowToPitch(rowC4), 60);
@@ -892,7 +892,7 @@ test("scdaw-editor: maps MIDI pitch to piano roll row and back", () => {
   );
 });
 
-test("scdaw-editor: computeCellActiveMap accurately indexes active notes by pitch and step", () => {
+test("shadow-claw-daw-editor: computeCellActiveMap accurately indexes active notes by pitch and step", () => {
   const notes = [
     { pitch: 36, position: 0, duration: 480, velocity: 0.8 },
     { pitch: 40, position: 960, duration: 480, velocity: 0.8 }, // step 4 (960 PPQN)
@@ -904,7 +904,7 @@ test("scdaw-editor: computeCellActiveMap accurately indexes active notes by pitc
   assert.equal(activeMap.has("60:0"), false);
 });
 
-test("scdaw-editor: shouldPreserveEditorDom prevents tearing down DOM and resetting scroll on note edits", () => {
+test("shadow-claw-daw-editor: shouldPreserveEditorDom prevents tearing down DOM and resetting scroll on note edits", () => {
   // Same track, same step count, skeleton already rendered -> preserve DOM (in-place update)
   assert.equal(
     shouldPreserveEditorDom({
@@ -954,7 +954,7 @@ test("scdaw-editor: shouldPreserveEditorDom prevents tearing down DOM and resett
   );
 });
 
-test("scdaw-editor: resolveEditorScrollPosition preserves scroll position and centers track notes on first view", () => {
+test("shadow-claw-daw-editor: resolveEditorScrollPosition preserves scroll position and centers track notes on first view", () => {
   // Existing scroll position is strictly preserved
   assert.equal(
     resolveEditorScrollPosition({
@@ -979,7 +979,7 @@ test("scdaw-editor: resolveEditorScrollPosition preserves scroll position and ce
   );
 });
 
-test("scdaw-devices: constructs device chain for track (MIDI FX -> Instrument -> Audio FX)", () => {
+test("shadow-claw-daw-devices: constructs device chain for track (MIDI FX -> Instrument -> Audio FX)", () => {
   const track = {
     id: "trk_1",
     name: "Lead",
@@ -999,7 +999,7 @@ test("scdaw-devices: constructs device chain for track (MIDI FX -> Instrument ->
   assert.equal(chain[2].type, "delay");
 });
 
-test("scdaw-devices: shouldPreserveDevicesDom determines when device rack DOM should be updated in-place vs re-rendered", () => {
+test("shadow-claw-daw-devices: shouldPreserveDevicesDom determines when device rack DOM should be updated in-place vs re-rendered", () => {
   const chainA = [
     { role: "instrument", type: "808", params: { decay: 1.2, drive: 0.3 } },
     { role: "audio-fx", type: "delay", params: { id: "fx1", feedback: 0.3 } },
@@ -1091,7 +1091,7 @@ test("scdaw-devices: shouldPreserveDevicesDom determines when device rack DOM sh
   );
 });
 
-test("scdaw-devices: in-place DOM sync preserves active knob dragging without destroying DOM or resetting values", () => {
+test("shadow-claw-daw-devices: in-place DOM sync preserves active knob dragging without destroying DOM or resetting values", () => {
   // Simulate active device rack DOM with knobs
   const knobDecay = {
     dataset: { param: "decay" },
@@ -1106,14 +1106,14 @@ test("scdaw-devices: in-place DOM sync preserves active knob dragging without de
 
   const mockCard = {
     querySelectorAll: (sel) => {
-      if (sel === "scdaw-knob") return [knobDecay, knobGlide];
+      if (sel === "shadow-claw-daw-knob") return [knobDecay, knobGlide];
       return [];
     },
   };
 
   const mockHeaderStrong = { textContent: "Drums" };
 
-  const element = new DawDevicesElement();
+  const element = new ShadowClawDawDevices();
   element.shadowRoot = {
     querySelector: (sel) => {
       if (sel === ".scdaw-devices__header strong") return mockHeaderStrong;
@@ -1151,7 +1151,7 @@ test("scdaw-devices: in-place DOM sync preserves active knob dragging without de
   assert.equal(knobGlide.value, 240);
 });
 
-test("scdaw-devices: omits instrument card when track.instrument is 'none'", () => {
+test("shadow-claw-daw-devices: omits instrument card when track.instrument is 'none'", () => {
   const track = {
     id: "trk_1",
     name: "Lead",
@@ -1167,7 +1167,7 @@ test("scdaw-devices: omits instrument card when track.instrument is 'none'", () 
   assert.equal(chain[1].role, "audio-fx");
 });
 
-test("scdaw-devices: renders '✕' remove button on each device card and dispatches removal commands", () => {
+test("shadow-claw-daw-devices: renders '✕' remove button on each device card and dispatches removal commands", () => {
   const track = {
     id: "trk_drums",
     name: "Drums",
@@ -1210,7 +1210,7 @@ test("scdaw-devices: renders '✕' remove button on each device card and dispatc
       },
     ];
 
-    const element = new DawDevicesElement();
+    const element = new ShadowClawDawDevices();
     element._selectedTrackId = "trk_drums";
     element.shadowRoot = {
       innerHTML: "",
@@ -1271,7 +1271,7 @@ test("scdaw-devices: renders '✕' remove button on each device card and dispatc
   }
 });
 
-test("scdaw-mixer: computes 12-segment meter levels and formats decibels", () => {
+test("shadow-claw-daw-mixer: computes 12-segment meter levels and formats decibels", () => {
   // Clipping / 0 dB
   const topSegments = computeMeterSegments(0, 12);
   assert.equal(topSegments.litCount, 12);
@@ -1291,7 +1291,7 @@ test("scdaw-mixer: computes 12-segment meter levels and formats decibels", () =>
   assert.equal(formatDb(-100), "-∞ dB");
 });
 
-test("scdaw-mixer: calculateSliderValueFromPointer computes vertical fader level from pointer coordinate accurately", () => {
+test("shadow-claw-daw-mixer: calculateSliderValueFromPointer computes vertical fader level from pointer coordinate accurately", () => {
   const rect = { top: 100, bottom: 220, height: 120 };
   // Track volume fader (min 0, max 150)
   // Clicking top (clientY = 100) -> max 150
@@ -1394,7 +1394,7 @@ test("scdaw-mixer: calculateSliderValueFromPointer computes vertical fader level
   );
 });
 
-test("scdaw-mixer: calculateSliderValueFromWheel increments and decrements volume with clamping and shift-key fine tuning", () => {
+test("shadow-claw-daw-mixer: calculateSliderValueFromWheel increments and decrements volume with clamping and shift-key fine tuning", () => {
   // Master fader: scroll up (negative deltaY) increases volume
   assert.equal(
     calculateSliderValueFromWheel({
@@ -1508,7 +1508,7 @@ test("scdaw-mixer: calculateSliderValueFromWheel increments and decrements volum
   );
 });
 
-test("scdaw-mixer: shouldPreserveMixerDom determines when mixer DOM should be updated in-place vs re-rendered", () => {
+test("shadow-claw-daw-mixer: shouldPreserveMixerDom determines when mixer DOM should be updated in-place vs re-rendered", () => {
   // Same track IDs in sequence with container -> preserve
   assert.equal(
     shouldPreserveMixerDom({
@@ -1550,7 +1550,7 @@ test("scdaw-mixer: shouldPreserveMixerDom determines when mixer DOM should be up
   );
 });
 
-test("scdaw-mixer: setupVolumeSlider binds pointer dragging, wheel scrolling, and reset events", () => {
+test("shadow-claw-daw-mixer: setupVolumeSlider binds pointer dragging, wheel scrolling, and reset events", () => {
   const capturedEvents = [];
   const volumeChanges = [];
   let resetCalled = false;
@@ -1658,7 +1658,7 @@ test("scdaw-mixer: setupVolumeSlider binds pointer dragging, wheel scrolling, an
   assert.equal(resetCalled, true);
 });
 
-test("scdaw-mixer: setupVolumeSlider suppresses duplicate input during drag and invokes onVolumeCommit once on pointerup", () => {
+test("shadow-claw-daw-mixer: setupVolumeSlider suppresses duplicate input during drag and invokes onVolumeCommit once on pointerup", () => {
   const liveChanges = [];
   const commits = [];
 
@@ -1712,12 +1712,12 @@ test("scdaw-mixer: setupVolumeSlider suppresses duplicate input during drag and 
   );
 });
 
-test("scdaw-transport: formats musical position string", () => {
+test("shadow-claw-daw-transport: formats musical position string", () => {
   assert.equal(formatPosition(1, 1, 0), "001 : 1 : 1");
   assert.equal(formatPosition(2, 3, 2), "002 : 3 : 3");
 });
 
-test("scdaw-transport: calculateTransportWheelValue adjusts BPM and Swing with clamping and shiftKey support", () => {
+test("shadow-claw-daw-transport: calculateTransportWheelValue adjusts BPM and Swing with clamping and shiftKey support", () => {
   // BPM adjustments (min: 40, max: 240, step: 1, shiftMultiplier: 5)
   // 1. Wheel up increases BPM by 1
   assert.equal(
@@ -1827,7 +1827,7 @@ test("scdaw-transport: calculateTransportWheelValue adjusts BPM and Swing with c
   );
 });
 
-test("scdaw-transport: setupTransportWheelControls binds non-passive wheel events, prevents scroll, and dispatches updates", () => {
+test("shadow-claw-daw-transport: setupTransportWheelControls binds non-passive wheel events, prevents scroll, and dispatches updates", () => {
   const bpmEvents = [];
   const swingEvents = [];
 
@@ -1885,7 +1885,7 @@ test("scdaw-transport: setupTransportWheelControls binds non-passive wheel event
   assert.deepEqual(swingEvents, [15]);
 });
 
-test("scdaw-transport: calculateBpmDragValue adjusts BPM with upward increase, downward decrease, clamping, and shift fine-tuning", () => {
+test("shadow-claw-daw-transport: calculateBpmDragValue adjusts BPM with upward increase, downward decrease, clamping, and shift fine-tuning", () => {
   // 1. Dragging UP (currentY < startY) increases BPM
   // startY = 100, currentY = 80 (deltaY = +20) -> with pixelsPerUnit = 2, increases by +10 BPM
   assert.equal(
@@ -1967,7 +1967,7 @@ test("scdaw-transport: calculateBpmDragValue adjusts BPM with upward increase, d
   );
 });
 
-test("scdaw-transport: setupBpmDragControl binds touch/pointer drag events, captures pointer, and dispatches updates", () => {
+test("shadow-claw-daw-transport: setupBpmDragControl binds touch/pointer drag events, captures pointer, and dispatches updates", () => {
   const bpmChanges = [];
   const capturedEvents = [];
 
@@ -2065,7 +2065,7 @@ test("scdaw-transport: setupBpmDragControl binds touch/pointer drag events, capt
   assert.equal(mockInput.selected, true);
 });
 
-test("scdaw-transport: shouldPromptRecordOptions identifies overlapping clips at current playhead", () => {
+test("shadow-claw-daw-transport: shouldPromptRecordOptions identifies overlapping clips at current playhead", () => {
   const synthTrack = { kind: "synth", name: "Lead", notes: [] };
   assert.equal(
     shouldPromptRecordOptions({ targetTrack: synthTrack, currentBeat: 0 }),
@@ -2121,10 +2121,10 @@ test("scdaw-transport: shouldPromptRecordOptions identifies overlapping clips at
   );
 });
 
-test("scdaw-transport: Audio Recording Options dialog strictly follows ShadowClaw theme tokens and avoids slate-blue/hardcoded colors", async () => {
+test("shadow-claw-daw-transport: Audio Recording Options dialog strictly follows ShadowClaw theme tokens and avoids slate-blue/hardcoded colors", async () => {
   const transportContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-transport.js",
+      "../.agents/scripts/components/shadow-claw-daw-transport.js",
       import.meta.url,
     ),
     "utf-8",
@@ -2134,34 +2134,34 @@ test("scdaw-transport: Audio Recording Options dialog strictly follows ShadowCla
   assert.doesNotMatch(
     transportContent,
     /#1e293b/i,
-    "scdaw-transport must not use hardcoded slate-800 (#1e293b)",
+    "shadow-claw-daw-transport must not use hardcoded slate-800 (#1e293b)",
   );
   assert.doesNotMatch(
     transportContent,
     /#334155/i,
-    "scdaw-transport must not use hardcoded slate-700 (#334155)",
+    "shadow-claw-daw-transport must not use hardcoded slate-700 (#334155)",
   );
   assert.doesNotMatch(
     transportContent,
     /#f8fafc/i,
-    "scdaw-transport must not use hardcoded slate-50 (#f8fafc)",
+    "shadow-claw-daw-transport must not use hardcoded slate-50 (#f8fafc)",
   );
 
   // Must not use ungrounded --scdaw- variables instead of theme tokens
   assert.doesNotMatch(
     transportContent,
     /--scdaw-surface/i,
-    "scdaw-transport must not use non-existent --scdaw-surface variable",
+    "shadow-claw-daw-transport must not use non-existent --scdaw-surface variable",
   );
   assert.doesNotMatch(
     transportContent,
     /--scdaw-border/i,
-    "scdaw-transport must not use non-existent --scdaw-border variable",
+    "shadow-claw-daw-transport must not use non-existent --scdaw-border variable",
   );
   assert.doesNotMatch(
     transportContent,
     /--scdaw-text\b/i,
-    "scdaw-transport must not use non-existent --scdaw-text variable",
+    "shadow-claw-daw-transport must not use non-existent --scdaw-text variable",
   );
 
   // Must use proper ShadowClaw theme variables for dialog surface and borders
@@ -2192,7 +2192,7 @@ test("scdaw-transport: Audio Recording Options dialog strictly follows ShadowCla
   );
 });
 
-test("scdaw-statusbar: formats audio telemetry, project summary, and bounce status", () => {
+test("shadow-claw-daw-status-bar: formats audio telemetry, project summary, and bounce status", () => {
   const status = formatTelemetryStatus(
     { audio: "running", lastBounce: { durationSec: 4.0, peakDb: -1.2 } },
     { name: "Techno Groove", bpm: 130, tracks: [1, 2, 3] },
@@ -2203,7 +2203,7 @@ test("scdaw-statusbar: formats audio telemetry, project summary, and bounce stat
   assert.equal(status.bounceSummary, "Bounce: 4.0s (-1.2 dB)");
 });
 
-test("scdaw-workbench: resolveWorkbenchFullscreenState accurately determines ARIA attributes and button state", () => {
+test("shadow-claw-daw-workbench: resolveWorkbenchFullscreenState accurately determines ARIA attributes and button state", () => {
   // Not fullscreen
   const off = resolveWorkbenchFullscreenState(false);
   assert.equal(off.isFullscreen, false);
@@ -2225,7 +2225,7 @@ test("scdaw-workbench: resolveWorkbenchFullscreenState accurately determines ARI
   assert.equal(on.hostClass, "scdaw-workbench--fullscreen");
 });
 
-test("scdaw-workbench: setupWorkbenchFullscreen manages toggle, Escape key, fullscreenchange, and ARIA updates", () => {
+test("shadow-claw-daw-workbench: setupWorkbenchFullscreen manages toggle, Escape key, fullscreenchange, and ARIA updates", () => {
   const workbenchClassList = new Set();
   const pageClassList = new Set();
   const btnAttrs = {};
@@ -2383,7 +2383,7 @@ test("scdaw-workbench: setupWorkbenchFullscreen manages toggle, Escape key, full
   assert.equal(Object.keys(docListeners).length, 0);
 });
 
-test("scdaw-workbench: resolves grid docking columns according to panel visibility", () => {
+test("shadow-claw-daw-workbench: resolves grid docking columns according to panel visibility", () => {
   const allOpen = resolveWorkbenchPanels(true, true, "piano-roll");
   assert.equal(allOpen.gridColumns, "240px 1fr 280px");
   assert.equal(allOpen.editorMode, "piano-roll");
@@ -2399,7 +2399,7 @@ test("scdaw-workbench: resolves grid docking columns according to panel visibili
   assert.equal(centerOnly.gridColumns, "1fr");
 });
 
-test("scdaw-resize-handle & responsive workbench: handles mobile-first container query adaptations", () => {
+test("shadow-claw-daw-resize-handle & responsive workbench: handles mobile-first container query adaptations", () => {
   // Mobile layout (< 640px)
   const mobileLayout = resolveWorkbenchResponsiveLayout({
     containerWidth: 400,
@@ -2434,12 +2434,12 @@ test("scdaw-resize-handle & responsive workbench: handles mobile-first container
   assert.equal(aria["aria-valuenow"], "240");
 });
 
-test("scdaw-styles & scdaw-workbench: toolbar buttons enforce uniform height and line-height across icons and text", async () => {
+test("scdaw-styles & shadow-claw-daw-workbench: toolbar buttons enforce uniform height and line-height across icons and text", async () => {
   assert.match(SHARED_STYLES, /line-height:\s*1/);
 
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -2449,10 +2449,10 @@ test("scdaw-styles & scdaw-workbench: toolbar buttons enforce uniform height and
   assert.match(workbenchContent, /min-height:\s*30px/);
 });
 
-test("scdaw-workbench: replaces native confirm() with accessible <shadow-claw-dialog> modal and scroll containment", async () => {
+test("shadow-claw-daw-workbench: replaces native confirm() with accessible <shadow-claw-dialog> modal and scroll containment", async () => {
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -2489,17 +2489,17 @@ test("scdaw-workbench: replaces native confirm() with accessible <shadow-claw-di
   // Safe action autofocus
   assert.match(workbenchContent, /<button[^>]+value="cancel"[^>]+autofocus/);
 
-  // Imports standalone shadow-claw-dialog component from CDN
+  // Imports standalone shadow-claw-dialog component from /lib/
   assert.match(
     workbenchContent,
-    /https:\/\/cdn\.jsdelivr\.net\/npm\/shadow-claw\/dist\/lib\/components\/shadow-claw-dialog\.js/,
+    /import\s+["']shadow-claw\/components\/shadow-claw-dialog["']/,
   );
 });
 
-test("scdaw-workbench: Save/Export and Open/Import dialogs adhere to WCAG and ARIA best practices", async () => {
+test("shadow-claw-daw-workbench: Save/Export and Open/Import dialogs adhere to WCAG and ARIA best practices", async () => {
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
@@ -2563,7 +2563,7 @@ test("scdaw-workbench: Save/Export and Open/Import dialogs adhere to WCAG and AR
   assert.match(workbenchContent, /addEventListener\s*\(\s*["']drop["']/);
 });
 
-test("scdaw-workbench: resolveDropAction determines context-sensitive action based on target and dragged payload", () => {
+test("shadow-claw-daw-workbench: resolveDropAction determines context-sensitive action based on target and dragged payload", () => {
   // 1. Dropping session file anywhere on workbench
   assert.deepEqual(
     resolveDropAction({
@@ -2632,27 +2632,30 @@ test("scdaw-workbench: resolveDropAction determines context-sensitive action bas
 test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degradation, BEM, and ARIA compliance", async () => {
   const workbenchContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf-8",
   );
   const transportContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-transport.js",
+      "../.agents/scripts/components/shadow-claw-daw-transport.js",
       import.meta.url,
     ),
     "utf-8",
   );
   const statusbarContent = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-statusbar.js",
+      "../.agents/scripts/components/shadow-claw-daw-status-bar.js",
       import.meta.url,
     ),
     "utf-8",
   );
   const stylesContent = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-styles.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-styles.js",
+      import.meta.url,
+    ),
     "utf-8",
   );
 
@@ -2660,24 +2663,24 @@ test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degrada
   // Workbench base styles must be mobile-first without desktop-first max-width container queries
   assert.doesNotMatch(
     workbenchContent,
-    /@container scdaw-workbench\s*\(\s*max-width:\s*680px\s*\)/,
+    /@container shadow-claw-daw-workbench\s*\(\s*max-width:\s*680px\s*\)/,
     "Workbench styles should be mobile-first, not desktop-first with max-width container queries",
   );
   assert.match(
     workbenchContent,
-    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-workbench\s*\(\s*min-width:\s*640px\s*\)/,
     "Workbench should progressively enhance via min-width container queries",
   );
   assert.match(
     workbenchContent,
-    /@container scdaw-workbench\s*\(\s*min-width:\s*1024px\s*\)/,
+    /@container shadow-claw-daw-workbench\s*\(\s*min-width:\s*1024px\s*\)/,
     "Workbench should progressively enhance desktop multi-pane grid via min-width container query",
   );
 
   // Transport base styles must be mobile-first
   assert.match(
     transportContent,
-    /@container scdaw-transport\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-transport\s*\(\s*min-width:\s*640px\s*\)/,
     "Transport bar should progressively enhance via min-width container query",
   );
 
@@ -2857,12 +2860,12 @@ test("scdaw-engine & components: selectTrack synchronizes selectedTrackId across
   assert.equal(scdaw.selectedTrackId.get(), secondTrackId);
 });
 
-test("scdaw-timeline & scdaw-mixer: clicking M (Mute) and S (Solo) buttons toggles track mute and solo state on and off", async () => {
+test("shadow-claw-daw-timeline & shadow-claw-daw-mixer: clicking M (Mute) and S (Solo) buttons toggles track mute and solo state on and off", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
-  const { DawMixerElement } =
-    await import("../.agents/scripts/components/scdaw-mixer.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
+  const { ShadowClawDawMixer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-mixer.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
   const initialProject = scdaw.getProject();
@@ -2870,8 +2873,8 @@ test("scdaw-timeline & scdaw-mixer: clicking M (Mute) and S (Solo) buttons toggl
   assert.equal(initialProject.tracks[0].mute, false);
   assert.equal(initialProject.tracks[0].solo, false);
 
-  // 1. Test DawTimelineElement Mute & Solo buttons
-  const timeline = new DawTimelineElement();
+  // 1. Test ShadowClawDawTimeline Mute & Solo buttons
+  const timeline = new ShadowClawDawTimeline();
   const makeBtnMock = (id) => {
     const listeners = new Map();
     const btn = {
@@ -2954,8 +2957,8 @@ test("scdaw-timeline & scdaw-mixer: clicking M (Mute) and S (Solo) buttons toggl
     "Clicking S a second time in Timeline must set track.solo = false",
   );
 
-  // 2. Test DawMixerElement Mute & Solo buttons across multiple clicks without full re-render
-  const mixer = new DawMixerElement();
+  // 2. Test ShadowClawDawMixer Mute & Solo buttons across multiple clicks without full re-render
+  const mixer = new ShadowClawDawMixer();
   const mixerMuteBtn = makeBtnMock(trackId);
   const mixerSoloBtn = makeBtnMock(trackId);
 
@@ -3009,10 +3012,10 @@ test("scdaw-timeline & scdaw-mixer: clicking M (Mute) and S (Solo) buttons toggl
   );
 });
 
-test("scdaw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .pr-cells geometry and support interactive velocity editing", async () => {
+test("shadow-claw-daw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .pr-cells geometry and support interactive velocity editing", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
   // 1. Pure helpers: computeStepVelocity & calculateVelocityFromPointer
   assert.equal(computeStepVelocity([], 0), 0);
@@ -3050,7 +3053,7 @@ test("scdaw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .
   const track = scdaw.getProject().tracks[0];
   scdaw.selectTrack(track.id);
 
-  const editor = new DawEditorElement();
+  const editor = new ShadowClawDawEditor();
   const stalkHandlers = {};
   const mockStalkStep0 = {
     dataset: { step: "0" },
@@ -3129,10 +3132,10 @@ test("scdaw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .
   );
 });
 
-test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation lanes with ARIA compliance", async () => {
+test("shadow-claw-daw-timeline: renders audio tracks, audio clips, and toggles automation lanes with ARIA compliance", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
   await scdaw.resetProject({ template: "empty" });
 
@@ -3161,7 +3164,7 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
     value: 0.9,
   });
 
-  const timeline = new DawTimelineElement();
+  const timeline = new ShadowClawDawTimeline();
   let addAudioBtn = null;
   let autoBtn = null;
 
@@ -3262,10 +3265,10 @@ test("scdaw-timeline: renders audio tracks, audio clips, and toggles automation 
   );
 });
 
-test("scdaw-timeline: track header enforces strict overflow containment, max-width, and non-overlapping controls", async () => {
+test("shadow-claw-daw-timeline: track header enforces strict overflow containment, max-width, and non-overlapping controls", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
   await scdaw.resetProject({ template: "empty" });
 
@@ -3274,7 +3277,7 @@ test("scdaw-timeline: track header enforces strict overflow containment, max-wid
     name: "Audio 1",
   });
 
-  const timeline = new DawTimelineElement();
+  const timeline = new ShadowClawDawTimeline();
   timeline.shadowRoot = {
     innerHTML: "",
     getElementById: () => null,
@@ -3338,67 +3341,79 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
   ] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-transport.js",
+        "../.agents/scripts/components/shadow-claw-daw-transport.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-timeline.js",
-        import.meta.url,
-      ),
-      "utf-8",
-    ),
-    fs.readFile(
-      new URL("../.agents/scripts/components/scdaw-editor.js", import.meta.url),
-      "utf-8",
-    ),
-    fs.readFile(
-      new URL(
-        "../.agents/scripts/components/scdaw-browser.js",
+        "../.agents/scripts/components/shadow-claw-daw-timeline.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-devices.js",
+        "../.agents/scripts/components/shadow-claw-daw-editor.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-statusbar.js",
+        "../.agents/scripts/components/shadow-claw-daw-browser.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-sequencer.js",
+        "../.agents/scripts/components/shadow-claw-daw-devices.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
-      new URL("../.agents/scripts/components/scdaw-mixer.js", import.meta.url),
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-status-bar.js",
+        import.meta.url,
+      ),
       "utf-8",
     ),
     fs.readFile(
-      new URL("../.agents/scripts/components/scdaw-knob.js", import.meta.url),
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-sequencer.js",
+        import.meta.url,
+      ),
       "utf-8",
     ),
     fs.readFile(
-      new URL("../.agents/scripts/components/scdaw-styles.js", import.meta.url),
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-mixer.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-knob.js",
+        import.meta.url,
+      ),
+      "utf-8",
+    ),
+    fs.readFile(
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-styles.js",
+        import.meta.url,
+      ),
       "utf-8",
     ),
   ]);
@@ -3439,18 +3454,18 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
   );
   assert.match(
     workbenchContent,
-    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?\.scdaw-workbench__toolbar-group\s*\{[^}]*flex:\s*0\s+0\s+auto/,
+    /@container shadow-claw-daw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?\.scdaw-workbench__toolbar-group\s*\{[^}]*flex:\s*0\s+0\s+auto/,
     "At >= 640px, .scdaw-workbench__toolbar-group must use flex: 0 0 auto so groups never shrink below content width or overlap Bounce WAV",
   );
 
   // 3. @media fallbacks must be isolated inside @supports not (container-type: inline-size)
   //    so desktop viewports never override narrow docked container queries
   for (const [name, content] of [
-    ["scdaw-workbench.js", workbenchContent],
-    ["scdaw-transport.js", transportContent],
-    ["scdaw-editor.js", editorContent],
-    ["scdaw-timeline.js", timelineContent],
-    ["scdaw-statusbar.js", statusbarContent],
+    ["shadow-claw-daw-workbench.js", workbenchContent],
+    ["shadow-claw-daw-transport.js", transportContent],
+    ["shadow-claw-daw-editor.js", editorContent],
+    ["shadow-claw-daw-timeline.js", timelineContent],
+    ["shadow-claw-daw-status-bar.js", statusbarContent],
   ]) {
     assert.match(
       content,
@@ -3462,15 +3477,15 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
   // 4. All layout custom elements must declare container-type: inline-size on :host
   //    and strictly use mobile-first min-width @container queries (never desktop-first max-width)
   for (const [name, content] of [
-    ["scdaw-workbench.js", workbenchContent],
-    ["scdaw-transport.js", transportContent],
-    ["scdaw-timeline.js", timelineContent],
-    ["scdaw-editor.js", editorContent],
-    ["scdaw-browser.js", browserContent],
-    ["scdaw-devices.js", devicesContent],
-    ["scdaw-statusbar.js", statusbarContent],
-    ["scdaw-sequencer.js", sequencerContent],
-    ["scdaw-mixer.js", mixerContent],
+    ["shadow-claw-daw-workbench.js", workbenchContent],
+    ["shadow-claw-daw-transport.js", transportContent],
+    ["shadow-claw-daw-timeline.js", timelineContent],
+    ["shadow-claw-daw-editor.js", editorContent],
+    ["shadow-claw-daw-browser.js", browserContent],
+    ["shadow-claw-daw-devices.js", devicesContent],
+    ["shadow-claw-daw-status-bar.js", statusbarContent],
+    ["shadow-claw-daw-sequencer.js", sequencerContent],
+    ["shadow-claw-daw-mixer.js", mixerContent],
   ]) {
     assert.match(
       content,
@@ -3487,114 +3502,114 @@ test("scdaw ground-up responsive toolbar & container queries: flattened sibling 
   // 5. Transport bar at >= 640px must allow wrapping and maintain gap so 001:1:1 and BPM never collide
   assert.match(
     transportContent,
-    /@container scdaw-transport\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?flex-wrap:\s*wrap/,
-    "scdaw-transport must allow flex-wrap: wrap in its >= 640px container rule so playback and tempo groups never collide or clip Panic",
+    /@container shadow-claw-daw-transport\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?flex-wrap:\s*wrap/,
+    "shadow-claw-daw-transport must allow flex-wrap: wrap in its >= 640px container rule so playback and tempo groups never collide or clip Panic",
   );
 
-  // 6. Timeline uses @container scdaw-timeline instead of bare @media for track header width
+  // 6. Timeline uses @container shadow-claw-daw-timeline instead of bare @media for track header width
   assert.match(
     timelineContent,
-    /@container scdaw-timeline\s*\(\s*min-width:\s*520px\s*\)/,
-    "scdaw-timeline must use @container scdaw-timeline to expand --track-header-w only when the timeline container itself is wide",
+    /@container shadow-claw-daw-timeline\s*\(\s*min-width:\s*520px\s*\)/,
+    "shadow-claw-daw-timeline must use @container shadow-claw-daw-timeline to expand --track-header-w only when the timeline container itself is wide",
   );
 
   // 6b. Timeline establishes balanced gutter spacing (using a custom property for width) and accessible clip resize handles
   assert.match(
     timelineContent,
     /--timeline-gutter-width:\s*(?:1[2-9]|2[0-9])px/,
-    "scdaw-timeline must declare --timeline-gutter-width CSS custom property for balanced gutters",
+    "shadow-claw-daw-timeline must declare --timeline-gutter-width CSS custom property for balanced gutters",
   );
   assert.match(
     timelineContent,
     /--timeline-gutter-l:\s*var\(--timeline-gutter-width\)/,
-    "scdaw-timeline must declare left gutter custom property referencing --timeline-gutter-width",
+    "shadow-claw-daw-timeline must declare left gutter custom property referencing --timeline-gutter-width",
   );
   assert.match(
     timelineContent,
     /--timeline-gutter-r:\s*var\(--timeline-gutter-width\)/,
-    "scdaw-timeline must declare right gutter custom property referencing --timeline-gutter-width",
+    "shadow-claw-daw-timeline must declare right gutter custom property referencing --timeline-gutter-width",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__ruler[^{]*\{[^}]*margin-left:\s*calc\([^}]*--timeline-gutter-l/,
-    "scdaw-timeline ruler must offset left margin using --timeline-gutter-l to balance with lanes",
+    "shadow-claw-daw-timeline ruler must offset left margin using --timeline-gutter-l to balance with lanes",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__lane[^{]*\{[^}]*margin-left:\s*var\(--timeline-gutter-l/,
-    "scdaw-timeline lane must apply left margin using --timeline-gutter-l to surround tracks with balanced gutters",
+    "shadow-claw-daw-timeline lane must apply left margin using --timeline-gutter-l to surround tracks with balanced gutters",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__lane[^{]*\{[^}]*margin-right:\s*var\(--timeline-gutter-r/,
-    "scdaw-timeline lane must apply right margin using --timeline-gutter-r to surround tracks with balanced gutters",
+    "shadow-claw-daw-timeline lane must apply right margin using --timeline-gutter-r to surround tracks with balanced gutters",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__track-header[^{]*\{[^}]*left:\s*0/,
-    "scdaw-timeline track header must be docked flush to the left boundary without empty gaps",
+    "shadow-claw-daw-timeline track header must be docked flush to the left boundary without empty gaps",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__clip-handle\s*\{[^}]*width:\s*(?:1[2-9]|2[0-9])px/,
-    "scdaw-timeline clip handles must provide at least 12px hit area for reliable dragging and edge resizing",
+    "shadow-claw-daw-timeline clip handles must provide at least 12px hit area for reliable dragging and edge resizing",
   );
 
   // 6c. Timeline establishes interactive snap mode control (Beat / Bar / Off)
   assert.match(
     timelineContent,
     /timeline-snap-btn|scdaw-timeline__snap-btn/,
-    "scdaw-timeline must provide a snap mode control in the toolbar",
+    "shadow-claw-daw-timeline must provide a snap mode control in the toolbar",
   );
 
   // 6d. Track header includes mobile-first, touch-friendly track reorder controls (grab handle and nudge buttons)
   assert.match(
     timelineContent,
     /scdaw-timeline__reorder-handle|scdaw-timeline__track-reorder/,
-    "scdaw-timeline track header must include track reorder grab handle",
+    "shadow-claw-daw-timeline track header must include track reorder grab handle",
   );
   assert.match(
     timelineContent,
     /scdaw-timeline__nudge-btn--up/,
-    "scdaw-timeline track header must include touch-friendly Move Up nudge button",
+    "shadow-claw-daw-timeline track header must include touch-friendly Move Up nudge button",
   );
   assert.match(
     timelineContent,
     /scdaw-timeline__nudge-btn--down/,
-    "scdaw-timeline track header must include touch-friendly Move Down nudge button",
+    "shadow-claw-daw-timeline track header must include touch-friendly Move Down nudge button",
   );
   assert.match(
     timelineContent,
     /\.scdaw-timeline__reorder-handle\s*\{[^}]*touch-action:\s*none/,
-    "scdaw-timeline reorder handle must specify touch-action: none for touch dragging",
+    "shadow-claw-daw-timeline reorder handle must specify touch-action: none for touch dragging",
   );
 
   // 7. Knob implements WCAG role="slider", keyboard navigation, touch-action: none, and BEM classes
   assert.match(knobContent, /role=["']slider["']/);
   assert.match(knobContent, /:host\s*\{[^}]*touch-action:\s*none/);
   assert.match(knobContent, /:host\s*\{[^}]*-webkit-user-select:\s*none/);
-  assert.match(knobContent, /scdaw-knob/);
+  assert.match(knobContent, /shadow-claw-daw-knob/);
 
   // 8. Device rack specifies overscroll-behavior-x: contain and touch containment to prevent mobile jumping
   assert.match(
     devicesContent,
     /overscroll-behavior-x:\s*contain/,
-    "scdaw-devices must specify overscroll-behavior-x: contain to prevent parent scroll jumping on touch gestures",
+    "shadow-claw-daw-devices must specify overscroll-behavior-x: contain to prevent parent scroll jumping on touch gestures",
   );
 });
 
-test("scdaw-browser & scdaw-workbench: mobile-first container query height capping and internal scroll containment", async () => {
+test("shadow-claw-daw-browser & shadow-claw-daw-workbench: mobile-first container query height capping and internal scroll containment", async () => {
   const [workbenchContent, browserContent] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf-8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-browser.js",
+        "../.agents/scripts/components/shadow-claw-daw-browser.js",
         import.meta.url,
       ),
       "utf-8",
@@ -3619,11 +3634,11 @@ test("scdaw-browser & scdaw-workbench: mobile-first container query height cappi
     "#browser-container must enforce min-height: 0 to allow flex/grid shrinking",
   );
 
-  // 2. Progressive enhancement for tablet/desktop in @container scdaw-workbench (min-width: 640px)
+  // 2. Progressive enhancement for tablet/desktop in @container shadow-claw-daw-workbench (min-width: 640px)
   // Height is capped relative to center-stack UI elements and viewport
   assert.match(
     workbenchContent,
-    /@container scdaw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?#browser-container\s*\{[^}]*max-height:\s*var\(--center-stack-h/,
+    /@container shadow-claw-daw-workbench\s*\(\s*min-width:\s*640px\s*\)\s*\{[\s\S]*?#browser-container\s*\{[^}]*max-height:\s*var\(--center-stack-h/,
     "#browser-container must cap height relative to center-stack UI elements (--center-stack-h) at >= 640px container width",
   );
 
@@ -3634,24 +3649,24 @@ test("scdaw-browser & scdaw-workbench: mobile-first container query height cappi
     "Workbench must define and update --center-stack-h CSS variable",
   );
 
-  // 4. scdaw-browser internal styles: :host and inner panel must not expand unboundedly
+  // 4. shadow-claw-daw-browser internal styles: :host and inner panel must not expand unboundedly
   assert.match(
     browserContent,
     /:host\s*\{[^}]*min-height:\s*0/,
-    "scdaw-browser :host must declare min-height: 0",
+    "shadow-claw-daw-browser :host must declare min-height: 0",
   );
   assert.match(
     browserContent,
     /:host\s*\{[^}]*max-height:\s*100%/,
-    "scdaw-browser :host must declare max-height: 100%",
+    "shadow-claw-daw-browser :host must declare max-height: 100%",
   );
   assert.match(
     browserContent,
     /:host\s*\{[^}]*overflow:\s*hidden/,
-    "scdaw-browser :host must declare overflow: hidden",
+    "shadow-claw-daw-browser :host must declare overflow: hidden",
   );
 
-  // 5. scdaw-browser item list: flex shrink and scroll containment per modern-web-guidance
+  // 5. shadow-claw-daw-browser item list: flex shrink and scroll containment per modern-web-guidance
   assert.match(
     browserContent,
     /\.item-list\s*\{[^}]*min-height:\s*0/,
@@ -3673,7 +3688,7 @@ test("scdaw-browser & scdaw-workbench: mobile-first container query height cappi
     ".item-list must declare scrollbar-gutter: stable to prevent layout shifts",
   );
 
-  // 6. Fixed elements inside scdaw-browser must have flex-shrink: 0
+  // 6. Fixed elements inside shadow-claw-daw-browser must have flex-shrink: 0
   assert.match(
     browserContent,
     /\.scdaw-browser__header[^}]*flex-shrink:\s*0/,
@@ -3685,15 +3700,15 @@ test("scdaw-browser & scdaw-workbench: mobile-first container query height cappi
     "Search box must declare flex-shrink: 0",
   );
 
-  // 7. Internal container query @container scdaw-browser (min-width: ...) for component-level reactivity
+  // 7. Internal container query @container shadow-claw-daw-browser (min-width: ...) for component-level reactivity
   assert.match(
     browserContent,
-    /@container scdaw-browser\s*\(\s*min-width:\s*\d+px\s*\)/,
-    "scdaw-browser must declare internal mobile-first container query @container scdaw-browser",
+    /@container shadow-claw-daw-browser\s*\(\s*min-width:\s*\d+px\s*\)/,
+    "shadow-claw-daw-browser must declare internal mobile-first container query @container shadow-claw-daw-browser",
   );
 });
 
-test("scdaw-devices: constructs device chain for all 9 roster instruments and new FX", () => {
+test("shadow-claw-daw-devices: constructs device chain for all 9 roster instruments and new FX", () => {
   const instruments = [
     "808",
     "cubed",
@@ -3726,8 +3741,8 @@ test("scdaw-devices: constructs device chain for all 9 roster instruments and ne
   }
 });
 
-test("scdaw-browser: _getItems lists all 9 roster instruments, Audio FX, and MIDI FX", () => {
-  const browser = new DawBrowserElement();
+test("shadow-claw-daw-browser: _getItems lists all 9 roster instruments, Audio FX, and MIDI FX", () => {
+  const browser = new ShadowClawDawBrowser();
   const items = browser._getItems();
   const deviceItems = items.filter((i) => i.type === "devices");
 
@@ -3779,19 +3794,19 @@ test("scdaw-browser: _getItems lists all 9 roster instruments, Audio FX, and MID
   }
 });
 
-test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor skip DOM rebuilds when only track volume/pan/params change", async () => {
+test("Performance: shadow-claw-daw-timeline, shadow-claw-daw-sequencer (hidden), and shadow-claw-daw-editor skip DOM rebuilds when only track volume/pan/params change", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
-  const { DawSequencerElement } =
-    await import("../.agents/scripts/components/scdaw-sequencer.js");
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
+  const { ShadowClawDawSequencer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-sequencer.js");
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
 
-  // 1. DawTimelineElement
-  const timeline = new DawTimelineElement();
+  // 1. ShadowClawDawTimeline
+  const timeline = new ShadowClawDawTimeline();
   let timelineHtmlSets = 0;
   let timelineHtml = "";
   timeline.shadowRoot = {
@@ -3811,8 +3826,8 @@ test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor sk
   globalThis.requestAnimationFrame = () => 1;
   globalThis.cancelAnimationFrame = () => {};
 
-  // 2. DawSequencerElement (hidden)
-  const sequencer = new DawSequencerElement();
+  // 2. ShadowClawDawSequencer (hidden)
+  const sequencer = new ShadowClawDawSequencer();
   let seqHtmlSets = 0;
   let seqHtml = "";
   sequencer.classList = { contains: (c) => c === "hidden" };
@@ -3829,8 +3844,8 @@ test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor sk
     querySelectorAll: () => [],
   };
 
-  // 3. DawEditorElement
-  const editor = new DawEditorElement();
+  // 3. ShadowClawDawEditor
+  const editor = new ShadowClawDawEditor();
   let editorHtml = "";
   let syncNotesCalls = 0;
   const fakeGridEl = {
@@ -3875,17 +3890,17 @@ test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor sk
     assert.equal(
       seqHtmlSets,
       initialSeqSets,
-      "Hidden scdaw-sequencer must not rebuild DOM",
+      "Hidden shadow-claw-daw-sequencer must not rebuild DOM",
     );
     assert.equal(
       timelineHtmlSets,
       initialTimelineSets,
-      "scdaw-timeline must not rebuild DOM when only mixer volume/pan change",
+      "shadow-claw-daw-timeline must not rebuild DOM when only mixer volume/pan change",
     );
     assert.equal(
       syncNotesCalls,
       initialSyncCalls,
-      "scdaw-editor must not run _syncNotes when track notes did not change",
+      "shadow-claw-daw-editor must not run _syncNotes when track notes did not change",
     );
   } finally {
     timeline.disconnectedCallback();
@@ -3896,22 +3911,22 @@ test("Performance: scdaw-timeline, scdaw-sequencer (hidden), and scdaw-editor sk
   }
 });
 
-test("Performance: scdaw-statusbar._sync() and scdaw-timeline._updatePlayhead() never call scdaw.getProject()", async () => {
+test("Performance: shadow-claw-daw-status-bar._sync() and shadow-claw-daw-timeline._updatePlayhead() never call scdaw.getProject()", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawStatusBarElement } =
-    await import("../.agents/scripts/components/scdaw-statusbar.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { ShadowClawDawStatusBar } =
+    await import("../.agents/scripts/components/shadow-claw-daw-status-bar.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
 
-  const statusbar = new DawStatusBarElement();
+  const statusbar = new ShadowClawDawStatusBar();
   statusbar.shadowRoot = {
     innerHTML: "",
     getElementById: () => ({ textContent: "", style: {} }),
   };
 
-  const timeline = new DawTimelineElement();
+  const timeline = new ShadowClawDawTimeline();
   timeline.shadowRoot = {
     innerHTML: "",
     getElementById: () => ({ style: {} }),
@@ -3939,17 +3954,17 @@ test("Performance: scdaw-statusbar._sync() and scdaw-timeline._updatePlayhead() 
   }
 });
 
-test("scdaw-mixer: clicking or releasing track slider/knob does not trigger scdaw.selectTrack", async () => {
+test("shadow-claw-daw-mixer: clicking or releasing track slider/knob does not trigger scdaw.selectTrack", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawMixerElement } =
-    await import("../.agents/scripts/components/scdaw-mixer.js");
+  const { ShadowClawDawMixer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-mixer.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
   const tracks = scdaw.project.get().tracks;
   scdaw.selectTrack(tracks[0].id);
   const targetTrackId = tracks[1].id;
 
-  const mixer = new DawMixerElement();
+  const mixer = new ShadowClawDawMixer();
   const stripListeners = {};
   const mockStrip = {
     dataset: { track: targetTrackId },
@@ -3968,11 +3983,11 @@ test("scdaw-mixer: clicking or releasing track slider/knob does not trigger scda
 
   mixer.render();
 
-  // Simulate click bubbling up from .vol-slider or scdaw-knob inside the strip
+  // Simulate click bubbling up from .vol-slider or shadow-claw-daw-knob inside the strip
   stripListeners.click({
     target: {
       closest: (s) =>
-        s.includes("input") || s.includes("scdaw-knob") ? {} : null,
+        s.includes("input") || s.includes("shadow-claw-daw-knob") ? {} : null,
     },
   });
 
@@ -3983,12 +3998,12 @@ test("scdaw-mixer: clicking or releasing track slider/knob does not trigger scda
   );
 });
 
-test("Performance: scdaw-sequencer and scdaw-timeline update in-place without rebuilding Shadow DOM on toggle_step", async () => {
+test("Performance: shadow-claw-daw-sequencer and shadow-claw-daw-timeline update in-place without rebuilding Shadow DOM on toggle_step", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawSequencerElement } =
-    await import("../.agents/scripts/components/scdaw-sequencer.js");
-  const { DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+  const { ShadowClawDawSequencer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-sequencer.js");
+  const { ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
 
@@ -3997,8 +4012,8 @@ test("Performance: scdaw-sequencer and scdaw-timeline update in-place without re
   globalThis.requestAnimationFrame = () => 1;
   globalThis.cancelAnimationFrame = () => {};
 
-  // 1. Visible DawSequencerElement with mock cells
-  const sequencer = new DawSequencerElement();
+  // 1. Visible ShadowClawDawSequencer with mock cells
+  const sequencer = new ShadowClawDawSequencer();
   let seqHtmlSets = 0;
   let seqHtml = "";
   const mockCell = {
@@ -4024,8 +4039,8 @@ test("Performance: scdaw-sequencer and scdaw-timeline update in-place without re
     querySelectorAll: (sel) => (sel === ".seq-cell" ? [mockCell] : []),
   };
 
-  // 2. DawTimelineElement with mock count element
-  const timeline = new DawTimelineElement();
+  // 2. ShadowClawDawTimeline with mock count element
+  const timeline = new ShadowClawDawTimeline();
   let timelineHtmlSets = 0;
   let timelineHtml = "";
   const mockCountEl = {
@@ -4063,17 +4078,17 @@ test("Performance: scdaw-sequencer and scdaw-timeline update in-place without re
     assert.equal(
       seqHtmlSets,
       initialSeqSets,
-      "Visible scdaw-sequencer must update cells in-place on toggle_step without rebuilding innerHTML",
+      "Visible shadow-claw-daw-sequencer must update cells in-place on toggle_step without rebuilding innerHTML",
     );
     assert.equal(
       mockCell.classList._active,
       true,
-      "scdaw-sequencer must toggle the active class on the edited cell in-place",
+      "shadow-claw-daw-sequencer must toggle the active class on the edited cell in-place",
     );
     assert.equal(
       timelineHtmlSets,
       initialTimelineSets,
-      "scdaw-timeline must not rebuild innerHTML on toggle_step",
+      "shadow-claw-daw-timeline must not rebuild innerHTML on toggle_step",
     );
   } finally {
     sequencer.disconnectedCallback();
@@ -4083,9 +4098,9 @@ test("Performance: scdaw-sequencer and scdaw-timeline update in-place without re
   }
 });
 
-test("Performance: scdaw-editor._syncNotes() pre-indexes step velocities in O(N) and runs < 25ms on 108 bars", async () => {
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
+test("Performance: shadow-claw-daw-editor._syncNotes() pre-indexes step velocities in O(N) and runs < 25ms on 108 bars", async () => {
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
   const notes = [];
   for (let i = 0; i < 2000; i++) {
@@ -4115,7 +4130,7 @@ test("Performance: scdaw-editor._syncNotes() pre-indexes step velocities in O(N)
     title: "",
   }));
 
-  const editor = new DawEditorElement();
+  const editor = new ShadowClawDawEditor();
   editor.shadowRoot = {
     getElementById: () => null,
     querySelectorAll: (sel) => {
@@ -4136,9 +4151,9 @@ test("Performance: scdaw-editor._syncNotes() pre-indexes step velocities in O(N)
   );
 });
 
-test("scdaw-timeline: calculateTimelineSeekPpqn maps ruler click/touch X coordinate to snapped PPQN", async () => {
+test("shadow-claw-daw-timeline: calculateTimelineSeekPpqn maps ruler click/touch X coordinate to snapped PPQN", async () => {
   const { calculateTimelineSeekPpqn } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
   const rect = { left: 100, width: 400 }; // 4 bars -> 100px per bar
   // Click at 50% (clientX = 300) on 4-bar 4/4 timeline -> Bar 3 (2 * 3840 = 7680 PPQN)
@@ -4174,9 +4189,13 @@ test("scdaw-timeline: calculateTimelineSeekPpqn maps ruler click/touch X coordin
   );
 });
 
-test("scdaw-transport: calculateBarsAdjustment and parseSignatureString handle clamping, shift-step, and validation", async () => {
-  const { calculateBarsAdjustment, parseSignatureString, DawTransportElement } =
-    await import("../.agents/scripts/components/scdaw-transport.js");
+test("shadow-claw-daw-transport: calculateBarsAdjustment and parseSignatureString handle clamping, shift-step, and validation", async () => {
+  const {
+    calculateBarsAdjustment,
+    parseSignatureString,
+    ShadowClawDawTransport,
+  } =
+    await import("../.agents/scripts/components/shadow-claw-daw-transport.js");
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
 
   assert.equal(calculateBarsAdjustment(1, 1, false), 2);
@@ -4189,7 +4208,7 @@ test("scdaw-transport: calculateBarsAdjustment and parseSignatureString handle c
   assert.deepEqual(parseSignatureString("invalid"), [4, 4]);
 
   await scdaw.resetProject({ template: "starter" });
-  const transport = new DawTransportElement();
+  const transport = new ShadowClawDawTransport();
   transport.shadowRoot = {
     innerHTML: "",
     getElementById: () => null,
@@ -4216,9 +4235,9 @@ test("scdaw-transport: calculateBarsAdjustment and parseSignatureString handle c
   );
 });
 
-test("scdaw-timeline: renders ARIA end-bar slider, + Bar button, and computes drag bars accurately", async () => {
-  const { calculateProjectBarsFromDrag, DawTimelineElement } =
-    await import("../.agents/scripts/components/scdaw-timeline.js");
+test("shadow-claw-daw-timeline: renders ARIA end-bar slider, + Bar button, and computes drag bars accurately", async () => {
+  const { calculateProjectBarsFromDrag, ShadowClawDawTimeline } =
+    await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
 
   assert.equal(
@@ -4235,7 +4254,7 @@ test("scdaw-timeline: renders ARIA end-bar slider, + Bar button, and computes dr
   );
 
   await scdaw.resetProject({ template: "starter" });
-  const timeline = new DawTimelineElement();
+  const timeline = new ShadowClawDawTimeline();
   timeline.shadowRoot = {
     innerHTML: "",
     getElementById: () => null,
@@ -4254,12 +4273,12 @@ test("scdaw-timeline: renders ARIA end-bar slider, + Bar button, and computes dr
   );
 });
 
-test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 12 steps per bar)", async () => {
+test("shadow-claw-daw-editor & shadow-claw-daw-sequencer: honor signature-aware stepsPerBar (3/4 = 12 steps per bar)", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
-  const { DawSequencerElement } =
-    await import("../.agents/scripts/components/scdaw-sequencer.js");
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
+  const { ShadowClawDawSequencer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-sequencer.js");
 
   await scdaw.resetProject({ template: "starter" });
   await scdaw.sendCommand("set_transport", {
@@ -4267,7 +4286,7 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
     signature: [3, 4],
   });
 
-  const editor = new DawEditorElement();
+  const editor = new ShadowClawDawEditor();
   editor.shadowRoot = {
     innerHTML: "",
     getElementById: () => null,
@@ -4277,7 +4296,7 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
   editor.render();
   assert.equal(editor._renderedNumSteps, 24);
 
-  const seq = new DawSequencerElement();
+  const seq = new ShadowClawDawSequencer();
   seq.shadowRoot = {
     innerHTML: "",
     getElementById: () => null,
@@ -4293,10 +4312,10 @@ test("scdaw-editor & scdaw-sequencer: honor signature-aware stepsPerBar (3/4 = 1
   assert.equal(maxStep, 23); // 0..23 = 24 steps for 2 bars of 3/4
 });
 
-test("scdaw-workbench: New Project button (#new-btn) creates a completely blank project while Reset (#reset-btn) restores starter template", async () => {
+test("shadow-claw-daw-workbench: New Project button (#new-btn) creates a completely blank project while Reset (#reset-btn) restores starter template", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawWorkbenchElement } =
-    await import("../.agents/scripts/components/scdaw-workbench.js");
+  const { ShadowClawDawWorkbench } =
+    await import("../.agents/scripts/components/shadow-claw-daw-workbench.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
   assert.ok(
@@ -4315,7 +4334,7 @@ test("scdaw-workbench: New Project button (#new-btn) creates a completely blank 
     removeAttribute() {},
   });
 
-  const wb = new DawWorkbenchElement();
+  const wb = new ShadowClawDawWorkbench();
   const dialogCalls = [];
   wb.confirmDialog = async (opts) => {
     dialogCalls.push(opts);
@@ -4361,11 +4380,11 @@ test("scdaw-workbench: New Project button (#new-btn) creates a completely blank 
   );
 });
 
-test("scdaw-editor: chord selector (#add-chord-select) offers all 12 major and 12 minor chords and inserts selected chord notes", async () => {
+test("shadow-claw-daw-editor: chord selector (#add-chord-select) offers all 12 major and 12 minor chords and inserts selected chord notes", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
   const editorMod =
-    await import("../.agents/scripts/components/scdaw-editor.js");
-  const { DawEditorElement, CHORD_OPTIONS, buildChordNotes } = editorMod;
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
+  const { ShadowClawDawEditor, CHORD_OPTIONS, buildChordNotes } = editorMod;
 
   assert.ok(Array.isArray(CHORD_OPTIONS), "CHORD_OPTIONS must be exported");
   assert.equal(
@@ -4403,7 +4422,7 @@ test("scdaw-editor: chord selector (#add-chord-select) offers all 12 major and 1
     value: "",
   });
 
-  const editor = new DawEditorElement();
+  const editor = new ShadowClawDawEditor();
   editor._selectedTrackId = trackId;
   editor.shadowRoot = {
     innerHTML: "",
@@ -4451,11 +4470,11 @@ test("scdaw-editor: chord selector (#add-chord-select) offers all 12 major and 1
   );
 });
 
-test("scdaw-editor: chord selector inserts chord at current timeline playhead position (e.g. Measure 1 then Measure 2)", async () => {
+test("shadow-claw-daw-editor: chord selector inserts chord at current timeline playhead position (e.g. Measure 1 then Measure 2)", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
   const { PPQN } = await import("../.agents/scripts/scdaw.js");
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
   await scdaw.resetProject({ template: "empty" });
   await scdaw.sendCommand("set_transport", { lengthBars: 2 });
@@ -4474,7 +4493,7 @@ test("scdaw-editor: chord selector inserts chord at current timeline playhead po
     value: "",
   });
 
-  const editor = new DawEditorElement();
+  const editor = new ShadowClawDawEditor();
   editor._selectedTrackId = trackId;
   editor.shadowRoot = {
     innerHTML: "",
@@ -4518,12 +4537,12 @@ test("scdaw-editor: chord selector inserts chord at current timeline playhead po
   );
 });
 
-test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only when adding a note (toggled === 'on')", async () => {
+test("shadow-claw-daw-editor & shadow-claw-daw-sequencer: audition note via scdaw.previewNote only when adding a note (toggled === 'on')", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawEditorElement } =
-    await import("../.agents/scripts/components/scdaw-editor.js");
-  const { DawSequencerElement } =
-    await import("../.agents/scripts/components/scdaw-sequencer.js");
+  const { ShadowClawDawEditor } =
+    await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
+  const { ShadowClawDawSequencer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-sequencer.js");
 
   await scdaw.sendCommand("new_project", {
     name: "Audition Test",
@@ -4561,7 +4580,7 @@ test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only w
         querySelector: () => null,
       },
     };
-    DawEditorElement.prototype._attachEventListeners.call(fakeEditor);
+    ShadowClawDawEditor.prototype._attachEventListeners.call(fakeEditor);
     assert.equal(cellClickListeners.length, 1);
 
     await cellClickListeners[0]({ preventDefault() {} });
@@ -4587,7 +4606,7 @@ test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only w
         if (type === "click") gridClickHandler = fn;
       },
     };
-    const fakeSeq = Object.create(DawSequencerElement.prototype);
+    const fakeSeq = Object.create(ShadowClawDawSequencer.prototype);
     fakeSeq.shadowRoot = {
       innerHTML: "",
       querySelector: (sel) => (sel === ".grid-container" ? mockGrid : null),
@@ -4621,7 +4640,7 @@ test("scdaw-editor & scdaw-sequencer: audition note via scdaw.previewNote only w
   }
 });
 
-test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG registration", async () => {
+test("shadow-claw-daw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG registration", async () => {
   const sections = getSynthSectionsForInstrument("tubular");
   assert.equal(sections.length, 4);
   assert.ok(sections.some((s) => s.id === "ops"));
@@ -4660,15 +4679,18 @@ test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG
     release: 0.4,
   });
   assert.match(svgPath, /^M\s/);
-  assert.equal(typeof DawSynthElement, "function");
+  assert.equal(typeof ShadowClawDawSynth, "function");
 
   const synthSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-synth.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-synth.js",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.match(
     synthSrc,
-    /@container scdaw-synth\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-synth\s*\(\s*min-width:\s*640px\s*\)/,
   );
   assert.match(synthSrc, /role=["']tablist["']/);
   assert.match(synthSrc, /role=["']tabpanel["']/);
@@ -4676,7 +4698,7 @@ test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG
   assert.match(synthSrc, /scdaw-synth__op-grid/);
 
   // Verify PSG in browser & devices
-  const browser = new DawBrowserElement();
+  const browser = new ShadowClawDawBrowser();
   assert.ok(browser._getItems().some((i) => i.kind === "psg"));
   const psgChain = getDeviceChainForTrack({
     id: "trk_psg",
@@ -4690,14 +4712,14 @@ test("scdaw-synth: pure helpers, mobile-first @container CSS, BEM, ARIA, and PSG
 
 test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Learn toggle & contextmenu, synth/devices contextmenu, and immediate liveRevision redraw", async () => {
   const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { DawTransportElement } =
-    await import("../.agents/scripts/components/scdaw-transport.js");
-  const { DawMixerElement } =
-    await import("../.agents/scripts/components/scdaw-mixer.js");
-  const { DawSynthElement } =
-    await import("../.agents/scripts/components/scdaw-synth.js");
-  const { DawDevicesElement } =
-    await import("../.agents/scripts/components/scdaw-devices.js");
+  const { ShadowClawDawTransport } =
+    await import("../.agents/scripts/components/shadow-claw-daw-transport.js");
+  const { ShadowClawDawMixer } =
+    await import("../.agents/scripts/components/shadow-claw-daw-mixer.js");
+  const { ShadowClawDawSynth } =
+    await import("../.agents/scripts/components/shadow-claw-daw-synth.js");
+  const { ShadowClawDawDevices } =
+    await import("../.agents/scripts/components/shadow-claw-daw-devices.js");
 
   await scdaw.resetProject({ template: "basic-beat" });
   const tracks = scdaw.getProject().tracks;
@@ -4709,10 +4731,10 @@ test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Lea
   globalThis.cancelAnimationFrame = () => {};
 
   try {
-    // 1. <scdaw-transport> MIDI dialog exposes Learn UI, live monitor, port filter, soft takeover, and SMC-Mixer preset
+    // 1. <shadow-claw-daw-transport> MIDI dialog exposes Learn UI, live monitor, port filter, soft takeover, and SMC-Mixer preset
     const transportSrc = await fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-transport.js",
+        "../.agents/scripts/components/shadow-claw-daw-transport.js",
         import.meta.url,
       ),
       "utf8",
@@ -4749,7 +4771,7 @@ test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Lea
       close() {},
       innerHTML: "",
     });
-    const transport = new DawTransportElement();
+    const transport = new ShadowClawDawTransport();
     transport.shadowRoot = {
       innerHTML: "",
       getElementById: (id) => makeTEl(id),
@@ -4791,8 +4813,8 @@ test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Lea
     assert.equal(scdaw.midi.state.get().learning.target.max, 0.5);
     scdaw.midi.cancelMidiLearn();
 
-    // 2. <scdaw-mixer> Learn mode (#mixer-learn-btn), contextmenu Learn, and immediate liveRevision redraw
-    const mixer = new DawMixerElement();
+    // 2. <shadow-claw-daw-mixer> Learn mode (#mixer-learn-btn), contextmenu Learn, and immediate liveRevision redraw
+    const mixer = new ShadowClawDawMixer();
     const mockVolSlider = {
       dataset: { track: trk0.id },
       value: String(Math.round(trk0.volume * 100)),
@@ -4917,14 +4939,17 @@ test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Lea
 
     mixer.disconnectedCallback();
 
-    // 3. <scdaw-synth> & <scdaw-devices> support contextmenu MIDI Learn and liveRevision redraw
+    // 3. <shadow-claw-daw-synth> & <shadow-claw-daw-devices> support contextmenu MIDI Learn and liveRevision redraw
     const synthSrc = await fs.readFile(
-      new URL("../.agents/scripts/components/scdaw-synth.js", import.meta.url),
+      new URL(
+        "../.agents/scripts/components/shadow-claw-daw-synth.js",
+        import.meta.url,
+      ),
       "utf8",
     );
     const devicesSrc = await fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-devices.js",
+        "../.agents/scripts/components/shadow-claw-daw-devices.js",
         import.meta.url,
       ),
       "utf8",
@@ -4936,10 +4961,10 @@ test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Lea
     assert.match(devicesSrc, /contextmenu/);
     assert.match(devicesSrc, /startMidiLearn/);
 
-    // 4. <scdaw-timeline> supports contextmenu MIDI Learn on record-arm, mute, and solo buttons
+    // 4. <shadow-claw-daw-timeline> supports contextmenu MIDI Learn on record-arm, mute, and solo buttons
     const timelineSrc = await fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-timeline.js",
+        "../.agents/scripts/components/shadow-claw-daw-timeline.js",
         import.meta.url,
       ),
       "utf8",

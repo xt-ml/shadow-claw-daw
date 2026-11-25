@@ -23,9 +23,9 @@ import {
 import {
   findNearestSpectrumBin,
   renderSpectrumSvg,
-} from "../.agents/scripts/components/scdaw-spectrum.js";
-import { renderSpectrogramSvg } from "../.agents/scripts/components/scdaw-wave-editor.js";
-import { formatRecordingErrorDialog } from "../.agents/scripts/components/scdaw-transport.js";
+} from "../.agents/scripts/components/shadow-claw-daw-spectrum.js";
+import { renderSpectrogramSvg } from "../.agents/scripts/components/shadow-claw-daw-wave-editor.js";
+import { formatRecordingErrorDialog } from "../.agents/scripts/components/shadow-claw-daw-transport.js";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
@@ -80,7 +80,7 @@ test("Phase 4.1: Transport native modal error dialog surfaces recording errors o
 
   const transportSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-transport.js",
+      "../.agents/scripts/components/shadow-claw-daw-transport.js",
       import.meta.url,
     ),
     "utf8",
@@ -314,7 +314,7 @@ test("Phase 4.5: Clipping, Silence, and Beat Onset analysis", () => {
   );
 });
 
-test("Phase 4.6: <scdaw-spectrum> & spectrogram SVG rendering + ARIA/mobile compliance", async () => {
+test("Phase 4.6: <shadow-claw-daw-spectrum> & spectrogram SVG rendering + ARIA/mobile compliance", async () => {
   const sr = 44100;
   const sine = makeSine(440, sr, 0.2, 0.8);
   const spec = computePowerSpectrum(sine, { fftSize: 1024, sampleRate: sr });
@@ -340,13 +340,16 @@ test("Phase 4.6: <scdaw-spectrum> & spectrogram SVG rendering + ARIA/mobile comp
   assert.match(specgramSvg, /scdaw-wave__freq-selection/);
 
   const spectrumSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-spectrum.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-spectrum.js",
+      import.meta.url,
+    ),
     "utf8",
   );
-  assert.match(spectrumSrc, /container-name:\s*scdaw-spectrum/);
+  assert.match(spectrumSrc, /container-name:\s*shadow-claw-daw-spectrum/);
   assert.match(
     spectrumSrc,
-    /@container scdaw-spectrum\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-spectrum\s*\(\s*min-width:\s*640px\s*\)/,
   );
   assert.match(
     spectrumSrc,
@@ -360,13 +363,16 @@ test("Phase 4.6: <scdaw-spectrum> & spectrogram SVG rendering + ARIA/mobile comp
   assert.match(spectrumSrc, /aria-live=["']polite["']/);
   assert.match(
     spectrumSrc,
-    /customElements\.define\(\s*["']scdaw-spectrum["']/,
+    /(?:defineElement|customElements\.define)\(\s*["']shadow-claw-daw-spectrum["']/,
   );
 
   const surface = await handleToolDispatch("scdaw_render_surface", {
     element: "spectrum",
   });
-  assert.equal(surface.element, "<scdaw-spectrum></scdaw-spectrum>");
+  assert.equal(
+    surface.element,
+    "<shadow-claw-daw-spectrum></shadow-claw-daw-spectrum>",
+  );
 });
 
 test("Phase 4.7: scdaw_analyze_audio_clip & spectral/noise_reduction tools work end-to-end", async () => {

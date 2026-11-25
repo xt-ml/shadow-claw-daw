@@ -1,12 +1,12 @@
 /**
- * .agents/scripts/components/scdaw-timeline.js
+ * .agents/scripts/components/shadow-claw-daw-timeline.js
  *
- * Arrangement Timeline & Track Headers Web Component (<scdaw-timeline>).
+ * Arrangement Timeline & Track Headers Web Component (<shadow-claw-daw-timeline>).
  * Ported concepts from openDAW Timeline & TrackHeader.
  * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import {
@@ -20,7 +20,10 @@ import {
 } from "../scdaw.js";
 import { computeWaveformPeaks } from "../scdaw-recorder.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function extractDroppedAudioFiles(dataTransfer) {
   const rawFiles = dataTransfer?.files ? Array.from(dataTransfer.files) : [];
@@ -1138,7 +1141,7 @@ export function setupClipInteraction({
   };
 }
 
-export class DawTimelineElement extends BaseElement {
+export class ShadowClawDawTimeline extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -1269,14 +1272,14 @@ export class DawTimelineElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-timeline;
+          container-name: shadow-claw-daw-timeline;
           --track-header-w: 136px;
           --timeline-gutter-width: 16px;
           --timeline-gutter-l: var(--timeline-gutter-width);
           --timeline-gutter-r: var(--timeline-gutter-width);
         }
 
-        @container scdaw-timeline (min-width: 520px) {
+        @container shadow-claw-daw-timeline (min-width: 520px) {
           :host {
             --track-header-w: 180px;
           }
@@ -1959,7 +1962,7 @@ export class DawTimelineElement extends BaseElement {
           opacity: 1;
         }
       </style>
-      <div class="scdaw-timeline daw-panel" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Arrangement Timeline and Tracks">
+      <div class="shadow-claw-daw-timeline daw-panel" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Arrangement Timeline and Tracks">
         <div class="scdaw-timeline__header timeline-header">
           <div class="scdaw-timeline__title-group">
             <span style="font-weight:700; font-size:0.8rem;">⏱ Timeline</span>
@@ -2843,9 +2846,4 @@ export class DawTimelineElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-timeline")
-) {
-  customElements.define("scdaw-timeline", DawTimelineElement);
-}
+defineElement("shadow-claw-daw-timeline", ShadowClawDawTimeline);

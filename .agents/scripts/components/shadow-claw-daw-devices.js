@@ -1,16 +1,19 @@
 /**
- * .agents/scripts/components/scdaw-devices.js
+ * .agents/scripts/components/shadow-claw-daw-devices.js
  *
- * Selected Track Device Rack Web Component (<scdaw-devices>).
+ * Selected Track Device Rack Web Component (<shadow-claw-daw-devices>).
  * Ported concepts from openDAW DeviceEditor & OpenStudio FXChainPanel.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import "./scdaw-knob.js";
+import "./shadow-claw-daw-knob.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function getDeviceChainForTrack(track) {
   if (!track) return [];
@@ -83,82 +86,82 @@ export function renderDeviceControls(dev) {
   switch (dev.type) {
     case "808":
       return `
-        <scdaw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.2}" default="1.2" data-param="decay"></scdaw-knob>
-        <scdaw-knob label="Glide" min="0" max="480" unit="t" value="${p.glide ?? 120}" default="120" data-param="glide"></scdaw-knob>
-        <scdaw-knob label="Drive" min="0" max="1.0" unit="" value="${p.drive ?? 0.3}" default="0.3" data-param="drive"></scdaw-knob>
-        <scdaw-knob label="Tone" min="0.1" max="1.0" unit="" value="${p.tone ?? 0.8}" default="0.8" data-param="tone"></scdaw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.2}" default="1.2" data-param="decay"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Glide" min="0" max="480" unit="t" value="${p.glide ?? 120}" default="120" data-param="glide"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Drive" min="0" max="1.0" unit="" value="${p.drive ?? 0.3}" default="0.3" data-param="drive"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Tone" min="0.1" max="1.0" unit="" value="${p.tone ?? 0.8}" default="0.8" data-param="tone"></shadow-claw-daw-knob>
       `;
     case "cubed":
       return `
-        <scdaw-knob label="Cutoff" min="50" max="6000" scaling="exponential" unit="Hz" value="${p.cutoff ?? 600}" default="600" data-param="cutoff"></scdaw-knob>
-        <scdaw-knob label="Res" min="0.1" max="25" unit="Q" value="${p.resonance ?? 8.0}" default="8.0" data-param="resonance"></scdaw-knob>
-        <scdaw-knob label="EnvMod" min="0" max="6000" unit="Hz" value="${p.envMod ?? 2000}" default="2000" data-param="envMod"></scdaw-knob>
-        <scdaw-knob label="Decay" min="0.05" max="2.0" unit="s" value="${p.decay ?? 0.3}" default="0.3" data-param="decay"></scdaw-knob>
-        <scdaw-knob label="Accent" min="0" max="1.0" unit="" value="${p.accent ?? 0.5}" default="0.5" data-param="accent"></scdaw-knob>
+        <shadow-claw-daw-knob label="Cutoff" min="50" max="6000" scaling="exponential" unit="Hz" value="${p.cutoff ?? 600}" default="600" data-param="cutoff"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Res" min="0.1" max="25" unit="Q" value="${p.resonance ?? 8.0}" default="8.0" data-param="resonance"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="EnvMod" min="0" max="6000" unit="Hz" value="${p.envMod ?? 2000}" default="2000" data-param="envMod"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.05" max="2.0" unit="s" value="${p.decay ?? 0.3}" default="0.3" data-param="decay"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Accent" min="0" max="1.0" unit="" value="${p.accent ?? 0.5}" default="0.5" data-param="accent"></shadow-claw-daw-knob>
       `;
     case "pluck":
       return `
-        <scdaw-knob label="Tone" min="0.1" max="1.0" unit="" value="${p.tone ?? 0.7}" default="0.7" data-param="tone"></scdaw-knob>
-        <scdaw-knob label="Decay" min="0.1" max="5.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></scdaw-knob>
-        <scdaw-knob label="Drive" min="0" max="1.0" unit="" value="${p.drive ?? 0.2}" default="0.2" data-param="drive"></scdaw-knob>
-        <scdaw-knob label="Width" min="0" max="2.0" unit="" value="${p.width ?? 1.0}" default="1.0" data-param="width"></scdaw-knob>
+        <shadow-claw-daw-knob label="Tone" min="0.1" max="1.0" unit="" value="${p.tone ?? 0.7}" default="0.7" data-param="tone"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.1" max="5.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Drive" min="0" max="1.0" unit="" value="${p.drive ?? 0.2}" default="0.2" data-param="drive"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Width" min="0" max="2.0" unit="" value="${p.width ?? 1.0}" default="1.0" data-param="width"></shadow-claw-daw-knob>
       `;
     case "tubular":
       return `
-        <scdaw-knob label="Algo" min="1" max="32" step="1" unit="#" value="${p.algorithm ?? 1}" default="1" data-param="algorithm"></scdaw-knob>
-        <scdaw-knob label="Feedback" min="0" max="7" step="1" unit="" value="${p.feedback ?? 0}" default="0" data-param="feedback"></scdaw-knob>
-        <scdaw-knob label="Brightness" min="0.1" max="2.0" unit="" value="${p.brightness ?? 1.0}" default="1.0" data-param="brightness"></scdaw-knob>
-        <scdaw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></scdaw-knob>
+        <shadow-claw-daw-knob label="Algo" min="1" max="32" step="1" unit="#" value="${p.algorithm ?? 1}" default="1" data-param="algorithm"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Feedback" min="0" max="7" step="1" unit="" value="${p.feedback ?? 0}" default="0" data-param="feedback"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Brightness" min="0.1" max="2.0" unit="" value="${p.brightness ?? 1.0}" default="1.0" data-param="brightness"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></shadow-claw-daw-knob>
       `;
     case "neon":
       return `
-        <scdaw-knob label="DCW" min="0" max="1.0" unit="" value="${p.dcw ?? 0.5}" default="0.5" data-param="dcw"></scdaw-knob>
-        <scdaw-knob label="DCA" min="0" max="1.0" unit="" value="${p.dca ?? 0.8}" default="0.8" data-param="dca"></scdaw-knob>
-        <scdaw-knob label="Detune" min="-24" max="24" unit="st" value="${p.detune ?? 0}" default="0" data-param="detune"></scdaw-knob>
-        <scdaw-knob label="Glide" min="0" max="480" unit="t" value="${p.glide ?? 0}" default="0" data-param="glide"></scdaw-knob>
+        <shadow-claw-daw-knob label="DCW" min="0" max="1.0" unit="" value="${p.dcw ?? 0.5}" default="0.5" data-param="dcw"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="DCA" min="0" max="1.0" unit="" value="${p.dca ?? 0.8}" default="0.8" data-param="dca"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Detune" min="-24" max="24" unit="st" value="${p.detune ?? 0}" default="0" data-param="detune"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Glide" min="0" max="480" unit="t" value="${p.glide ?? 0}" default="0" data-param="glide"></shadow-claw-daw-knob>
       `;
     case "noise-pad":
       return `
-        <scdaw-knob label="Attack" min="0.05" max="3.0" unit="s" value="${p.attack ?? 0.6}" default="0.6" data-param="attack"></scdaw-knob>
-        <scdaw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.8}" default="1.8" data-param="decay"></scdaw-knob>
-        <scdaw-knob label="Sustain" min="0" max="1.0" unit="" value="${p.sustain ?? 0.7}" default="0.7" data-param="sustain"></scdaw-knob>
-        <scdaw-knob label="Release" min="0.1" max="5.0" unit="s" value="${p.release ?? 2.0}" default="2.0" data-param="release"></scdaw-knob>
-        <scdaw-knob label="Texture" min="0" max="1.0" unit="" value="${p.texture ?? 0.3}" default="0.3" data-param="texture"></scdaw-knob>
+        <shadow-claw-daw-knob label="Attack" min="0.05" max="3.0" unit="s" value="${p.attack ?? 0.6}" default="0.6" data-param="attack"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.1" max="4.0" unit="s" value="${p.decay ?? 1.8}" default="1.8" data-param="decay"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Sustain" min="0" max="1.0" unit="" value="${p.sustain ?? 0.7}" default="0.7" data-param="sustain"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Release" min="0.1" max="5.0" unit="s" value="${p.release ?? 2.0}" default="2.0" data-param="release"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Texture" min="0" max="1.0" unit="" value="${p.texture ?? 0.3}" default="0.3" data-param="texture"></shadow-claw-daw-knob>
       `;
     case "korpus":
       return `
-        <scdaw-knob label="Intensity" min="0.1" max="2.0" unit="" value="${p.intensity ?? 1.0}" default="1.0" data-param="intensity"></scdaw-knob>
-        <scdaw-knob label="Coupling" min="0" max="1.0" unit="" value="${p.coupling ?? 0.5}" default="0.5" data-param="coupling"></scdaw-knob>
-        <scdaw-knob label="Damping" min="0" max="1.0" unit="" value="${p.damping ?? 0.3}" default="0.3" data-param="damping"></scdaw-knob>
-        <scdaw-knob label="Air" min="0" max="1.0" unit="" value="${p.air ?? 0.2}" default="0.2" data-param="air"></scdaw-knob>
+        <shadow-claw-daw-knob label="Intensity" min="0.1" max="2.0" unit="" value="${p.intensity ?? 1.0}" default="1.0" data-param="intensity"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Coupling" min="0" max="1.0" unit="" value="${p.coupling ?? 0.5}" default="0.5" data-param="coupling"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Damping" min="0" max="1.0" unit="" value="${p.damping ?? 0.3}" default="0.3" data-param="damping"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Air" min="0" max="1.0" unit="" value="${p.air ?? 0.2}" default="0.2" data-param="air"></shadow-claw-daw-knob>
       `;
     case "nano":
       return `
-        <scdaw-knob label="RootKey" min="0" max="127" step="1" unit="st" value="${p.rootKey ?? 60}" default="60" data-param="rootKey"></scdaw-knob>
-        <scdaw-knob label="Attack" min="0.001" max="2.0" unit="s" value="${p.attack ?? 0.01}" default="0.01" data-param="attack"></scdaw-knob>
-        <scdaw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></scdaw-knob>
+        <shadow-claw-daw-knob label="RootKey" min="0" max="127" step="1" unit="st" value="${p.rootKey ?? 60}" default="60" data-param="rootKey"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Attack" min="0.001" max="2.0" unit="s" value="${p.attack ?? 0.01}" default="0.01" data-param="attack"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></shadow-claw-daw-knob>
       `;
     case "psg":
       return `
-        <scdaw-knob label="Duty" min="0.125" max="0.875" step="0.125" unit="" value="${p.duty ?? 0.5}" default="0.5" data-param="duty"></scdaw-knob>
-        <scdaw-knob label="Noise" min="1" max="31" step="1" unit="" value="${p.noisePeriod ?? 16}" default="16" data-param="noisePeriod"></scdaw-knob>
-        <scdaw-knob label="Tune" min="-24" max="24" step="1" unit="st" value="${p.tune ?? 0}" default="0" data-param="tune"></scdaw-knob>
-        <scdaw-knob label="Arp" min="0" max="12" step="1" unit="st" value="${p.arpSteps ?? 0}" default="0" data-param="arpSteps"></scdaw-knob>
-        <scdaw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></scdaw-knob>
+        <shadow-claw-daw-knob label="Duty" min="0.125" max="0.875" step="0.125" unit="" value="${p.duty ?? 0.5}" default="0.5" data-param="duty"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Noise" min="1" max="31" step="1" unit="" value="${p.noisePeriod ?? 16}" default="16" data-param="noisePeriod"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Tune" min="-24" max="24" step="1" unit="st" value="${p.tune ?? 0}" default="0" data-param="tune"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Arp" min="0" max="12" step="1" unit="st" value="${p.arpSteps ?? 0}" default="0" data-param="arpSteps"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Release" min="0.01" max="3.0" unit="s" value="${p.release ?? 0.2}" default="0.2" data-param="release"></shadow-claw-daw-knob>
       `;
     case "soundfont":
       return `
-        <scdaw-knob label="Program" min="0" max="127" step="1" unit="#" value="${p.programNumber ?? 0}" default="0" data-param="programNumber"></scdaw-knob>
-        <scdaw-knob label="Bank" min="0" max="127" step="1" unit="#" value="${p.bank ?? 0}" default="0" data-param="bank"></scdaw-knob>
+        <shadow-claw-daw-knob label="Program" min="0" max="127" step="1" unit="#" value="${p.programNumber ?? 0}" default="0" data-param="programNumber"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Bank" min="0" max="127" step="1" unit="#" value="${p.bank ?? 0}" default="0" data-param="bank"></shadow-claw-daw-knob>
       `;
     case "synth":
     case "vaporisateur":
       return `
-        <scdaw-knob label="Cutoff" min="20" max="20000" scaling="exponential" unit="Hz" value="${p.cutoff || 1200}" default="1200" data-param="cutoff"></scdaw-knob>
-        <scdaw-knob label="Res" min="0.1" max="24" unit="Q" value="${p.resonance || 2.0}" default="2.0" data-param="resonance"></scdaw-knob>
-        <scdaw-knob label="EnvAmt" min="0" max="8000" unit="Hz" value="${p.filterEnvAmount || 0}" default="1000" data-param="filterEnvAmount"></scdaw-knob>
-        <scdaw-knob label="Attack" min="0.005" max="1.5" unit="s" value="${p.attack || 0.01}" default="0.01" data-param="attack"></scdaw-knob>
-        <scdaw-knob label="Decay" min="0.01" max="2.0" unit="s" value="${p.decay || 0.15}" default="0.15" data-param="decay"></scdaw-knob>
+        <shadow-claw-daw-knob label="Cutoff" min="20" max="20000" scaling="exponential" unit="Hz" value="${p.cutoff || 1200}" default="1200" data-param="cutoff"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Res" min="0.1" max="24" unit="Q" value="${p.resonance || 2.0}" default="2.0" data-param="resonance"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="EnvAmt" min="0" max="8000" unit="Hz" value="${p.filterEnvAmount || 0}" default="1000" data-param="filterEnvAmount"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Attack" min="0.005" max="1.5" unit="s" value="${p.attack || 0.01}" default="0.01" data-param="attack"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.01" max="2.0" unit="s" value="${p.decay || 0.15}" default="0.15" data-param="decay"></shadow-claw-daw-knob>
       `;
     case "drums":
       return `
@@ -168,97 +171,97 @@ export function renderDeviceControls(dev) {
       `;
     case "autotune":
       return `
-        <scdaw-knob label="Retune" min="0" max="1.0" unit="" value="${p.retune ?? 0.8}" default="0.8" data-param="retune"></scdaw-knob>
-        <scdaw-knob label="Amount" min="0" max="1.0" unit="" value="${p.amount ?? 1.0}" default="1.0" data-param="amount"></scdaw-knob>
-        <scdaw-knob label="Shift" min="-12" max="12" step="1" unit="st" value="${p.shift ?? 0}" default="0" data-param="shift"></scdaw-knob>
+        <shadow-claw-daw-knob label="Retune" min="0" max="1.0" unit="" value="${p.retune ?? 0.8}" default="0.8" data-param="retune"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Amount" min="0" max="1.0" unit="" value="${p.amount ?? 1.0}" default="1.0" data-param="amount"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Shift" min="-12" max="12" step="1" unit="st" value="${p.shift ?? 0}" default="0" data-param="shift"></shadow-claw-daw-knob>
       `;
     case "vocoder":
       return `
-        <scdaw-knob label="Bands" min="8" max="16" step="4" unit="#" value="${p.bands ?? 16}" default="16" data-param="bands"></scdaw-knob>
-        <scdaw-knob label="Release" min="0.01" max="0.2" unit="s" value="${p.release ?? 0.04}" default="0.04" data-param="release"></scdaw-knob>
-        <scdaw-knob label="Carrier" min="0" max="2.0" unit="" value="${p.carrierGain ?? 1.0}" default="1.0" data-param="carrierGain"></scdaw-knob>
+        <shadow-claw-daw-knob label="Bands" min="8" max="16" step="4" unit="#" value="${p.bands ?? 16}" default="16" data-param="bands"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Release" min="0.01" max="0.2" unit="s" value="${p.release ?? 0.04}" default="0.04" data-param="release"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Carrier" min="0" max="2.0" unit="" value="${p.carrierGain ?? 1.0}" default="1.0" data-param="carrierGain"></shadow-claw-daw-knob>
       `;
     case "maximizer":
       return `
-        <scdaw-knob label="Thresh" min="-24" max="0" unit="dB" value="${p.threshold ?? -6.0}" default="-6.0" data-param="threshold"></scdaw-knob>
-        <scdaw-knob label="Ceiling" min="-6" max="0" unit="dB" value="${p.ceiling ?? -0.1}" default="-0.1" data-param="ceiling"></scdaw-knob>
-        <scdaw-knob label="Release" min="0.02" max="1.0" unit="s" value="${p.release ?? 0.15}" default="0.15" data-param="release"></scdaw-knob>
+        <shadow-claw-daw-knob label="Thresh" min="-24" max="0" unit="dB" value="${p.threshold ?? -6.0}" default="-6.0" data-param="threshold"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Ceiling" min="-6" max="0" unit="dB" value="${p.ceiling ?? -0.1}" default="-0.1" data-param="ceiling"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Release" min="0.02" max="1.0" unit="s" value="${p.release ?? 0.15}" default="0.15" data-param="release"></shadow-claw-daw-knob>
       `;
     case "tidal":
       return `
-        <scdaw-knob label="Rate" min="0.1" max="16.0" unit="Hz" value="${p.rate ?? 4}" default="4" data-param="rate"></scdaw-knob>
-        <scdaw-knob label="Depth" min="0" max="1.0" unit="" value="${p.depth ?? 0.8}" default="0.8" data-param="depth"></scdaw-knob>
-        <scdaw-knob label="Offset" min="-180" max="180" unit="°" value="${p.channelOffset ?? 90}" default="90" data-param="channelOffset"></scdaw-knob>
+        <shadow-claw-daw-knob label="Rate" min="0.1" max="16.0" unit="Hz" value="${p.rate ?? 4}" default="4" data-param="rate"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Depth" min="0" max="1.0" unit="" value="${p.depth ?? 0.8}" default="0.8" data-param="depth"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Offset" min="-180" max="180" unit="°" value="${p.channelOffset ?? 90}" default="90" data-param="channelOffset"></shadow-claw-daw-knob>
       `;
     case "transient":
       return `
-        <scdaw-knob label="Attack" min="-1.0" max="1.0" unit="" value="${p.attack ?? 0.0}" default="0.0" data-param="attack"></scdaw-knob>
-        <scdaw-knob label="Sustain" min="-1.0" max="1.0" unit="" value="${p.sustain ?? 0.0}" default="0.0" data-param="sustain"></scdaw-knob>
+        <shadow-claw-daw-knob label="Attack" min="-1.0" max="1.0" unit="" value="${p.attack ?? 0.0}" default="0.0" data-param="attack"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Sustain" min="-1.0" max="1.0" unit="" value="${p.sustain ?? 0.0}" default="0.0" data-param="sustain"></shadow-claw-daw-knob>
       `;
     case "sidechain":
       return `
-        <scdaw-knob label="Thresh" min="-40" max="0" unit="dB" value="${p.thresholdDb ?? -18}" default="-18" data-param="thresholdDb"></scdaw-knob>
-        <scdaw-knob label="Depth" min="0" max="36" unit="dB" value="${p.depthDb ?? 18}" default="18" data-param="depthDb"></scdaw-knob>
+        <shadow-claw-daw-knob label="Thresh" min="-40" max="0" unit="dB" value="${p.thresholdDb ?? -18}" default="-18" data-param="thresholdDb"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Depth" min="0" max="36" unit="dB" value="${p.depthDb ?? 18}" default="18" data-param="depthDb"></shadow-claw-daw-knob>
       `;
     case "fold":
       return `
-        <scdaw-knob label="Drive" min="0" max="24" unit="dB" value="${p.driveDb ?? 6}" default="6" data-param="driveDb"></scdaw-knob>
-        <scdaw-knob label="Mix" min="0" max="1.0" unit="" value="${p.mix ?? 1.0}" default="1.0" data-param="mix"></scdaw-knob>
+        <shadow-claw-daw-knob label="Drive" min="0" max="24" unit="dB" value="${p.driveDb ?? 6}" default="6" data-param="driveDb"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Mix" min="0" max="1.0" unit="" value="${p.mix ?? 1.0}" default="1.0" data-param="mix"></shadow-claw-daw-knob>
       `;
     case "crusher":
       return `
-        <scdaw-knob label="Bits" min="4" max="16" step="1" unit="b" value="${p.bits ?? 8}" default="8" data-param="bits"></scdaw-knob>
-        <scdaw-knob label="Down" min="1" max="16" step="1" unit="x" value="${p.downsample ?? 1}" default="1" data-param="downsample"></scdaw-knob>
+        <shadow-claw-daw-knob label="Bits" min="4" max="16" step="1" unit="b" value="${p.bits ?? 8}" default="8" data-param="bits"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Down" min="1" max="16" step="1" unit="x" value="${p.downsample ?? 1}" default="1" data-param="downsample"></shadow-claw-daw-knob>
       `;
     case "delay":
       return `
-        <scdaw-knob label="TimeL" min="1" max="16" step="1" unit="st" value="${p.timeStepsL ?? 3}" default="3" data-param="timeStepsL"></scdaw-knob>
-        <scdaw-knob label="TimeR" min="1" max="16" step="1" unit="st" value="${p.timeStepsR ?? 4}" default="4" data-param="timeStepsR"></scdaw-knob>
-        <scdaw-knob label="FdBk" min="0" max="0.9" unit="" value="${p.feedback ?? 0.35}" default="0.35" data-param="feedback"></scdaw-knob>
-        <scdaw-knob label="Wet" min="0" max="1.0" unit="" value="${p.wet ?? 0.3}" default="0.3" data-param="wet"></scdaw-knob>
+        <shadow-claw-daw-knob label="TimeL" min="1" max="16" step="1" unit="st" value="${p.timeStepsL ?? 3}" default="3" data-param="timeStepsL"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="TimeR" min="1" max="16" step="1" unit="st" value="${p.timeStepsR ?? 4}" default="4" data-param="timeStepsR"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="FdBk" min="0" max="0.9" unit="" value="${p.feedback ?? 0.35}" default="0.35" data-param="feedback"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Wet" min="0" max="1.0" unit="" value="${p.wet ?? 0.3}" default="0.3" data-param="wet"></shadow-claw-daw-knob>
       `;
     case "reverb":
       return `
-        <scdaw-knob label="Decay" min="0.1" max="5.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></scdaw-knob>
-        <scdaw-knob label="Damp" min="0" max="1.0" unit="" value="${p.damping ?? 0.5}" default="0.5" data-param="damping"></scdaw-knob>
-        <scdaw-knob label="Wet" min="0" max="1.0" unit="" value="${p.wet ?? 0.25}" default="0.25" data-param="wet"></scdaw-knob>
+        <shadow-claw-daw-knob label="Decay" min="0.1" max="5.0" unit="s" value="${p.decay ?? 1.5}" default="1.5" data-param="decay"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Damp" min="0" max="1.0" unit="" value="${p.damping ?? 0.5}" default="0.5" data-param="damping"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Wet" min="0" max="1.0" unit="" value="${p.wet ?? 0.25}" default="0.25" data-param="wet"></shadow-claw-daw-knob>
       `;
     case "stereo":
     case "stereoTool":
       return `
-        <scdaw-knob label="Width" min="0" max="2.0" unit="" value="${p.width ?? 1.0}" default="1.0" data-param="width"></scdaw-knob>
-        <scdaw-knob label="Pan" min="-1.0" max="1.0" unit="" value="${p.pan ?? 0.0}" default="0.0" data-param="pan"></scdaw-knob>
+        <shadow-claw-daw-knob label="Width" min="0" max="2.0" unit="" value="${p.width ?? 1.0}" default="1.0" data-param="width"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Pan" min="-1.0" max="1.0" unit="" value="${p.pan ?? 0.0}" default="0.0" data-param="pan"></shadow-claw-daw-knob>
       `;
     case "zeitgeist":
       return `
-        <scdaw-knob label="Amount" min="0" max="1.0" unit="" value="${p.amount ?? 0.5}" default="0.5" data-param="amount"></scdaw-knob>
+        <shadow-claw-daw-knob label="Amount" min="0" max="1.0" unit="" value="${p.amount ?? 0.5}" default="0.5" data-param="amount"></shadow-claw-daw-knob>
       `;
     case "notefilter":
       return `
-        <scdaw-knob label="MinPitch" min="0" max="127" step="1" unit="st" value="${p.minPitch ?? 0}" default="0" data-param="minPitch"></scdaw-knob>
-        <scdaw-knob label="MaxPitch" min="0" max="127" step="1" unit="st" value="${p.maxPitch ?? 127}" default="127" data-param="maxPitch"></scdaw-knob>
+        <shadow-claw-daw-knob label="MinPitch" min="0" max="127" step="1" unit="st" value="${p.minPitch ?? 0}" default="0" data-param="minPitch"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="MaxPitch" min="0" max="127" step="1" unit="st" value="${p.maxPitch ?? 127}" default="127" data-param="maxPitch"></shadow-claw-daw-knob>
       `;
     case "chord":
       return `
-        <scdaw-knob label="Strum" min="0" max="120" step="5" unit="t" value="${p.strumTicks ?? 0}" default="0" data-param="strumTicks"></scdaw-knob>
+        <shadow-claw-daw-knob label="Strum" min="0" max="120" step="5" unit="t" value="${p.strumTicks ?? 0}" default="0" data-param="strumTicks"></shadow-claw-daw-knob>
       `;
     case "humanize":
       return `
-        <scdaw-knob label="Timing" min="0" max="120" unit="t" value="${p.timingTicks ?? 15}" default="15" data-param="timingTicks"></scdaw-knob>
-        <scdaw-knob label="Velocity" min="0" max="64" unit="" value="${p.velocity ?? 10}" default="10" data-param="velocity"></scdaw-knob>
+        <shadow-claw-daw-knob label="Timing" min="0" max="120" unit="t" value="${p.timingTicks ?? 15}" default="15" data-param="timingTicks"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Velocity" min="0" max="64" unit="" value="${p.velocity ?? 10}" default="10" data-param="velocity"></shadow-claw-daw-knob>
       `;
     case "arpeggio":
       return `
-        <scdaw-knob label="Steps" min="1" max="4" step="1" unit="st" value="${p.rateSteps ?? 1}" default="1" data-param="rateSteps"></scdaw-knob>
-        <scdaw-knob label="Gate" min="0.1" max="1.0" unit="" value="${p.gate ?? 0.8}" default="0.8" data-param="gate"></scdaw-knob>
+        <shadow-claw-daw-knob label="Steps" min="1" max="4" step="1" unit="st" value="${p.rateSteps ?? 1}" default="1" data-param="rateSteps"></shadow-claw-daw-knob>
+        <shadow-claw-daw-knob label="Gate" min="0.1" max="1.0" unit="" value="${p.gate ?? 0.8}" default="0.8" data-param="gate"></shadow-claw-daw-knob>
       `;
     case "pitch":
       return `
-        <scdaw-knob label="Shift" min="-24" max="24" step="1" unit="st" value="${p.semitones ?? 0}" default="0" data-param="semitones"></scdaw-knob>
+        <shadow-claw-daw-knob label="Shift" min="-24" max="24" step="1" unit="st" value="${p.semitones ?? 0}" default="0" data-param="semitones"></shadow-claw-daw-knob>
       `;
     case "velocity":
       return `
-        <scdaw-knob label="Drive" min="-1.0" max="1.0" unit="" value="${p.drive ?? 0}" default="0" data-param="drive"></scdaw-knob>
+        <shadow-claw-daw-knob label="Drive" min="-1.0" max="1.0" unit="" value="${p.drive ?? 0}" default="0" data-param="drive"></shadow-claw-daw-knob>
       `;
     default:
       return `<div style="font-size:0.75rem; color:var(--text-secondary); padding:0.4rem;">${dev.name} active</div>`;
@@ -287,7 +290,7 @@ export function shouldPreserveDevicesDom({
   return true;
 }
 
-export class DawDevicesElement extends BaseElement {
+export class ShadowClawDawDevices extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -357,7 +360,7 @@ export class DawDevicesElement extends BaseElement {
       if (!dev) return;
       const p = dev.params || {};
 
-      card.querySelectorAll("scdaw-knob").forEach((knob) => {
+      card.querySelectorAll("shadow-claw-daw-knob").forEach((knob) => {
         const param = knob.dataset.param;
         if (!param) return;
         const targetVal = p[param];
@@ -399,7 +402,7 @@ export class DawDevicesElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-devices;
+          container-name: shadow-claw-daw-devices;
         }
         .scdaw-devices__rack,
         .rack-container {
@@ -464,7 +467,7 @@ export class DawDevicesElement extends BaseElement {
           flex-wrap: wrap;
           touch-action: none;
         }
-        @container scdaw-devices (min-width: 640px) {
+        @container shadow-claw-daw-devices (min-width: 640px) {
           .scdaw-devices__rack,
           .rack-container {
             padding: 0.9rem;
@@ -492,7 +495,7 @@ export class DawDevicesElement extends BaseElement {
           }
         }
       </style>
-      <div class="scdaw-devices daw-panel" role="region" aria-label="Track Device Rack">
+      <div class="shadow-claw-daw-devices daw-panel" role="region" aria-label="Track Device Rack">
         <div class="scdaw-devices__header daw-panel-header">
           <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
             <span>🎛️ Device Rack: <strong>${track?.name || "None"}</strong></span>
@@ -538,7 +541,7 @@ export class DawDevicesElement extends BaseElement {
     `;
 
     // Knob parameter adjustments
-    this.shadowRoot.querySelectorAll("scdaw-knob").forEach((knob) => {
+    this.shadowRoot.querySelectorAll("shadow-claw-daw-knob").forEach((knob) => {
       knob.addEventListener("input", (e) => {
         if (!this._selectedTrackId) return;
         const card = knob.closest(".scdaw-devices__card");
@@ -653,9 +656,4 @@ export class DawDevicesElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-devices")
-) {
-  customElements.define("scdaw-devices", DawDevicesElement);
-}
+defineElement("shadow-claw-daw-devices", ShadowClawDawDevices);

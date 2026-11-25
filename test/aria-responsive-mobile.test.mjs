@@ -1,24 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { DawEditorElement } from "../.agents/scripts/components/scdaw-editor.js";
-import { DawSequencerElement } from "../.agents/scripts/components/scdaw-sequencer.js";
-import { DawMixerElement } from "../.agents/scripts/components/scdaw-mixer.js";
-import { DawBrowserElement } from "../.agents/scripts/components/scdaw-browser.js";
-import { DawDevicesElement } from "../.agents/scripts/components/scdaw-devices.js";
+import { ShadowClawDawEditor } from "../.agents/scripts/components/shadow-claw-daw-editor.js";
+import { ShadowClawDawSequencer } from "../.agents/scripts/components/shadow-claw-daw-sequencer.js";
+import { ShadowClawDawMixer } from "../.agents/scripts/components/shadow-claw-daw-mixer.js";
+import { ShadowClawDawBrowser } from "../.agents/scripts/components/shadow-claw-daw-browser.js";
+import { ShadowClawDawDevices } from "../.agents/scripts/components/shadow-claw-daw-devices.js";
 import {
   SIGNATURE_PRESETS,
   calculateBpmDragValue,
-} from "../.agents/scripts/components/scdaw-transport.js";
+} from "../.agents/scripts/components/shadow-claw-daw-transport.js";
 import {
   resolveWorkbenchResponsiveLayout,
   resolveWorkbenchButtonStates,
-} from "../.agents/scripts/components/scdaw-workbench.js";
+} from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
 
 test("Transport: supports 20-300 BPM bounds, extended signature presets, coarse pointer touch targets, and ARIA", async () => {
   const src = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-transport.js",
+      "../.agents/scripts/components/shadow-claw-daw-transport.js",
       import.meta.url,
     ),
     "utf8",
@@ -47,9 +47,12 @@ test("Transport: supports 20-300 BPM bounds, extended signature presets, coarse 
   assert.match(src, /@media\s*\(\s*pointer:\s*coarse\s*\)/);
 });
 
-test("Piano Roll (<scdaw-editor>): ARIA roles, keyboard accessibility, bar-start markers, and coarse touch targets", async () => {
+test("Piano Roll (<shadow-claw-daw-editor>): ARIA roles, keyboard accessibility, bar-start markers, and coarse touch targets", async () => {
   const src = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-editor.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-editor.js",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -69,10 +72,10 @@ test("Piano Roll (<scdaw-editor>): ARIA roles, keyboard accessibility, bar-start
   assert.match(src, /bar-start/);
 });
 
-test("Step Sequencer (<scdaw-sequencer>): ARIA button cells, keyboard support, @supports fallback, and coarse touch targets", async () => {
+test("Step Sequencer (<shadow-claw-daw-sequencer>): ARIA button cells, keyboard support, @supports fallback, and coarse touch targets", async () => {
   const src = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-sequencer.js",
+      "../.agents/scripts/components/shadow-claw-daw-sequencer.js",
       import.meta.url,
     ),
     "utf8",
@@ -94,9 +97,12 @@ test("Step Sequencer (<scdaw-sequencer>): ARIA button cells, keyboard support, @
   );
 });
 
-test("Mixer (<scdaw-mixer>): ARIA labels on faders/reset/strips, @supports fallback, and coarse touch targets", async () => {
+test("Mixer (<shadow-claw-daw-mixer>): ARIA labels on faders/reset/strips, @supports fallback, and coarse touch targets", async () => {
   const src = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-mixer.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-mixer.js",
+      import.meta.url,
+    ),
     "utf8",
   );
 
@@ -114,18 +120,18 @@ test("Mixer (<scdaw-mixer>): ARIA labels on faders/reset/strips, @supports fallb
   );
 });
 
-test("Browser & Devices (<scdaw-browser>, <scdaw-devices>): ARIA compliance, @supports fallback, and coarse touch targets", async () => {
+test("Browser & Devices (<shadow-claw-daw-browser>, <shadow-claw-daw-devices>): ARIA compliance, @supports fallback, and coarse touch targets", async () => {
   const [browserSrc, devicesSrc] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-browser.js",
+        "../.agents/scripts/components/shadow-claw-daw-browser.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-devices.js",
+        "../.agents/scripts/components/shadow-claw-daw-devices.js",
         import.meta.url,
       ),
       "utf8",
@@ -141,7 +147,7 @@ test("Browser & Devices (<scdaw-browser>, <scdaw-devices>): ARIA compliance, @su
 
   assert.match(
     devicesSrc,
-    /@container scdaw-devices\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-devices\s*\(\s*min-width:\s*640px\s*\)/,
   );
   assert.match(
     devicesSrc,
@@ -150,10 +156,10 @@ test("Browser & Devices (<scdaw-browser>, <scdaw-devices>): ARIA compliance, @su
   assert.match(devicesSrc, /id=["']reset-device-btn["'][^>]*aria-label=/);
 });
 
-test("Workbench (<scdaw-workbench>): mobile browser-full view, keyboard file list, and touch targets", async () => {
+test("Workbench (<shadow-claw-daw-workbench>): mobile browser-full view, keyboard file list, and touch targets", async () => {
   const workbenchSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-workbench.js",
+      "../.agents/scripts/components/shadow-claw-daw-workbench.js",
       import.meta.url,
     ),
     "utf8",

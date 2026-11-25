@@ -8,7 +8,7 @@ import {
   encodeDawProject,
   decodeDawProject,
 } from "../.agents/scripts/scdaw-dawproject.js";
-import { extractDroppedAudioFiles } from "../.agents/scripts/components/scdaw-timeline.js";
+import { extractDroppedAudioFiles } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import {
   createDspWorkerRunner,
   enableDspWorker,
@@ -87,7 +87,10 @@ test("Phase 6.1: scdaw_import_audio decodes base64/data-URI WAV in pure JS and s
   );
 
   const timelineSrc = await fs.readFile(
-    new URL("../.agents/scripts/components/scdaw-timeline.js", import.meta.url),
+    new URL(
+      "../.agents/scripts/components/shadow-claw-daw-timeline.js",
+      import.meta.url,
+    ),
     "utf8",
   );
   assert.match(timelineSrc, /scdaw-timeline__lane--drop-target/);
@@ -97,7 +100,7 @@ test("Phase 6.1: scdaw_import_audio decodes base64/data-URI WAV in pure JS and s
 
   const waveSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-wave-editor.js",
+      "../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
       import.meta.url,
     ),
     "utf8",

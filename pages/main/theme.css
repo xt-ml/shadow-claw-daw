@@ -860,7 +860,7 @@ a.portal-cta:hover span,
   overflow-x: hidden;
 }
 
-.scdaw-workbench-page scdaw-workbench {
+.scdaw-workbench-page shadow-claw-daw-workbench {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -898,8 +898,9 @@ a.portal-cta:hover span,
   overflow-x: hidden !important;
 }
 
-.scdaw-workbench-page.scdaw-workbench-page--fullscreen scdaw-workbench,
-.scdaw-workbench-page:fullscreen scdaw-workbench {
+.scdaw-workbench-page.scdaw-workbench-page--fullscreen
+  shadow-claw-daw-workbench,
+.scdaw-workbench-page:fullscreen shadow-claw-daw-workbench {
   height: 100%;
   max-height: 100%;
 }

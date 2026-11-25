@@ -1,13 +1,20 @@
 /**
- * .agents/scripts/components/scdaw-workbench.js
+ * .agents/scripts/components/shadow-claw-daw-workbench.js
  *
- * Master Studio Docking Workbench Web Component (<scdaw-workbench>).
+ * Master Studio Docking Workbench Web Component (<shadow-claw-daw-workbench>).
  * Ported concepts from openDAW DefaultWorkspace & WorkspacePage.
  * Incorporates CSS Container Queries (@container), accessible split-pane
- * resize handles (<scdaw-resize-handle>), and responsive mobile-first full-width views.
+ * resize handles (<shadow-claw-daw-resize-handle>), and responsive mobile-first full-width views.
  */
 
-import { SHARED_STYLES, installPageSwipeGuard } from "./scdaw-styles.js";
+import {
+  SHARED_STYLES,
+  installPageSwipeGuard,
+} from "./shadow-claw-daw-styles.js";
+import {
+  resolveWorkbenchFullscreenState as resolveSharedWorkbenchFullscreenState,
+  setupWorkbenchFullscreen as setupSharedWorkbenchFullscreen,
+} from "shadow-claw/utils/workbench-fullscreen";
 import { scdaw } from "../scdaw-engine.js";
 import { shouldHandleSoftwareKeyboardEvent } from "../scdaw-midi-io.js";
 import { serializeProject } from "../scdaw.js";
@@ -26,31 +33,25 @@ import {
   classifyFile,
 } from "../scdaw-fs.js";
 
-import "./scdaw-transport.js";
-import "./scdaw-browser.js";
-import "./scdaw-timeline.js";
-import "./scdaw-editor.js";
-import "./scdaw-wave-editor.js";
-import "./scdaw-sequencer.js";
-import "./scdaw-synth.js";
-import "./scdaw-devices.js";
-import "./scdaw-mixer.js";
-import "./scdaw-statusbar.js";
-import "./scdaw-midi-keyboard.js";
-import "./scdaw-resize-handle.js";
+import "./shadow-claw-daw-transport.js";
+import "./shadow-claw-daw-browser.js";
+import "./shadow-claw-daw-timeline.js";
+import "./shadow-claw-daw-editor.js";
+import "./shadow-claw-daw-wave-editor.js";
+import "./shadow-claw-daw-sequencer.js";
+import "./shadow-claw-daw-synth.js";
+import "./shadow-claw-daw-devices.js";
+import "./shadow-claw-daw-mixer.js";
+import "./shadow-claw-daw-status-bar.js";
+import "./shadow-claw-daw-midi-keyboard.js";
+import "./shadow-claw-daw-resize-handle.js";
 
-// Ensure <shadow-claw-dialog> custom element is available via CDN
-if (
-  typeof window !== "undefined" &&
-  typeof customElements !== "undefined" &&
-  !customElements.get("shadow-claw-dialog")
-) {
-  import("https://cdn.jsdelivr.net/npm/shadow-claw/dist/lib/components/shadow-claw-dialog.js").catch(
-    () => {},
-  );
-}
+import "shadow-claw/components/shadow-claw-dialog";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function resolveDropAction({
   targetTrackId = null,
@@ -307,37 +308,22 @@ export function resolveWorkbenchButtonStates({
  * }}
  */
 export function resolveWorkbenchFullscreenState(isFullscreen) {
-  const active = Boolean(isFullscreen);
+  const shared = resolveSharedWorkbenchFullscreenState(isFullscreen, {
+    studioName: "DAW",
+    hostClass: "scdaw-workbench--fullscreen",
+  });
   return {
-    isFullscreen: active,
-    ariaLabel: active ? "Exit full screen mode" : "Enter full screen mode",
-    ariaPressed: active ? "true" : "false",
-    title: active
-      ? "Exit full screen mode (restore app navigation)"
-      : "Full screen mode (hide app navigation and focus on DAW)",
-    btnText: active ? "Exit Full Screen" : "Full Screen",
-    btnIcon: active ? "✕" : "⛶",
-    btnClass: active
+    ...shared,
+    hostClass: shared.isFullscreen ? "scdaw-workbench--fullscreen" : "",
+    btnClass: shared.isFullscreen
       ? "scdaw-workbench__btn btn btn-icon scdaw-workbench__btn--fullscreen scdaw-workbench__btn--active btn-primary"
       : "scdaw-workbench__btn btn btn-icon scdaw-workbench__btn--fullscreen",
-    hostClass: active ? "scdaw-workbench--fullscreen" : "",
   };
 }
 
 /**
  * Toggles fullscreen mode for the DAW workbench and host page container.
- * Safely invokes requestFullscreen / exitFullscreen when supported,
- * synchronizes CSS fixed fullscreen classes, ARIA attributes, and handles
- * keyboard Escape and fullscreenchange events.
- *
- * @param {Object} options
- * @param {HTMLElement} options.workbenchEl - The <scdaw-workbench> element
- * @param {HTMLElement} [options.fullscreenBtn] - The fullscreen toggle button
- * @param {HTMLElement} [options.pageEl] - The parent .scdaw-workbench-page element (if present)
- * @param {Object} [options.windowObj] - Window reference (defaults to global window)
- * @param {Object} [options.documentObj] - Document reference (defaults to global document)
- * @param {Function} [options.onStateChange] - Callback invoked when state changes
- * @returns {{ toggle: (force?: boolean) => void, setState: (force?: boolean) => void, isFullscreen: () => boolean, dispose: () => void }}
+ * Delegates fullscreen orchestration to `shadow-claw/utils/workbench-fullscreen`.
  */
 export function setupWorkbenchFullscreen({
   workbenchEl,
@@ -347,118 +333,21 @@ export function setupWorkbenchFullscreen({
   documentObj = typeof document !== "undefined" ? document : null,
   onStateChange,
 }) {
-  let isFullscreen = false;
-
-  const updateUI = () => {
-    const state = resolveWorkbenchFullscreenState(isFullscreen);
-
-    // Toggle classes on workbench element
-    workbenchEl?.classList?.toggle("scdaw-workbench--fullscreen", isFullscreen);
-
-    // Toggle classes on parent page container if available
-    pageEl?.classList?.toggle("scdaw-workbench-page--fullscreen", isFullscreen);
-
-    // Update button attributes and labels
-    if (fullscreenBtn) {
-      fullscreenBtn.setAttribute?.("aria-pressed", state.ariaPressed);
-      fullscreenBtn.setAttribute?.("aria-label", state.ariaLabel);
-      fullscreenBtn.title = state.title;
-
-      fullscreenBtn.classList?.toggle("btn-primary", state.isFullscreen);
-      fullscreenBtn.classList?.toggle(
-        "scdaw-workbench__btn--active",
-        state.isFullscreen,
-      );
-
-      const iconEl = fullscreenBtn.querySelector?.(
-        ".scdaw-workbench__fullscreen-icon",
-      );
-      if (iconEl) iconEl.textContent = state.btnIcon;
-
-      const labelEl = fullscreenBtn.querySelector?.(
-        ".scdaw-workbench__fullscreen-label",
-      );
-      if (labelEl) labelEl.textContent = state.btnText;
-    }
-
-    if (typeof onStateChange === "function") {
-      onStateChange(isFullscreen);
-    }
-  };
-
-  const setState = (nextActive) => {
-    const active = Boolean(nextActive);
-    if (isFullscreen === active) return;
-    isFullscreen = active;
-
-    if (documentObj) {
-      const isDocFs = Boolean(documentObj.fullscreenElement);
-      if (isFullscreen && !isDocFs) {
-        const target = pageEl || workbenchEl;
-        try {
-          if (typeof target?.requestFullscreen === "function") {
-            const p = target.requestFullscreen();
-            p?.catch?.(() => {});
-          }
-        } catch {}
-      } else if (!isFullscreen && isDocFs) {
-        try {
-          if (typeof documentObj.exitFullscreen === "function") {
-            const p = documentObj.exitFullscreen();
-            p?.catch?.(() => {});
-          }
-        } catch {}
-      }
-    }
-
-    updateUI();
-  };
-
-  const toggle = (force) => {
-    const next = typeof force === "boolean" ? force : !isFullscreen;
-    setState(next);
-  };
-
-  const onBtnClick = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-    toggle();
-  };
-
-  const onKeyDown = (e) => {
-    if (e?.key === "Escape" && isFullscreen) {
-      e?.preventDefault?.();
-      setState(false);
-    }
-  };
-
-  const onFullscreenChange = () => {
-    const docActive = Boolean(documentObj?.fullscreenElement);
-    if (docActive !== isFullscreen) {
-      setState(docActive);
-    }
-  };
-
-  fullscreenBtn?.addEventListener?.("click", onBtnClick);
-  windowObj?.addEventListener?.("keydown", onKeyDown);
-  documentObj?.addEventListener?.("fullscreenchange", onFullscreenChange);
-
-  // Initialize initial UI
-  updateUI();
-
-  return {
-    toggle,
-    setState,
-    isFullscreen: () => isFullscreen,
-    dispose: () => {
-      fullscreenBtn?.removeEventListener?.("click", onBtnClick);
-      windowObj?.removeEventListener?.("keydown", onKeyDown);
-      documentObj?.removeEventListener?.(
-        "fullscreenchange",
-        onFullscreenChange,
-      );
-    },
-  };
+  return setupSharedWorkbenchFullscreen({
+    workbenchEl,
+    fullscreenBtn,
+    pageEl,
+    studioName: "DAW",
+    workbenchClass: "scdaw-workbench--fullscreen",
+    pageClass: "scdaw-workbench-page--fullscreen",
+    activeBtnClass: "scdaw-workbench__btn--active",
+    labelSelector: ".scdaw-workbench__fullscreen-label",
+    iconSelector: ".scdaw-workbench__fullscreen-icon",
+    enterIconSelector: "__scdaw_none__",
+    windowObj,
+    documentObj,
+    onStateChange,
+  });
 }
 
 export function setupWorkbenchMidiKeyboard({
@@ -512,7 +401,7 @@ export function setupWorkbenchMidiKeyboard({
   const onKeyboardClose = (e) => {
     const kbd = shadowRoot?.getElementById?.("midi-keyboard");
     if (!kbd || (e?.target && e.target !== kbd)) return;
-    const transport = shadowRoot?.querySelector?.("scdaw-transport");
+    const transport = shadowRoot?.querySelector?.("shadow-claw-daw-transport");
     const keysBtn = transport?.shadowRoot?.getElementById?.("keys-btn");
     if (keysBtn) {
       keysBtn.setAttribute?.("aria-pressed", "false");
@@ -539,7 +428,7 @@ export function setupWorkbenchMidiKeyboard({
   };
 }
 
-export class DawWorkbenchElement extends BaseElement {
+export class ShadowClawDawWorkbench extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -701,7 +590,7 @@ export class DawWorkbenchElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-workbench;
+          container-name: shadow-claw-daw-workbench;
           --browser-w: ${this._browserWidth}px;
           --mixer-w: ${this._mixerWidth}px;
           --center-stack-h: calc(100vh - 180px);
@@ -996,7 +885,7 @@ export class DawWorkbenchElement extends BaseElement {
         }
 
         /* 2. Progressive Enhancement: Tablet and Wider (>= 640px) */
-        @container scdaw-workbench (min-width: 640px) {
+        @container shadow-claw-daw-workbench (min-width: 640px) {
           .scdaw-workbench__header {
             flex-direction: column;
             align-items: stretch;
@@ -1064,7 +953,7 @@ export class DawWorkbenchElement extends BaseElement {
         }
 
         /* 3. Progressive Enhancement: Desktop Multi-Pane Grid (>= 1024px) */
-        @container scdaw-workbench (min-width: 1024px) {
+        @container shadow-claw-daw-workbench (min-width: 1024px) {
           .scdaw-workbench__dock-grid {
             display: grid;
             gap: 0;
@@ -1326,7 +1215,7 @@ export class DawWorkbenchElement extends BaseElement {
           outline-offset: 2px;
         }
       </style>
-      <div class="scdaw-workbench" data-no-swipe="true" data-no-nav="true">
+      <div class="shadow-claw-daw-workbench" data-no-swipe="true" data-no-nav="true">
         <header class="scdaw-workbench__header" role="banner">
           <div class="scdaw-workbench__title-bar">
             <div class="scdaw-workbench__title-group">
@@ -1385,7 +1274,7 @@ export class DawWorkbenchElement extends BaseElement {
         </header>
 
         <section class="scdaw-workbench__transport" style="margin-bottom:0.6rem;" aria-label="Audio Transport">
-          <scdaw-transport></scdaw-transport>
+          <shadow-claw-daw-transport></shadow-claw-daw-transport>
         </section>
 
         <div id="scdaw-error-banner" role="alert" aria-live="assertive" aria-atomic="true" class="scdaw-error-banner hidden" hidden>
@@ -1399,16 +1288,16 @@ export class DawWorkbenchElement extends BaseElement {
         <main id="dock-grid" class="scdaw-workbench__dock-grid" role="main">
           <!-- Left: Browser Panel -->
           <div id="browser-container" class="scdaw-workbench__dock-panel scdaw-workbench__dock-panel--browser" role="region" aria-label="Library Browser">
-            <scdaw-browser></scdaw-browser>
+            <shadow-claw-daw-browser></shadow-claw-daw-browser>
           </div>
 
           <!-- Browser Resize Handle -->
-          <scdaw-resize-handle id="browser-handle" class="scdaw-workbench__handle scdaw-workbench__handle--browser" orientation="vertical" value="${this._browserWidth}" min="150" max="420" label="Resize Browser panel"></scdaw-resize-handle>
+          <shadow-claw-daw-resize-handle id="browser-handle" class="scdaw-workbench__handle scdaw-workbench__handle--browser" orientation="vertical" value="${this._browserWidth}" min="150" max="420" label="Resize Browser panel"></shadow-claw-daw-resize-handle>
 
           <!-- Center Stack: Timeline + Editor Switcher + Editor/Sequencer + Device Rack -->
           <div id="center-stack" class="scdaw-workbench__center-stack" role="region" aria-label="Arrangement and Track Editing">
             <div id="timeline-container" class="scdaw-workbench__section scdaw-workbench__section--timeline">
-              <scdaw-timeline></scdaw-timeline>
+              <shadow-claw-daw-timeline></shadow-claw-daw-timeline>
             </div>
             <div id="editor-bar" class="scdaw-workbench__editor-bar" role="toolbar" aria-label="Detail Editor Switcher">
               <div class="scdaw-workbench__editor-tabs" role="group" aria-label="Active Detail View">
@@ -1420,34 +1309,34 @@ export class DawWorkbenchElement extends BaseElement {
               <button id="center-toggle-devices-btn" type="button" class="btn btn-icon btn-primary scdaw-workbench__btn--active" aria-pressed="true" title="Toggle Track Device Chain Rack">🎛️ Device Rack</button>
             </div>
             <div id="editor-container" class="scdaw-workbench__section scdaw-workbench__section--editor">
-              <scdaw-editor></scdaw-editor>
+              <shadow-claw-daw-editor></shadow-claw-daw-editor>
             </div>
             <div id="seq-container" class="scdaw-workbench__section scdaw-workbench__section--sequencer hidden" hidden>
-              <scdaw-sequencer></scdaw-sequencer>
+              <shadow-claw-daw-sequencer></shadow-claw-daw-sequencer>
             </div>
             <div id="synth-container" class="scdaw-workbench__section scdaw-workbench__section--synth hidden" hidden>
-              <scdaw-synth></scdaw-synth>
+              <shadow-claw-daw-synth></shadow-claw-daw-synth>
             </div>
             <div id="wave-container" class="scdaw-workbench__section scdaw-workbench__section--wave hidden" hidden>
-              <scdaw-wave-editor></scdaw-wave-editor>
+              <shadow-claw-daw-wave-editor></shadow-claw-daw-wave-editor>
             </div>
             <div id="devices-container" class="scdaw-workbench__section scdaw-workbench__section--devices">
-              <scdaw-devices></scdaw-devices>
+              <shadow-claw-daw-devices></shadow-claw-daw-devices>
             </div>
           </div>
 
           <!-- Mixer Resize Handle -->
-          <scdaw-resize-handle id="mixer-handle" class="scdaw-workbench__handle scdaw-workbench__handle--mixer" orientation="vertical" invert value="${this._mixerWidth}" min="180" max="520" label="Resize Mixer panel"></scdaw-resize-handle>
+          <shadow-claw-daw-resize-handle id="mixer-handle" class="scdaw-workbench__handle scdaw-workbench__handle--mixer" orientation="vertical" invert value="${this._mixerWidth}" min="180" max="520" label="Resize Mixer panel"></shadow-claw-daw-resize-handle>
 
           <!-- Right: Mixer Panel -->
           <div id="mixer-container" class="scdaw-workbench__dock-panel scdaw-workbench__dock-panel--mixer" role="region" aria-label="Mixer Console">
-            <scdaw-mixer></scdaw-mixer>
+            <shadow-claw-daw-mixer></shadow-claw-daw-mixer>
           </div>
         </main>
 
-        <scdaw-midi-keyboard id="midi-keyboard" hidden></scdaw-midi-keyboard>
+        <shadow-claw-daw-midi-keyboard id="midi-keyboard" hidden></shadow-claw-daw-midi-keyboard>
         <footer class="scdaw-workbench__footer" style="margin-top:0.6rem;" role="contentinfo">
-          <scdaw-statusbar></scdaw-statusbar>
+          <shadow-claw-daw-status-bar></shadow-claw-daw-status-bar>
         </footer>
 
         <shadow-claw-dialog
@@ -2265,7 +2154,9 @@ export class DawWorkbenchElement extends BaseElement {
             });
           }
           exportModal?.close();
-          const browserEl = this.shadowRoot.querySelector("scdaw-browser");
+          const browserEl = this.shadowRoot.querySelector(
+            "shadow-claw-daw-browser",
+          );
           if (
             browserEl &&
             typeof browserEl.loadFilesForConversation === "function"
@@ -3062,9 +2953,4 @@ export class DawWorkbenchElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-workbench")
-) {
-  customElements.define("scdaw-workbench", DawWorkbenchElement);
-}
+defineElement("shadow-claw-daw-workbench", ShadowClawDawWorkbench);

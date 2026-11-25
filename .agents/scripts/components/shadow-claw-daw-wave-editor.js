@@ -1,25 +1,31 @@
 /**
- * .agents/scripts/components/scdaw-wave-editor.js
+ * .agents/scripts/components/shadow-claw-daw-wave-editor.js
  *
- * Mobile-First, Responsive, ARIA-Compliant Audio Clip Waveform & Envelope Editor (<scdaw-wave-editor>).
+ * Mobile-First, Responsive, ARIA-Compliant Audio Clip Waveform & Envelope Editor (<shadow-claw-daw-wave-editor>).
  * Ported from Audacity 4 waveform/envelope interaction models & builtin DSP collection.
  */
 
-import { SHARED_STYLES, installPageSwipeGuard } from "./scdaw-styles.js";
+import {
+  SHARED_STYLES,
+  installPageSwipeGuard,
+} from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { evaluateClipGainEnvelope, PPQN } from "../scdaw.js";
 import { findNearestZeroCrossing } from "../scdaw-audio-dsp.js";
-import { extractDroppedAudioFiles } from "./scdaw-timeline.js";
+import { extractDroppedAudioFiles } from "./shadow-claw-daw-timeline.js";
 import {
   SPECTROGRAM_PALETTES,
   SPECTROGRAM_SCALES,
   computeSpectrogram,
   mapSpectrogramColor,
 } from "../scdaw-spectral-dsp.js";
-import "./scdaw-spectrum.js";
+import "./shadow-claw-daw-spectrum.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 /**
  * Compute min, max, and RMS amplitude buckets over a slice of PCM samples.
@@ -482,7 +488,7 @@ export function renderSpectrogramSvg({
   `.trim();
 }
 
-export class DawWaveEditorElement extends BaseElement {
+export class ShadowClawDawWaveEditor extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -688,7 +694,7 @@ export class DawWaveEditorElement extends BaseElement {
           width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-wave-editor;
+          container-name: shadow-claw-daw-wave-editor;
         }
         .scdaw-wave {
           display: flex;
@@ -776,7 +782,7 @@ export class DawWaveEditorElement extends BaseElement {
           font-size: 0.72rem;
           color: var(--shadow-claw-text-secondary, #94a3b8);
         }
-        @container scdaw-wave-editor (min-width: 640px) {
+        @container shadow-claw-daw-wave-editor (min-width: 640px) {
           .scdaw-wave__header {
             flex-direction: row;
             justify-content: space-between;
@@ -898,7 +904,7 @@ export class DawWaveEditorElement extends BaseElement {
           </div>
         </div>
 
-        ${this._showSpectrum ? `<scdaw-spectrum></scdaw-spectrum>` : ""}
+        ${this._showSpectrum ? `<shadow-claw-daw-spectrum></shadow-claw-daw-spectrum>` : ""}
 
         <div class="scdaw-wave__footer">
           <span id="wave-selection-readout">${selSummary}</span>
@@ -1251,9 +1257,4 @@ export class DawWaveEditorElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-wave-editor")
-) {
-  customElements.define("scdaw-wave-editor", DawWaveEditorElement);
-}
+defineElement("shadow-claw-daw-wave-editor", ShadowClawDawWaveEditor);

@@ -1,16 +1,19 @@
 /**
- * .agents/scripts/components/scdaw-mixer.js
+ * .agents/scripts/components/shadow-claw-daw-mixer.js
  *
- * Mixing Console & Channel Strips Web Component (<scdaw-mixer>).
+ * Mixing Console & Channel Strips Web Component (<shadow-claw-daw-mixer>).
  * Ported concepts from openDAW Mixer, ChannelStrip, and PeakMeter.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
-import "./scdaw-knob.js";
+import "./shadow-claw-daw-knob.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function computeMeterSegments(peakDb, numSegments = 12) {
   if (peakDb <= -60) {
@@ -172,7 +175,7 @@ export function setupVolumeSlider(
   slider.addEventListener("dblclick", handleDblClick);
 }
 
-export class DawMixerElement extends BaseElement {
+export class ShadowClawDawMixer extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -310,7 +313,7 @@ export class DawMixerElement extends BaseElement {
         nameEl.textContent = t.name;
       }
 
-      const knob = strip.querySelector("scdaw-knob");
+      const knob = strip.querySelector("shadow-claw-daw-knob");
       if (knob && !knob._isDragging && knob.value !== (t.pan || 0)) {
         knob.value = t.pan || 0;
       }
@@ -389,7 +392,7 @@ export class DawMixerElement extends BaseElement {
           width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-mixer;
+          container-name: shadow-claw-daw-mixer;
         }
         /* Mobile-First Base Styles (Compact Dock & Mobile Viewports) */
         .scdaw-mixer__channels,
@@ -461,7 +464,7 @@ export class DawMixerElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Wide Mixer Console / Full View (>= 420px) */
-        @container scdaw-mixer (min-width: 420px) {
+        @container shadow-claw-daw-mixer (min-width: 420px) {
           .scdaw-mixer__channels,
           .mixer-container {
             gap: 0.75rem;
@@ -567,7 +570,7 @@ export class DawMixerElement extends BaseElement {
               return `
             <div class="strip ${isSelected ? "strip--selected" : ""}" role="group" aria-label="${t.name} channel strip" data-track="${t.id}">
               <div class="strip-name" title="${t.name}">${kindIcon} ${t.name}</div>
-              <scdaw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></scdaw-knob>
+              <shadow-claw-daw-knob label="Pan" min="-1" max="1" unit="pan" value="${t.pan || 0}" default="0" data-track="${t.id}"></shadow-claw-daw-knob>
               <div class="meter-fader-row">
                 <div style="display:flex; gap:2px; height:110px;">
                   <canvas class="meter-canvas" data-track="${t.id}" width="12" height="110"></canvas>
@@ -629,7 +632,7 @@ export class DawMixerElement extends BaseElement {
     // Selecting a channel strip updates global selectedTrackId
     this.shadowRoot.querySelectorAll(".strip[data-track]").forEach((strip) => {
       strip.addEventListener("click", (e) => {
-        if (e.target.closest?.("button, input, scdaw-knob")) return;
+        if (e.target.closest?.("button, input, shadow-claw-daw-knob")) return;
         const id = strip.dataset.track;
         if (id && typeof scdaw.selectTrack === "function") {
           scdaw.selectTrack(id);
@@ -686,7 +689,7 @@ export class DawMixerElement extends BaseElement {
       });
     });
 
-    this.shadowRoot.querySelectorAll("scdaw-knob").forEach((k) => {
+    this.shadowRoot.querySelectorAll("shadow-claw-daw-knob").forEach((k) => {
       const learnTarget = () => ({
         trackId: k.dataset.track,
         param: "pan",
@@ -905,9 +908,4 @@ export class DawMixerElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-mixer")
-) {
-  customElements.define("scdaw-mixer", DawMixerElement);
-}
+defineElement("shadow-claw-daw-mixer", ShadowClawDawMixer);

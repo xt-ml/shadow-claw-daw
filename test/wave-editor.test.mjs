@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { DawEngine, formatUserError } from "../.agents/scripts/scdaw-engine.js";
-import { formatTelemetryStatus } from "../.agents/scripts/components/scdaw-statusbar.js";
+import { formatTelemetryStatus } from "../.agents/scripts/components/shadow-claw-daw-status-bar.js";
 import {
   computeWaveformEnvelope,
   clampWaveSelection,
@@ -12,15 +12,15 @@ import {
   renderWaveformSvg,
   extractClipDisplayWindow,
   computeWavePlayheadState,
-} from "../.agents/scripts/components/scdaw-wave-editor.js";
+} from "../.agents/scripts/components/shadow-claw-daw-wave-editor.js";
 import { PPQN } from "../.agents/scripts/scdaw.js";
 import {
   resolveWorkbenchResponsiveLayout,
   resolveWorkbenchButtonStates,
   resolveWorkbenchPanels,
-} from "../.agents/scripts/components/scdaw-workbench.js";
+} from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
 import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
-import { installPageSwipeGuard } from "../.agents/scripts/components/scdaw-styles.js";
+import { installPageSwipeGuard } from "../.agents/scripts/components/shadow-claw-daw-styles.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
@@ -83,21 +83,21 @@ test("Phase 3.1: Systemic error surfacing (formatUserError, reportError, clearEr
   const [transportSrc, statusbarSrc, workbenchSrc] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-transport.js",
+        "../.agents/scripts/components/shadow-claw-daw-transport.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-statusbar.js",
+        "../.agents/scripts/components/shadow-claw-daw-status-bar.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf8",
@@ -110,7 +110,7 @@ test("Phase 3.1: Systemic error surfacing (formatUserError, reportError, clearEr
   const dialogMatches = transportSrc.match(/showErrorDialog\(/g) || [];
   assert.ok(
     reportMatches.length >= 1 && dialogMatches.length >= 4,
-    `Expected scdaw-transport.js to surface all recording errors via showErrorDialog + scdaw.reportError`,
+    `Expected shadow-claw-daw-transport.js to surface all recording errors via showErrorDialog + scdaw.reportError`,
   );
   assert.match(statusbarSrc, /id=["']error-stat["']/);
   assert.match(
@@ -236,29 +236,32 @@ test("Phase 3.3: Workbench audio tab, audio-full layout, render_surface, and mob
   const surface = await handleToolDispatch("scdaw_render_surface", {
     element: "wave-editor",
   });
-  assert.equal(surface.element, "<scdaw-wave-editor></scdaw-wave-editor>");
+  assert.equal(
+    surface.element,
+    "<shadow-claw-daw-wave-editor></shadow-claw-daw-wave-editor>",
+  );
 
   const [waveSrc, workbenchSrc] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-wave-editor.js",
+        "../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf8",
     ),
   ]);
 
-  assert.match(waveSrc, /container-name:\s*scdaw-wave-editor/);
+  assert.match(waveSrc, /container-name:\s*shadow-claw-daw-wave-editor/);
   assert.match(
     waveSrc,
-    /@container scdaw-wave-editor\s*\(\s*min-width:\s*640px\s*\)/,
+    /@container shadow-claw-daw-wave-editor\s*\(\s*min-width:\s*640px\s*\)/,
   );
   assert.match(
     waveSrc,
@@ -271,11 +274,17 @@ test("Phase 3.3: Workbench audio tab, audio-full layout, render_surface, and mob
   assert.match(waveSrc, /role=["']region["']/);
   assert.match(waveSrc, /role=["']toolbar["']/);
   assert.match(waveSrc, /aria-live=["']polite["']/);
-  assert.match(waveSrc, /customElements\.define\(\s*["']scdaw-wave-editor["']/);
+  assert.match(
+    waveSrc,
+    /(?:defineElement|customElements\.define)\(\s*["']shadow-claw-daw-wave-editor["']/,
+  );
 
   assert.match(workbenchSrc, /id=["']center-editor-audio-btn["']/);
   assert.match(workbenchSrc, /id=["']mode-audio-full-btn["']/);
-  assert.match(workbenchSrc, /<scdaw-wave-editor><\/scdaw-wave-editor>/);
+  assert.match(
+    workbenchSrc,
+    /<shadow-claw-daw-wave-editor><\/shadow-claw-daw-wave-editor>/,
+  );
 });
 
 test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/data-no-nav and restores cleanly", async () => {
@@ -347,21 +356,21 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
   const [wbSrc, waveSrc, timelineSrc] = await Promise.all([
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-workbench.js",
+        "../.agents/scripts/components/shadow-claw-daw-workbench.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-wave-editor.js",
+        "../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
         import.meta.url,
       ),
       "utf8",
     ),
     fs.readFile(
       new URL(
-        "../.agents/scripts/components/scdaw-timeline.js",
+        "../.agents/scripts/components/shadow-claw-daw-timeline.js",
         import.meta.url,
       ),
       "utf8",
@@ -375,7 +384,7 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
   );
   assert.match(
     wbSrc,
-    /scdaw-workbench[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+    /shadow-claw-daw-workbench[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
   );
 
   assert.match(waveSrc, /installPageSwipeGuard/);
@@ -394,7 +403,7 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
 
   assert.match(
     timelineSrc,
-    /scdaw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+    /shadow-claw-daw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
   );
 });
 
@@ -498,10 +507,10 @@ test("Wave Editor: extractClipDisplayWindow slices trimmed clip offset/duration 
   });
   assert.equal(zoomedOut.visible, false);
 
-  // Verify scdaw-wave-editor.js wires extractClipDisplayWindow, trim refresh, and #wave-playhead RAF loop
+  // Verify shadow-claw-daw-wave-editor.js wires extractClipDisplayWindow, trim refresh, and #wave-playhead RAF loop
   const waveSrc = await fs.readFile(
     new URL(
-      "../.agents/scripts/components/scdaw-wave-editor.js",
+      "../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
       import.meta.url,
     ),
     "utf8",

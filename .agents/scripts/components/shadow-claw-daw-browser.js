@@ -1,16 +1,19 @@
 /**
- * .agents/scripts/components/scdaw-browser.js
+ * .agents/scripts/components/shadow-claw-daw-browser.js
  *
- * Left Sidebar Browser Web Component (<scdaw-browser>).
+ * Left Sidebar Browser Web Component (<shadow-claw-daw-browser>).
  * Ported concepts from openDAW BrowserPanel & DeviceCatalog.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { INSTRUMENT_PRESETS, GENRE_TEMPLATES } from "../scdaw-presets.js";
 import { DEFAULT_GROUP_ID, formatFileSize, getFileIcon } from "../scdaw-fs.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function filterBrowserItems(items, query = "", tab = "all") {
   const cleanQ = query.trim().toLowerCase();
@@ -35,7 +38,7 @@ export function filterBrowserItems(items, query = "", tab = "all") {
   });
 }
 
-export class DawBrowserElement extends BaseElement {
+export class ShadowClawDawBrowser extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -341,7 +344,7 @@ export class DawBrowserElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-browser;
+          container-name: shadow-claw-daw-browser;
           overflow: hidden;
         }
         .scdaw-browser {
@@ -435,7 +438,7 @@ export class DawBrowserElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Wider browser sidebar (>= 220px) */
-        @container scdaw-browser (min-width: 220px) {
+        @container shadow-claw-daw-browser (min-width: 220px) {
           .scdaw-browser__tab-btn,
           .tab-btn {
             font-size: 0.75rem;
@@ -469,7 +472,7 @@ export class DawBrowserElement extends BaseElement {
           }
         }
       </style>
-      <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
+      <div class="shadow-claw-daw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
         <div class="scdaw-browser__header browser-header" role="tablist" aria-label="Library Categories">
           <button type="button" role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
           <button type="button" role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>
@@ -714,9 +717,4 @@ export class DawBrowserElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-browser")
-) {
-  customElements.define("scdaw-browser", DawBrowserElement);
-}
+defineElement("shadow-claw-daw-browser", ShadowClawDawBrowser);

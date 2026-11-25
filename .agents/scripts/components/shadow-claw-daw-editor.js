@@ -1,11 +1,11 @@
 /**
- * .agents/scripts/components/scdaw-editor.js
+ * .agents/scripts/components/shadow-claw-daw-editor.js
  *
- * Piano Roll & Note Inspector Web Component (<scdaw-editor>).
+ * Piano Roll & Note Inspector Web Component (<shadow-claw-daw-editor>).
  * Ported concepts from openDAW PianoRoll & OpenStudio NoteInspector.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import {
@@ -16,7 +16,10 @@ import {
   stepsPerBar,
 } from "../scdaw.js";
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 const MIN_PITCH = 0; // C-1
 const MAX_PITCH = 127; // G9
@@ -318,7 +321,7 @@ function computeNotesSignature(notes) {
   return `${notes.length}:${hash}`;
 }
 
-export class DawEditorElement extends BaseElement {
+export class ShadowClawDawEditor extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -520,7 +523,7 @@ export class DawEditorElement extends BaseElement {
           width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-editor;
+          container-name: shadow-claw-daw-editor;
         }
         /* Mobile First Base Styles (Stacked responsive editor) */
         .scdaw-editor__container,
@@ -631,7 +634,7 @@ export class DawEditorElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Desktop Side-by-Side Inspector (>= 601px) */
-        @container scdaw-editor (min-width: 601px) {
+        @container shadow-claw-daw-editor (min-width: 601px) {
           .scdaw-editor__container,
           .editor-container {
             flex-direction: row;
@@ -1003,9 +1006,4 @@ export class DawEditorElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-editor")
-) {
-  customElements.define("scdaw-editor", DawEditorElement);
-}
+defineElement("shadow-claw-daw-editor", ShadowClawDawEditor);

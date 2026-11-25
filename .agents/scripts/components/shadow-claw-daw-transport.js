@@ -1,12 +1,12 @@
 /**
- * .agents/scripts/components/scdaw-transport.js
+ * .agents/scripts/components/shadow-claw-daw-transport.js
  *
- * Header Transport Bar Web Component (<scdaw-transport>).
+ * Header Transport Bar Web Component (<shadow-claw-daw-transport>).
  * Ported concepts from openDAW TransportGroup & OpenStudio TransportBar.
  * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
  */
 
-import { SHARED_STYLES } from "./scdaw-styles.js";
+import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw, formatUserError } from "../scdaw-engine.js";
 import { effect } from "../scdaw-signals.js";
 import { PPQN, RESERVED_MIDI_CCS, MIDI_CONTROLLER_PRESETS } from "../scdaw.js";
@@ -50,7 +50,10 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-const BaseElement = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
+import {
+  BaseElement,
+  defineElement,
+} from "shadow-claw/components/shadow-claw-element";
 
 export function formatMidiStatusBadge(midiState = {}) {
   const status = midiState?.status || "idle";
@@ -343,7 +346,7 @@ export function setupTransportWheelControls({
   }
 }
 
-export class DawTransportElement extends BaseElement {
+export class ShadowClawDawTransport extends BaseElement {
   constructor() {
     super();
     if (this.attachShadow) {
@@ -511,7 +514,7 @@ export class DawTransportElement extends BaseElement {
           max-width: 100%;
           box-sizing: border-box;
           container-type: inline-size;
-          container-name: scdaw-transport;
+          container-name: shadow-claw-daw-transport;
         }
 
         /* Base styles: Mobile First (Stacked, fluid, no horizontal overflow) */
@@ -732,7 +735,7 @@ export class DawTransportElement extends BaseElement {
         }
 
         /* Progressive Enhancement: Tablet and Desktop (>= 640px) */
-        @container scdaw-transport (min-width: 640px) {
+        @container shadow-claw-daw-transport (min-width: 640px) {
           .scdaw-transport,
           .transport-bar {
             flex-direction: row;
@@ -972,7 +975,7 @@ export class DawTransportElement extends BaseElement {
           }
         }
       </style>
-      <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
+      <div class="shadow-claw-daw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
           <button id="play-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Pause playback" : "Start playback"}">
             ${s.playing ? "⏸ Pause" : "▶ Play"}
@@ -2043,9 +2046,4 @@ export class DawTransportElement extends BaseElement {
   }
 }
 
-if (
-  typeof customElements !== "undefined" &&
-  !customElements.get("scdaw-transport")
-) {
-  customElements.define("scdaw-transport", DawTransportElement);
-}
+defineElement("shadow-claw-daw-transport", ShadowClawDawTransport);
