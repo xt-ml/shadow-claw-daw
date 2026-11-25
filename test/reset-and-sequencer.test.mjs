@@ -5,14 +5,14 @@ import {
   applyCommand,
   computeEventsInRange,
   ppqnToStep,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 import {
   SYNTH_PARAM_SCHEMA,
   TRACK_MIX_SCHEMA,
   MASTER_SCHEMA,
   getDefaultParams,
-} from "../.agents/scripts/scdaw-schema.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+} from "../.agents/scripts/shadow-claw-daw-schema.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,

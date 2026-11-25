@@ -1,5 +1,5 @@
 /**
- * ShadowClaw DAW — DAWproject v1.0 Format Interop Codec (scdaw-dawproject.js)
+ * ShadowClaw DAW — DAWproject v1.0 Format Interop Codec (shadow-claw-daw-dawproject.js)
  *
  * Implements pure-JS zero-dependency XML parsing/serialization and .dawproject v1.0
  * interchange format reader/writer, enabling lossless project sharing between
@@ -11,7 +11,7 @@
  *   - <Application>, <Transport> (Tempo, TimeSignature)
  *   - <Structure> (<Track>, <Channel>, <Devices>, <Equalizer>)
  *   - <Arrangement> (<Lanes timeUnit="beats">, <Clips>, <Notes>)
- * - ZIP container packing & unpacking via scdaw-zip.js
+ * - ZIP container packing & unpacking via shadow-claw-daw-zip.js
  *
  * @license AGPL-3.0-or-later
  */
@@ -21,8 +21,8 @@ import {
   beatsPerBar,
   createProject,
   resolveTrackNotes,
-} from "./scdaw.js";
-import { encodeZip, decodeZip } from "./scdaw-zip.js";
+} from "./shadow-claw-daw.js";
+import { encodeZip, decodeZip } from "./shadow-claw-daw-zip.js";
 
 /**
  * Escapes XML entity characters.

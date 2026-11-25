@@ -8,10 +8,10 @@ import {
   readVarLen,
   SMF_FORMAT_SINGLE_TRACK,
   SMF_FORMAT_MULTI_TRACK,
-} from "../.agents/scripts/scdaw-midi.js";
-import { createProject, PPQN } from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw-midi.js";
+import { createProject, PPQN } from "../.agents/scripts/shadow-claw-daw.js";
 
-test("scdaw-midi: writeVarLen and readVarLen encode/decode variable-length quantities", () => {
+test("shadow-claw-daw-midi: writeVarLen and readVarLen encode/decode variable-length quantities", () => {
   const testCases = [
     { value: 0, expected: [0x00] },
     { value: 0x40, expected: [0x40] },
@@ -45,7 +45,7 @@ test("scdaw-midi: writeVarLen and readVarLen encode/decode variable-length quant
   }
 });
 
-test("scdaw-midi: encodeMidiFile generates valid SMF Format 1 multi-track file", () => {
+test("shadow-claw-daw-midi: encodeMidiFile generates valid SMF Format 1 multi-track file", () => {
   const project = createProject({
     title: "SMF Test Song",
     bpm: 128,
@@ -126,7 +126,7 @@ test("scdaw-midi: encodeMidiFile generates valid SMF Format 1 multi-track file",
   assert.equal(decoded.tracks[2].notes[0].duration, 480);
 });
 
-test("scdaw-midi: encodeMidiFile generates valid SMF Format 0 single-track file", () => {
+test("shadow-claw-daw-midi: encodeMidiFile generates valid SMF Format 0 single-track file", () => {
   const project = createProject({
     title: "Format 0 Song",
     bpm: 140,
@@ -162,7 +162,7 @@ test("scdaw-midi: encodeMidiFile generates valid SMF Format 0 single-track file"
   assert.equal(decoded.tracks[0].notes[0].pitch, 60);
 });
 
-test("scdaw-midi: decodes running status and handles variable time division rescaling", () => {
+test("shadow-claw-daw-midi: decodes running status and handles variable time division rescaling", () => {
   // Construct a minimal SMF buffer with running status and division = 480
   // MThd: len=6, fmt=0, tracks=1, div=480
   const header = [
@@ -227,7 +227,7 @@ test("scdaw-midi: decodes running status and handles variable time division resc
   assert.equal(track.notes[0].duration, 480);
 });
 
-test("scdaw-midi: round-trip project -> encodeMidiFile -> midiToProject preserves musical integrity", () => {
+test("shadow-claw-daw-midi: round-trip project -> encodeMidiFile -> midiToProject preserves musical integrity", () => {
   const original = createProject({
     title: "RoundTrip Song",
     bpm: 124,

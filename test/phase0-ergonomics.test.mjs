@@ -8,7 +8,7 @@ import {
   projectToScoreView,
   beatsPerBar,
   PPQN,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 
 test("WP0.1: new_project defaults to empty template and reports seeded notes", () => {
   const base = createProject("empty");
@@ -230,7 +230,7 @@ test("WP0.5: canonical velocity 0-1 and master limiter", () => {
 
 test("WP0.6: default synth and init-saw avoid aggressive filter sweeps", async () => {
   const { INSTRUMENT_PRESETS } =
-    await import("../.agents/scripts/scdaw-presets.js");
+    await import("../.agents/scripts/shadow-claw-daw-presets.js");
   assert.equal(
     INSTRUMENT_PRESETS["init-saw"].filterEnvAmount,
     0,

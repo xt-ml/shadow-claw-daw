@@ -6,7 +6,7 @@ import {
   transformLiveMidiNote,
   resolveCapturedMidiNotes,
   MIN_CAPTURED_NOTE_DURATION,
-} from "../.agents/scripts/scdaw-midi.js";
+} from "../.agents/scripts/shadow-claw-daw-midi.js";
 import {
   createProject,
   applyCommand,
@@ -15,7 +15,7 @@ import {
   RESERVED_MIDI_CCS,
   MIDI_CONTROLLER_PRESETS,
   resolveMidiMappingDefaults,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 
 test("parseMidiMessage: decodes NoteOn, NoteOn vel=0 -> NoteOff, and NoteOff", () => {
   const on = parseMidiMessage(new Uint8Array([0x92, 60, 127]));

@@ -1,14 +1,19 @@
 /**
- * .agents/scripts/scdaw-adapter.js
+ * .agents/scripts/shadow-claw-daw-adapter.js
  *
  * ShadowClaw Page Adapter & WebMCP IPC Bridge for Daw.
  * Bridges worker declarative tools to the Web Audio engine via BroadcastChannel.
  * Coordinates leader election via Web Locks so only one document answers tool commands.
  */
 
-import { scdaw } from "./scdaw-engine.js";
-import { MIN_BPM, MAX_BPM, projectToScoreView, beatsPerBar } from "./scdaw.js";
-import { TOOLS_METADATA } from "./scdaw-tools-metadata.js";
+import { scdaw } from "./shadow-claw-daw-engine.js";
+import {
+  MIN_BPM,
+  MAX_BPM,
+  projectToScoreView,
+  beatsPerBar,
+} from "./shadow-claw-daw.js";
+import { TOOLS_METADATA } from "./shadow-claw-daw-tools-metadata.js";
 import "./shadow-claw-daw-element.js";
 import {
   createToolAdapterBridge,
@@ -31,7 +36,7 @@ function buildSnapshotPayload() {
 }
 
 const bridge = createToolAdapterBridge({
-  lockName: "scdaw-engine",
+  lockName: "shadow-claw-daw-engine",
   commandsChannel: "scdaw-commands",
   resultsChannel: "scdaw-results",
   stateChannel: "scdaw-state",

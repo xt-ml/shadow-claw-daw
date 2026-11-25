@@ -5,8 +5,8 @@ import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decompressFromBase64Url } from "../.agents/scripts/scdaw-compress.js";
-import { deserializeProject } from "../.agents/scripts/scdaw.js";
+import { decompressFromBase64Url } from "../.agents/scripts/shadow-claw-daw-compress.js";
+import { deserializeProject } from "../.agents/scripts/shadow-claw-daw.js";
 
 const SHADOW_CLAW_LOBSTER_HASHES = new Set([
   "33a5914fdb9b42c622ceb4bdfd421d7c8792ce3809a10acc83dd356a975c1f66", // 48.png
@@ -79,7 +79,7 @@ test("PWA Manifest: start_url and share_target.action are within manifest scope"
   );
   assert.ok(
     manifest.file_handlers[0].accept["application/json"].includes(
-      ".scdaw.json",
+      ".shadow-claw-daw.json",
     ),
   );
 });
@@ -93,7 +93,7 @@ test("Workbench scripts: shadow-claw.config.json declares scdaw custom element s
     s.src?.includes("shadow-claw-daw-element.js"),
   );
   const adapterScript = scripts.find((s) =>
-    s.src?.includes("scdaw-adapter.js"),
+    s.src?.includes("shadow-claw-daw-adapter.js"),
   );
 
   assert.ok(
@@ -105,7 +105,7 @@ test("Workbench scripts: shadow-claw.config.json declares scdaw custom element s
 
   assert.ok(
     adapterScript,
-    "scdaw-adapter.js must be in customElements.scripts",
+    "shadow-claw-daw-adapter.js must be in customElements.scripts",
   );
   assert.equal(adapterScript.global, true);
   assert.equal(adapterScript.autoload, true);

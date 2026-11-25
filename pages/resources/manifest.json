@@ -8,6 +8,16 @@
   "start_url": ".",
   "scope": ".",
   "theme_color": "#0e1415",
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "audio/midi": [".mid", ".midi"],
+        "application/vnd.dawproject+zip": [".dawproject"],
+        "application/json": [".shadow-claw-daw.json", ".json"]
+      }
+    }
+  ],
   "share_target": {
     "action": "share/share-target.html",
     "method": "POST",
@@ -46,7 +56,7 @@
       "accept": {
         "application/vnd.dawproject+zip": [".dawproject"],
         "audio/midi": [".mid", ".midi"],
-        "application/json": [".json", ".scdaw.json"],
+        "application/json": [".shadow-claw-daw.json", ".json", ".scdaw.json"],
         "audio/wav": [".wav"],
         "audio/x-wav": [".wav"]
       }

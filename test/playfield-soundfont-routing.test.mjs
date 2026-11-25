@@ -4,8 +4,8 @@ import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 import {
   triggerDrums,
   triggerInstrumentVoice,
-} from "../.agents/scripts/scdaw-instruments.js";
-import { triggerDrumSoundfont } from "../.agents/scripts/scdaw-soundfont.js";
+} from "../.agents/scripts/shadow-claw-daw-instruments.js";
+import { triggerDrumSoundfont } from "../.agents/scripts/shadow-claw-daw-soundfont.js";
 
 test("Playfield: default drum triggering preserves procedural 808/909 synth", () => {
   const ctx = new FakeAudioContext();

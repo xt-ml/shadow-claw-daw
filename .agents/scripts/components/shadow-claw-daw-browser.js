@@ -6,9 +6,16 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { INSTRUMENT_PRESETS, GENRE_TEMPLATES } from "../scdaw-presets.js";
-import { DEFAULT_GROUP_ID, formatFileSize, getFileIcon } from "../scdaw-fs.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import {
+  INSTRUMENT_PRESETS,
+  GENRE_TEMPLATES,
+} from "../shadow-claw-daw-presets.js";
+import {
+  DEFAULT_GROUP_ID,
+  formatFileSize,
+  getFileIcon,
+} from "../shadow-claw-daw-fs.js";
 
 import {
   BaseElement,
@@ -472,7 +479,7 @@ export class ShadowClawDawBrowser extends BaseElement {
           }
         }
       </style>
-      <div class="shadow-claw-daw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
+      <div class="scdaw-browser daw-panel" style="padding:0.75rem; height:100%; max-height:100%; min-height:0; display:flex; flex-direction:column; box-sizing:border-box; width:100%; overflow:hidden;">
         <div class="scdaw-browser__header browser-header" role="tablist" aria-label="Library Categories">
           <button type="button" role="tab" aria-selected="${this._activeTab === "presets"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "presets" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="presets">Presets</button>
           <button type="button" role="tab" aria-selected="${this._activeTab === "devices"}" class="scdaw-browser__tab-btn tab-btn ${this._activeTab === "devices" ? "active scdaw-browser__tab-btn--active" : ""}" data-tab="devices">Devices</button>

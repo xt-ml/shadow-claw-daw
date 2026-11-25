@@ -4,14 +4,14 @@ import {
   FakeAudioContext,
   FakeOfflineAudioContext,
 } from "./helpers/fake-audio-context.mjs";
-import { triggerInstrumentVoice } from "../.agents/scripts/scdaw-instruments.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+import { triggerInstrumentVoice } from "../.agents/scripts/shadow-claw-daw-instruments.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   computeEventsInRange,
   createProject,
   encodeWav,
   PPQN,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 
 test("Instruments: triggers drum synth voices with parameter automation", () => {
   const ctx = new FakeAudioContext();

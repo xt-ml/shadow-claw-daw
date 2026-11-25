@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-spectral-dsp.js
+ * .agents/scripts/shadow-claw-daw-spectral-dsp.js
  *
  * Pure Float32Array FFT/IFFT, windowing, calibrated power spectrum,
  * profile-based STFT noise reduction, spectrogram computation, spectral selection editing,

@@ -2,15 +2,18 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 import { FakeMIDIPort, FakeMIDIAccess } from "./helpers/fake-midi-access.mjs";
-import { createProject, applyCommand } from "../.agents/scripts/scdaw.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+import {
+  createProject,
+  applyCommand,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   createMidiIo,
   SoftwareMidiInput,
   QWERTY_LAYOUTS,
   getQwertyKeyMapForLayout,
   shouldHandleSoftwareKeyboardEvent,
-} from "../.agents/scripts/scdaw-midi-io.js";
+} from "../.agents/scripts/shadow-claw-daw-midi-io.js";
 
 function createTestSetup() {
   const fakeCtx = new FakeAudioContext();

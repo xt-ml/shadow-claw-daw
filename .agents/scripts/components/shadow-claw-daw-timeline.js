@@ -7,8 +7,8 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
 import {
   PPQN,
   barPulses,
@@ -17,8 +17,8 @@ import {
   getBarTimeline,
   computeProjectTotalPulses,
   evaluateClipGainEnvelope,
-} from "../scdaw.js";
-import { computeWaveformPeaks } from "../scdaw-recorder.js";
+} from "../shadow-claw-daw.js";
+import { computeWaveformPeaks } from "../shadow-claw-daw-recorder.js";
 
 import {
   BaseElement,
@@ -1962,7 +1962,7 @@ export class ShadowClawDawTimeline extends BaseElement {
           opacity: 1;
         }
       </style>
-      <div class="shadow-claw-daw-timeline daw-panel" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Arrangement Timeline and Tracks">
+      <div class="scdaw-timeline daw-panel" data-no-swipe="true" data-no-nav="true" role="region" aria-label="Arrangement Timeline and Tracks">
         <div class="scdaw-timeline__header timeline-header">
           <div class="scdaw-timeline__title-group">
             <span style="font-weight:700; font-size:0.8rem;">⏱ Timeline</span>

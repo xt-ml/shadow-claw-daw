@@ -1,14 +1,14 @@
 /**
- * .agents/scripts/scdaw-midi-io.js
+ * .agents/scripts/shadow-claw-daw-midi-io.js
  *
  * Web MIDI API integration, hot-plug device enumeration, MIDI Learn,
  * MIDI Output, and Software QWERTY MIDI Keyboard fallback.
  * Gracefully degrades when navigator.requestMIDIAccess is unavailable or denied.
  */
 
-import { State } from "./scdaw-signals.js";
-import { parseMidiMessage, encodeMidiMessage } from "./scdaw-midi.js";
-import { resolveMidiMappingDefaults } from "./scdaw.js";
+import { State } from "./shadow-claw-daw-signals.js";
+import { parseMidiMessage, encodeMidiMessage } from "./shadow-claw-daw-midi.js";
+import { resolveMidiMappingDefaults } from "./shadow-claw-daw.js";
 
 function freezeNotes(notes) {
   return Object.freeze(notes.map((n) => Object.freeze({ ...n })));

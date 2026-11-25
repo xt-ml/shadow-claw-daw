@@ -1,12 +1,12 @@
 /**
- * .agents/scripts/scdaw-recorder.js
+ * .agents/scripts/shadow-claw-daw-recorder.js
  *
  * Audio recording pipeline and waveform peak computation for ShadowClaw DAW.
  * Ports OpenStudio's AudioRecorder and PeakCache concepts using native Web Audio API
  * and zero external dependencies.
  */
 
-import { encodeWav } from "./scdaw.js";
+import { encodeWav } from "./shadow-claw-daw.js";
 
 /**
  * Computes normalized peak amplitudes (0.0 to 1.0) from raw PCM samples

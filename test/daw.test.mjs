@@ -27,7 +27,7 @@ import {
   beatsPerBar,
   barPulses,
   stepsPerBar,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 
 test("PPQN: conforms to openDAW constants and conversions", () => {
   assert.equal(PPQN.Quarter, 960);

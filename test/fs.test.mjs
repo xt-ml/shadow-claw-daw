@@ -21,14 +21,14 @@ import {
   deleteConversationFile,
   setMockFsStorage,
   resetMockFsStorage,
-} from "../.agents/scripts/scdaw-fs.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+} from "../.agents/scripts/shadow-claw-daw-fs.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,
 } from "./helpers/fake-audio-context.mjs";
 
-test("scdaw-fs: sanitizeGroupId & unsanitizeGroupId handles group identifiers cleanly", () => {
+test("shadow-claw-daw-fs: sanitizeGroupId & unsanitizeGroupId handles group identifiers cleanly", () => {
   assert.equal(sanitizeGroupId("br:main"), "br-main");
   assert.equal(sanitizeGroupId("br:session-01"), "br-session-01");
   assert.equal(sanitizeGroupId("server:main"), "server-main");
@@ -41,12 +41,12 @@ test("scdaw-fs: sanitizeGroupId & unsanitizeGroupId handles group identifiers cl
   assert.equal(unsanitizeGroupId(""), DEFAULT_GROUP_ID);
 });
 
-test("scdaw-fs: classifyFile & getFileIcon identifies project and audio types accurately", () => {
-  const jsonFile = classifyFile("my-song.scdaw.json");
+test("shadow-claw-daw-fs: classifyFile & getFileIcon identifies project and audio types accurately", () => {
+  const jsonFile = classifyFile("my-song.shadow-claw-daw.json");
   assert.equal(jsonFile.format, "scdaw-json");
   assert.equal(jsonFile.isProject, true);
   assert.equal(jsonFile.isAudio, false);
-  assert.equal(getFileIcon("my-song.scdaw.json"), "📄");
+  assert.equal(getFileIcon("my-song.shadow-claw-daw.json"), "📄");
 
   const dawprojFile = classifyFile("techno.dawproject");
   assert.equal(dawprojFile.format, "dawproject");
@@ -72,7 +72,7 @@ test("scdaw-fs: classifyFile & getFileIcon identifies project and audio types ac
   assert.equal(formatFileSize(1572864), "1.5 MB");
 });
 
-test("scdaw-fs: listConversations defaults to Main conversation and sorts Main first", async () => {
+test("shadow-claw-daw-fs: listConversations defaults to Main conversation and sorts Main first", async () => {
   resetMockFsStorage();
 
   const initial = await listConversations();
@@ -100,58 +100,61 @@ test("scdaw-fs: listConversations defaults to Main conversation and sorts Main f
   assert.equal(updated[2].name, "Ambient Pad Session");
 });
 
-test("scdaw-fs: writeConversationFile and readConversationFile supports saving and loading across any conversation", async () => {
+test("shadow-claw-daw-fs: writeConversationFile and readConversationFile supports saving and loading across any conversation", async () => {
   resetMockFsStorage();
 
   // 1. Save to default Main conversation
   const mainSave = await writeConversationFile(
     DEFAULT_GROUP_ID,
-    "main-beat.scdaw.json",
+    "main-beat.shadow-claw-daw.json",
     JSON.stringify({ name: "Main Beat", bpm: 124 }),
   );
   assert.equal(mainSave.ok, true);
-  assert.equal(mainSave.name, "main-beat.scdaw.json");
+  assert.equal(mainSave.name, "main-beat.shadow-claw-daw.json");
   assert.equal(mainSave.groupId, DEFAULT_GROUP_ID);
 
   // 2. Save to another conversation
   const customGid = "br:ambient-session";
   const customSave = await writeConversationFile(
     customGid,
-    "ambient-groove.scdaw.json",
+    "ambient-groove.shadow-claw-daw.json",
     JSON.stringify({ name: "Ambient Groove", bpm: 90 }),
   );
   assert.equal(customSave.ok, true);
-  assert.equal(customSave.name, "ambient-groove.scdaw.json");
+  assert.equal(customSave.name, "ambient-groove.shadow-claw-daw.json");
   assert.equal(customSave.groupId, customGid);
 
   // 3. List files in Main conversation
   const mainFiles = await listConversationFiles(DEFAULT_GROUP_ID);
   assert.equal(mainFiles.length, 1);
-  assert.equal(mainFiles[0].name, "main-beat.scdaw.json");
+  assert.equal(mainFiles[0].name, "main-beat.shadow-claw-daw.json");
   assert.equal(mainFiles[0].format, "scdaw-json");
 
   // 4. List files in Custom conversation
   const customFiles = await listConversationFiles(customGid);
   assert.equal(customFiles.length, 1);
-  assert.equal(customFiles[0].name, "ambient-groove.scdaw.json");
+  assert.equal(customFiles[0].name, "ambient-groove.shadow-claw-daw.json");
 
   // 5. Read back file from custom conversation
   const loaded = await readConversationFile(
     customGid,
-    "ambient-groove.scdaw.json",
+    "ambient-groove.shadow-claw-daw.json",
   );
-  assert.equal(loaded.name, "ambient-groove.scdaw.json");
+  assert.equal(loaded.name, "ambient-groove.shadow-claw-daw.json");
   const parsed = JSON.parse(loaded.text);
   assert.equal(parsed.name, "Ambient Groove");
   assert.equal(parsed.bpm, 90);
 
   // 6. Delete file
-  await deleteConversationFile(customGid, "ambient-groove.scdaw.json");
+  await deleteConversationFile(
+    customGid,
+    "ambient-groove.shadow-claw-daw.json",
+  );
   const remaining = await listConversationFiles(customGid);
   assert.equal(remaining.length, 0);
 });
 
-test("scdaw-engine: saveProject and loadProjectFromFs round-trip across conversations", async () => {
+test("shadow-claw-daw-engine: saveProject and loadProjectFromFs round-trip across conversations", async () => {
   resetMockFsStorage();
 
   const ctx = new FakeAudioContext();
@@ -167,7 +170,7 @@ test("scdaw-engine: saveProject and loadProjectFromFs round-trip across conversa
 
   // 1. Save project to Main conversation by default
   const saveMainResult = await engine.saveProject({
-    filename: "techno-anthem.scdaw.json",
+    filename: "techno-anthem.shadow-claw-daw.json",
   });
   assert.equal(saveMainResult.ok, true);
   assert.equal(saveMainResult.conversationId, DEFAULT_GROUP_ID);
@@ -176,17 +179,21 @@ test("scdaw-engine: saveProject and loadProjectFromFs round-trip across conversa
   const customGid = "br:hiphop-lab";
   const saveCustomResult = await engine.saveProject({
     conversationId: customGid,
-    filename: "boom-bap.scdaw.json",
+    filename: "boom-bap.shadow-claw-daw.json",
   });
   assert.equal(saveCustomResult.ok, true);
   assert.equal(saveCustomResult.conversationId, customGid);
 
   // Verify files exist in their respective conversations
   const mainFiles = await engine.listConversationFiles(DEFAULT_GROUP_ID);
-  assert.ok(mainFiles.some((f) => f.name === "techno-anthem.scdaw.json"));
+  assert.ok(
+    mainFiles.some((f) => f.name === "techno-anthem.shadow-claw-daw.json"),
+  );
 
   const customFiles = await engine.listConversationFiles(customGid);
-  assert.ok(customFiles.some((f) => f.name === "boom-bap.scdaw.json"));
+  assert.ok(
+    customFiles.some((f) => f.name === "boom-bap.shadow-claw-daw.json"),
+  );
 
   // Change project to a blank project
   await engine.sendCommand("new_project", { template: "empty", bpm: 80 });
@@ -195,7 +202,7 @@ test("scdaw-engine: saveProject and loadProjectFromFs round-trip across conversa
   // 3. Load project FROM custom conversation
   const loadResult = await engine.loadProjectFromFs({
     conversationId: customGid,
-    filename: "boom-bap.scdaw.json",
+    filename: "boom-bap.shadow-claw-daw.json",
   });
   assert.equal(loadResult.ok, true);
   assert.equal(engine.getProject().bpm, 135);
@@ -220,7 +227,7 @@ test("scdaw-engine: saveProject and loadProjectFromFs round-trip across conversa
   assert.equal(engine.getProject().bpm, 135);
 });
 
-test("scdaw-engine: bounce, exportMidi, and bounceStems save to conversation OPFS files", async () => {
+test("shadow-claw-daw-engine: bounce, exportMidi, and bounceStems save to conversation OPFS files", async () => {
   resetMockFsStorage();
 
   const ctx = new FakeAudioContext();
@@ -370,7 +377,7 @@ test("shadow-claw-daw-browser UI: contains Files tab for browsing conversation f
   );
 });
 
-test("scdaw-fs: resolves deployment namespace from <base href> and location pathname to match ShadowClaw OPFS root", () => {
+test("shadow-claw-daw-fs: resolves deployment namespace from <base href> and location pathname to match ShadowClaw OPFS root", () => {
   // Save originals
   const origWindow = globalThis.window;
   const origDocument = globalThis.document;
@@ -445,7 +452,7 @@ test("scdaw-fs: resolves deployment namespace from <base href> and location path
   }
 });
 
-test("scdaw-fs: writeConversationFile falls back to worker-based sync access handle when main-thread writable stream is unavailable", async () => {
+test("shadow-claw-daw-fs: writeConversationFile falls back to worker-based sync access handle when main-thread writable stream is unavailable", async () => {
   const origNavigatorDesc = Object.getOwnPropertyDescriptor(
     globalThis,
     "navigator",

@@ -19,14 +19,14 @@ import {
   findClippingRegions,
   findSilenceRegions,
   findBeatOnsets,
-} from "../.agents/scripts/scdaw-spectral-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-spectral-dsp.js";
 import {
   findNearestSpectrumBin,
   renderSpectrumSvg,
 } from "../.agents/scripts/components/shadow-claw-daw-spectrum.js";
 import { renderSpectrogramSvg } from "../.agents/scripts/components/shadow-claw-daw-wave-editor.js";
 import { formatRecordingErrorDialog } from "../.agents/scripts/components/shadow-claw-daw-transport.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
   const len = Math.round(sampleRate * durationSec);

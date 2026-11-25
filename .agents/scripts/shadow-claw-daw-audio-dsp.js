@@ -1,23 +1,23 @@
 /**
- * .agents/scripts/scdaw-audio-dsp.js
+ * .agents/scripts/shadow-claw-daw-audio-dsp.js
  *
  * Pure Float32Array offline audio DSP kernels, restoration, generators,
  * zero-crossing analysis, and EBU R128 loudness measurement.
  * 100% zero-dependency ESM with optional pluggable WASM/Worker backend hooks.
  */
 
-import { evaluateClipGainEnvelope } from "./scdaw.js";
+import { evaluateClipGainEnvelope } from "./shadow-claw-daw.js";
 import {
   applyNoiseReduction,
   applySpectralEdit,
-} from "./scdaw-spectral-dsp.js";
+} from "./shadow-claw-daw-spectral-dsp.js";
 import {
   resampleAudio,
   timeStretchWsola,
   pitchShiftAudio,
   changeSpeedAudio,
   truncateSilenceAudio,
-} from "./scdaw-time-dsp.js";
+} from "./shadow-claw-daw-time-dsp.js";
 
 export {
   resampleAudio,

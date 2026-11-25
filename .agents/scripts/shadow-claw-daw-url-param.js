@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-url-param.js
+ * .agents/scripts/shadow-claw-daw-url-param.js
  *
  * URL parameter management for compressed project payloads.
  * Uses URL hash fragments (`#file=...`) by default so large songs never hit
@@ -11,7 +11,7 @@ import {
   compressToBase64Url,
   decompressFromBase64Url,
   validateBase64UrlLength,
-} from "./scdaw-compress.js";
+} from "./shadow-claw-daw-compress.js";
 
 /**
  * Conservative cross-browser URL length thresholds.

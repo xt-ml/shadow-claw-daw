@@ -1,6 +1,6 @@
 // Ported concepts from claw-daw (MIT, © 2026 soya) and openDAW packages/lib/dsp (AGPL-3.0, © André Michelle)
 /**
- * .agents/scripts/scdaw-compose.js
+ * .agents/scripts/shadow-claw-daw-compose.js
  *
  * High-level song composition engine: compiles structured SongSpec descriptions
  * (sections, chord progressions, genre feel, energy curves, and instrumentation)
@@ -8,8 +8,13 @@
  * Zero DOM and zero Web Audio dependencies.
  */
 
-import { PPQN, barPulses, beatsPerBar, stepsPerBar } from "./scdaw.js";
-import { resolveGmProgram } from "./scdaw-soundfont.js";
+import {
+  PPQN,
+  barPulses,
+  beatsPerBar,
+  stepsPerBar,
+} from "./shadow-claw-daw.js";
+import { resolveGmProgram } from "./shadow-claw-daw-soundfont.js";
 
 // --- Music Theory Constants (openDAW & claw-daw) ---
 

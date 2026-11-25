@@ -6,9 +6,9 @@ import {
   PPQN,
   encodeWav,
   decodeWavHeader,
-} from "../.agents/scripts/scdaw.js";
-import { decodeZip } from "../.agents/scripts/scdaw-zip.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { decodeZip } from "../.agents/scripts/shadow-claw-daw-zip.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,
@@ -43,7 +43,7 @@ test("scdaw: audibleLength detects tail silence and trims up to threshold", () =
   assert.ok(trimmedLength >= minLength, "Must never trim below musical length");
 });
 
-test("scdaw-engine: bounce() supports bitDepth 16, 24, and 32 with accurate headers", async () => {
+test("shadow-claw-daw-engine: bounce() supports bitDepth 16, 24, and 32 with accurate headers", async () => {
   const ctx = new FakeAudioContext();
   const engine = new DawEngine({
     audioContext: ctx,
@@ -72,7 +72,7 @@ test("scdaw-engine: bounce() supports bitDepth 16, 24, and 32 with accurate head
   );
 });
 
-test("scdaw-engine: bounceStems() renders multi-track stems and bundles into ZIP archive", async () => {
+test("shadow-claw-daw-engine: bounceStems() renders multi-track stems and bundles into ZIP archive", async () => {
   const ctx = new FakeAudioContext();
   const engine = new DawEngine({
     audioContext: ctx,
@@ -127,7 +127,7 @@ test("scdaw-engine: bounceStems() renders multi-track stems and bundles into ZIP
     "ZIP must contain Standard MIDI File",
   );
   assert.ok(
-    zipFileNames.some((n) => n.endsWith(".scdaw.json")),
+    zipFileNames.some((n) => n.endsWith(".shadow-claw-daw.json")),
     "ZIP must contain native project JSON",
   );
 
@@ -142,7 +142,7 @@ test("scdaw-engine: bounceStems() renders multi-track stems and bundles into ZIP
   }
 });
 
-test("scdaw-engine: bounceStems() honors pre-fader tap routing", async () => {
+test("shadow-claw-daw-engine: bounceStems() honors pre-fader tap routing", async () => {
   const ctx = new FakeAudioContext();
   const engine = new DawEngine({
     audioContext: ctx,

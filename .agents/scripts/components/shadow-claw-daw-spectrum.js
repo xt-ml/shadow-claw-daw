@@ -6,13 +6,13 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
 import {
   WINDOW_FUNCTIONS,
   computePowerSpectrum,
   freqToNoteName,
-} from "../scdaw-spectral-dsp.js";
+} from "../shadow-claw-daw-spectral-dsp.js";
 
 import {
   BaseElement,
@@ -304,7 +304,7 @@ export class ShadowClawDawSpectrum extends BaseElement {
           }
         }
       </style>
-      <section class="shadow-claw-daw-spectrum" role="region" aria-label="Plot Spectrum Frequency Analyzer">
+      <section class="scdaw-spectrum" role="region" aria-label="Plot Spectrum Frequency Analyzer">
         <div class="scdaw-spectrum__header">
           <strong>📊 Plot Spectrum</strong>
           <div class="scdaw-spectrum__controls">

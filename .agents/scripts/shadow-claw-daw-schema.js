@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-schema.js
+ * .agents/scripts/shadow-claw-daw-schema.js
  *
  * Formal parameter definitions, constraints, defaults, and value mappers.
  * Ported concepts from openDAW forge-boxes and Defaults.ts.

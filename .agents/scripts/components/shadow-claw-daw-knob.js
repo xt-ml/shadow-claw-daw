@@ -410,7 +410,7 @@ export class ShadowClawDawKnob extends BaseElement {
         }
       </style>
       <span class="scdaw-knob__label knob-label">${this.label}</span>
-      <div class="shadow-claw-daw-knob scdaw-knob__control knob-container" id="knob" role="slider" tabindex="0" aria-label="${this.label || "Parameter"}" aria-valuemin="${this.min}" aria-valuemax="${this.max}" aria-valuenow="${this._value}" aria-valuetext="${formatted}" title="${this.label} (Double-click to reset)">
+      <div class="scdaw-knob scdaw-knob__control knob-container" id="knob" role="slider" tabindex="0" aria-label="${this.label || "Parameter"}" aria-valuemin="${this.min}" aria-valuemax="${this.max}" aria-valuenow="${this._value}" aria-valuetext="${formatted}" title="${this.label} (Double-click to reset)">
         <svg class="scdaw-knob__svg knob-svg" viewBox="0 0 40 40" aria-hidden="true">
           <circle cx="20" cy="20" r="14" fill="var(--bg-elevated)" stroke="var(--border)" stroke-width="2" />
           <circle id="val-arc" cx="20" cy="20" r="14" fill="none" stroke="var(--accent)" stroke-width="2.5"

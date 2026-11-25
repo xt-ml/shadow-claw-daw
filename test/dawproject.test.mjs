@@ -9,15 +9,15 @@ import {
   serializeXmlDocument,
   encodeDawProject,
   decodeDawProject,
-} from "../.agents/scripts/scdaw-dawproject.js";
-import { createProject } from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw-dawproject.js";
+import { createProject } from "../.agents/scripts/shadow-claw-daw.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = fs.existsSync(join(__dirname, "fixtures"))
   ? join(__dirname, "fixtures")
   : join(__dirname, "assets");
 
-test("scdaw-dawproject: parseXml and serializeXmlDocument parse and format clean XML", () => {
+test("shadow-claw-daw-dawproject: parseXml and serializeXmlDocument parse and format clean XML", () => {
   const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Project version="1.0">
     <Application name="ShadowClaw DAW" version="1.0.0"/>
@@ -62,7 +62,7 @@ test("scdaw-dawproject: parseXml and serializeXmlDocument parse and format clean
   assert.ok(built.includes("<Artist>ShadowClaw</Artist>"));
 });
 
-test("scdaw-dawproject: decodeDawProject imports note-regions.dawproject fixture accurately", async () => {
+test("shadow-claw-daw-dawproject: decodeDawProject imports note-regions.dawproject fixture accurately", async () => {
   const fixturePath = join(FIXTURES_DIR, "note-regions.dawproject");
   const fileBuffer = fs.readFileSync(fixturePath);
 
@@ -91,7 +91,7 @@ test("scdaw-dawproject: decodeDawProject imports note-regions.dawproject fixture
   assert.ok(note0.position >= 0, "Position must be non-negative PPQN");
 });
 
-test("scdaw-dawproject: decodeDawProject imports eq.dawproject fixture and detects equalizer device", async () => {
+test("shadow-claw-daw-dawproject: decodeDawProject imports eq.dawproject fixture and detects equalizer device", async () => {
   const fixturePath = join(FIXTURES_DIR, "eq.dawproject");
   const fileBuffer = fs.readFileSync(fixturePath);
 
@@ -110,7 +110,7 @@ test("scdaw-dawproject: decodeDawProject imports eq.dawproject fixture and detec
   assert.equal(eqDevice.bands.length, 6, "EQ+ fixture has 6 bands");
 });
 
-test("scdaw-dawproject: round-trip project -> encodeDawProject -> decodeDawProject preserves project structure and notes", async () => {
+test("shadow-claw-daw-dawproject: round-trip project -> encodeDawProject -> decodeDawProject preserves project structure and notes", async () => {
   const original = createProject({
     name: "DAWproject Interchange Test",
     bpm: 126,
@@ -164,7 +164,7 @@ test("scdaw-dawproject: round-trip project -> encodeDawProject -> decodeDawProje
   assert.equal(synthTrack.notes[0].duration, 480);
 });
 
-test("scdaw-dawproject: preserves device parameters and presets in presets/*.json", async () => {
+test("shadow-claw-daw-dawproject: preserves device parameters and presets in presets/*.json", async () => {
   const original = createProject({
     name: "Deep Data Project",
     bpm: 132,
@@ -201,7 +201,7 @@ test("scdaw-dawproject: preserves device parameters and presets in presets/*.jso
   assert.equal(bassTrack.params.attack, 0.005);
 });
 
-test("scdaw-dawproject: supports hybrid audio stems embedding in samples/*.wav", async () => {
+test("shadow-claw-daw-dawproject: supports hybrid audio stems embedding in samples/*.wav", async () => {
   const original = createProject({
     name: "Hybrid Stems Project",
     bpm: 124,
@@ -226,7 +226,8 @@ test("scdaw-dawproject: supports hybrid audio stems embedding in samples/*.wav",
   });
 
   // Extract ZIP and verify samples/drums.wav entry
-  const { decodeZip } = await import("../.agents/scripts/scdaw-zip.js");
+  const { decodeZip } =
+    await import("../.agents/scripts/shadow-claw-daw-zip.js");
   const extracted = await decodeZip(zipBytes);
   const sampleEntry = extracted.find((e) => e.name === "samples/drums.wav");
   assert.ok(
@@ -236,7 +237,7 @@ test("scdaw-dawproject: supports hybrid audio stems embedding in samples/*.wav",
   assert.equal(sampleEntry.data.length, fakeWav.length);
 });
 
-test("scdaw-dawproject: encodes and decodes continuous parameter automation curves in Points lanes", async () => {
+test("shadow-claw-daw-dawproject: encodes and decodes continuous parameter automation curves in Points lanes", async () => {
   const original = createProject({
     name: "Automation Test",
     bpm: 128,
@@ -301,7 +302,7 @@ test("scdaw-dawproject: encodes and decodes continuous parameter automation curv
   assert.equal(lead.automation.cutoff[0].value, 800);
 });
 
-test("scdaw-dawproject: preserves extended builtin audio FX (delay, reverb, crusher, wavefolder)", async () => {
+test("shadow-claw-daw-dawproject: preserves extended builtin audio FX (delay, reverb, crusher, wavefolder)", async () => {
   const original = createProject({
     name: "FX Rack Test",
     bpm: 120,
@@ -355,7 +356,7 @@ test("scdaw-dawproject: preserves extended builtin audio FX (delay, reverb, crus
   assert.equal(foldFx.driveDb, 6);
 });
 
-test("scdaw-dawproject: encodes and decodes timeline audio clips referencing embedded samples", async () => {
+test("shadow-claw-daw-dawproject: encodes and decodes timeline audio clips referencing embedded samples", async () => {
   const original = createProject({
     name: "Audio Clips Test",
     bpm: 120,

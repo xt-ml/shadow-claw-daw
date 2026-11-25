@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-audio-dsp-worker.js
+ * .agents/scripts/shadow-claw-daw-audio-dsp-worker.js
  *
  * Optional Web Worker and Rust/WASM DSP acceleration adapter for ShadowClaw DAW.
  * Executes offline channel processing via an optional Worker or WASM backend,
@@ -10,7 +10,7 @@ import {
   processAudioChannels,
   registerDspBackend,
   unregisterDspBackend,
-} from "./scdaw-audio-dsp.js";
+} from "./shadow-claw-daw-audio-dsp.js";
 
 let _activeWorkerRunner = null;
 

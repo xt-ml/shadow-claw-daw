@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-fs.js
+ * .agents/scripts/shadow-claw-daw-fs.js
  *
  * ShadowClaw File System & OPFS (Origin Private File System) integration for ShadowClaw DAW.
  * Delegates conversation discovery, storage handles, worker fallback, and mocks to
@@ -59,7 +59,7 @@ export function classifyFile(filename) {
   let isProject = false;
   let isAudio = false;
 
-  if (lower.endsWith(".scdaw.json") || lower.endsWith(".json")) {
+  if (lower.endsWith(".shadow-claw-daw.json") || lower.endsWith(".json")) {
     format = "scdaw-json";
     isProject = true;
   } else if (lower.endsWith(".dawproject")) {

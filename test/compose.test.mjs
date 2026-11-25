@@ -6,8 +6,11 @@ import {
   parseMotif,
   compileSong,
   STYLE_PRESETS,
-} from "../.agents/scripts/scdaw-compose.js";
-import { validateProject, applyCommand } from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw-compose.js";
+import {
+  validateProject,
+  applyCommand,
+} from "../.agents/scripts/shadow-claw-daw.js";
 
 test("WP1.1: parseChord parses chord symbols to root, pitches, and bass", () => {
   const eMajor = parseChord("E");
@@ -167,7 +170,7 @@ test("WP1.3: applyCommand supports compose_song and describe_arrangement", () =>
 
 test("WP1.3: handleToolDispatch dispatches scdaw_compose_song and scdaw_describe_arrangement", async () => {
   const { handleToolDispatch } =
-    await import("../.agents/scripts/scdaw-adapter.js");
+    await import("../.agents/scripts/shadow-claw-daw-adapter.js");
 
   const spec = {
     title: "Adapter Saints March",

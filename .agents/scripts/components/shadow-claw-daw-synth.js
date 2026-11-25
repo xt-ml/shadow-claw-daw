@@ -9,17 +9,20 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
-import { INSTRUMENT_SCHEMAS, getDefaultParams } from "../scdaw-schema.js";
-import { INSTRUMENT_PRESETS } from "../scdaw-presets.js";
-import { ppqnToStep, stepsPerBar } from "../scdaw.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
+import {
+  INSTRUMENT_SCHEMAS,
+  getDefaultParams,
+} from "../shadow-claw-daw-schema.js";
+import { INSTRUMENT_PRESETS } from "../shadow-claw-daw-presets.js";
+import { ppqnToStep, stepsPerBar } from "../shadow-claw-daw.js";
 import {
   describeDx7Algorithm,
   renderAlgorithmSvg,
   parseDx7Sysex,
   encodeDx7SysexVoice,
-} from "../scdaw-syx.js";
+} from "../shadow-claw-daw-syx.js";
 import "./shadow-claw-daw-knob.js";
 
 import {
@@ -1127,7 +1130,7 @@ export class ShadowClawDawSynth extends BaseElement {
           }
         }
       </style>
-      <div class="shadow-claw-daw-synth daw-panel" role="region" aria-label="Synthesizer Workbench">
+      <div class="scdaw-synth daw-panel" role="region" aria-label="Synthesizer Workbench">
         <div class="scdaw-synth__header">
           <div class="scdaw-synth__selectors">
             <label class="scdaw-synth__field">

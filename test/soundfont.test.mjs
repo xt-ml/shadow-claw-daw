@@ -14,7 +14,7 @@ import {
   resolveGmProgram,
   findRegionForNote,
   renderSoundfontVoice,
-} from "../.agents/scripts/scdaw-soundfont.js";
+} from "../.agents/scripts/shadow-claw-daw-soundfont.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -232,7 +232,7 @@ test("WP3.1: GM program mapping maps instrument names to MIDI programs", () => {
 test("WP3.2: triggerDrumSoundfont triggers real drum sample in Web Audio graph", async () => {
   const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
   const { triggerDrumSoundfont } =
-    await import("../.agents/scripts/scdaw-soundfont.js");
+    await import("../.agents/scripts/shadow-claw-daw-soundfont.js");
 
   const ctx = new FakeAudioContext();
   const dest = ctx.destination;
@@ -247,7 +247,7 @@ test("WP3.2: triggerDrumSoundfont triggers real drum sample in Web Audio graph",
 test("WP3.2: triggerSoundfontNote triggers GM instrument note with ADSR and pan", async () => {
   const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
   const { triggerSoundfontNote } =
-    await import("../.agents/scripts/scdaw-soundfont.js");
+    await import("../.agents/scripts/shadow-claw-daw-soundfont.js");
 
   const ctx = new FakeAudioContext();
   const dest = ctx.destination;
@@ -263,7 +263,7 @@ test("WP3.2: triggerSoundfontNote triggers GM instrument note with ADSR and pan"
 test("WP3.3: triggerSoundfontNote resolves GM preset by MIDI program (not array index) in gm-lofi.sf2", async () => {
   const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
   const { registerSoundfont, triggerSoundfontNote } =
-    await import("../.agents/scripts/scdaw-soundfont.js");
+    await import("../.agents/scripts/shadow-claw-daw-soundfont.js");
 
   const gmPath = resolve(ROOT, "pages/resources/assets/soundfonts/gm-lofi.sf2");
   assert.ok(existsSync(gmPath), "gm-lofi.sf2 must exist");
@@ -343,7 +343,7 @@ test("WP3.3: triggerSoundfontNote resolves GM preset by MIDI program (not array 
 test("WP3.3: triggerDrumSoundfont plays at 1.0 playbackRate even when ctx.sampleRate is 48000", async () => {
   const { FakeAudioContext } = await import("./helpers/fake-audio-context.mjs");
   const { triggerDrumSoundfont } =
-    await import("../.agents/scripts/scdaw-soundfont.js");
+    await import("../.agents/scripts/shadow-claw-daw-soundfont.js");
 
   const ctx = new FakeAudioContext();
   ctx.sampleRate = 48000;

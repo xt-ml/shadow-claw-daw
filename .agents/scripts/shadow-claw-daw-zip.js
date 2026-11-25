@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-zip.js
+ * .agents/scripts/shadow-claw-daw-zip.js
  *
  * Zero-dependency pure JavaScript ZIP archive reader and writer.
  * Environment agnostic: runs identically in Node.js, Web Workers, and browser main thread.

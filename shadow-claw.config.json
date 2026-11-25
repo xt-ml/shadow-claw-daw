@@ -66,9 +66,9 @@
         "hasInit": false
       },
       {
-        "id": "scdaw-adapter",
-        "name": "scdaw-adapter",
-        "src": ".agents/scripts/scdaw-adapter.js",
+        "id": "shadow-claw-daw-adapter",
+        "name": "shadow-claw-daw-adapter",
+        "src": ".agents/scripts/shadow-claw-daw-adapter.js",
         "global": true,
         "autoload": true,
         "hasInit": true

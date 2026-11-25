@@ -1,10 +1,10 @@
 /**
- * .agents/scripts/scdaw-presets.js
+ * .agents/scripts/shadow-claw-daw-presets.js
  *
  * Curated synthesizer presets, drum kits, and genre-specific multi-track pattern generators.
  */
 
-import { PPQN, stepToPpqn } from "./scdaw.js";
+import { PPQN, stepToPpqn } from "./shadow-claw-daw.js";
 
 const TECHNO_BASS_SYNTH_PARAMS = Object.freeze({
   waveform: "sawtooth",

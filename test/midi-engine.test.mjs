@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
-import { createProject, applyCommand } from "../.agents/scripts/scdaw.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
-import { triggerInstrumentVoice } from "../.agents/scripts/scdaw-instruments.js";
+import {
+  createProject,
+  applyCommand,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import { triggerInstrumentVoice } from "../.agents/scripts/shadow-claw-daw-instruments.js";
 
 function createTestEngine() {
   const fakeCtx = new FakeAudioContext();
@@ -170,7 +173,10 @@ test("DawEngine: getExactPlayheadPpqn interpolates audio clock and compensates o
 
 test("triggerInstrumentVoice: gate=true release uses cancelAndHoldAtTime and ramps to 0 cleanly", async () => {
   const fs = await import("node:fs/promises");
-  const src = await fs.readFile(".agents/scripts/scdaw-instruments.js", "utf8");
+  const src = await fs.readFile(
+    ".agents/scripts/shadow-claw-daw-instruments.js",
+    "utf8",
+  );
   assert.match(src, /cancelAndHoldAtTime/);
   assert.match(src, /linearRampToValueAtTime\(\s*0\s*,/);
 });

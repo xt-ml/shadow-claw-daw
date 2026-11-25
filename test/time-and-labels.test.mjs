@@ -7,21 +7,21 @@ import {
   pitchShiftAudio,
   changeSpeedAudio,
   truncateSilenceAudio,
-} from "../.agents/scripts/scdaw-time-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-time-dsp.js";
 import {
   processAudioChannels,
   registerDspBackend,
   unregisterDspBackend,
-} from "../.agents/scripts/scdaw-audio-dsp.js";
-import { computePowerSpectrum } from "../.agents/scripts/scdaw-spectral-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-audio-dsp.js";
+import { computePowerSpectrum } from "../.agents/scripts/shadow-claw-daw-spectral-dsp.js";
 import {
   createProject,
   validateProject,
   applyCommand,
   computeClipPlaybackParams,
-} from "../.agents/scripts/scdaw.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import { computeLabelLayout } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import {
   FakeAudioContext,

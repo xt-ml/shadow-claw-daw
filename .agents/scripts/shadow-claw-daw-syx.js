@@ -1,6 +1,6 @@
 // Ported concepts from openDAW Tubular / Dx7Sysex & fm1_open dx7core (AGPL-3.0-or-later / Apache-2.0)
 /**
- * .agents/scripts/scdaw-syx.js
+ * .agents/scripts/shadow-claw-daw-syx.js
  *
  * Pure-JS DX7 6-operator / 32-algorithm topology decoder, SVG renderer,
  * and Standard MIDI SysEx (.syx) voice & 32-voice cartridge codec.

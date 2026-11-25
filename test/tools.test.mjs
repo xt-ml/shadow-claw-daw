@@ -7,7 +7,7 @@ import { TOOLS } from "../bin/tool-manifest.mjs";
 import {
   handleToolDispatch,
   registerNativeWebMcp,
-} from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw-adapter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");

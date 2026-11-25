@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { SHARED_STYLES } from "../.agents/scripts/components/shadow-claw-daw-styles.js";
-import { scdaw } from "../.agents/scripts/scdaw-engine.js";
+import { scdaw } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   mapNormalizedToValue,
   mapValueToNormalized,
@@ -2576,7 +2576,7 @@ test("shadow-claw-daw-workbench: resolveDropAction determines context-sensitive 
   assert.deepEqual(
     resolveDropAction({
       targetTrackId: null,
-      file: { name: "groove.scdaw.json" },
+      file: { name: "groove.shadow-claw-daw.json" },
     }),
     { action: "import_session", format: "scdaw-json" },
   );
@@ -2833,8 +2833,9 @@ test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degrada
   );
 });
 
-test("scdaw-engine & components: selectTrack synchronizes selectedTrackId across Timeline, Editor, Device Rack, and Mixer", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+test("shadow-claw-daw-engine & components: selectTrack synchronizes selectedTrackId across Timeline, Editor, Device Rack, and Mixer", async () => {
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const p = scdaw.getProject();
   assert.ok(p.tracks.length >= 2);
   assert.ok(scdaw.selectedTrackId, "scdaw must expose selectedTrackId signal");
@@ -2861,7 +2862,8 @@ test("scdaw-engine & components: selectTrack synchronizes selectedTrackId across
 });
 
 test("shadow-claw-daw-timeline & shadow-claw-daw-mixer: clicking M (Mute) and S (Solo) buttons toggles track mute and solo state on and off", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawTimeline } =
     await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
   const { ShadowClawDawMixer } =
@@ -3013,7 +3015,8 @@ test("shadow-claw-daw-timeline & shadow-claw-daw-mixer: clicking M (Mute) and S 
 });
 
 test("shadow-claw-daw-editor: velocity stalks align 1:1 inside .grid-area with .pr-key + .pr-cells geometry and support interactive velocity editing", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawEditor } =
     await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
@@ -3133,7 +3136,8 @@ test("shadow-claw-daw-editor: velocity stalks align 1:1 inside .grid-area with .
 });
 
 test("shadow-claw-daw-timeline: renders audio tracks, audio clips, and toggles automation lanes with ARIA compliance", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawTimeline } =
     await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
@@ -3266,7 +3270,8 @@ test("shadow-claw-daw-timeline: renders audio tracks, audio clips, and toggles a
 });
 
 test("shadow-claw-daw-timeline: track header enforces strict overflow containment, max-width, and non-overlapping controls", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawTimeline } =
     await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
 
@@ -3795,7 +3800,8 @@ test("shadow-claw-daw-browser: _getItems lists all 9 roster instruments, Audio F
 });
 
 test("Performance: shadow-claw-daw-timeline, shadow-claw-daw-sequencer (hidden), and shadow-claw-daw-editor skip DOM rebuilds when only track volume/pan/params change", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawTimeline } =
     await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
   const { ShadowClawDawSequencer } =
@@ -3912,7 +3918,8 @@ test("Performance: shadow-claw-daw-timeline, shadow-claw-daw-sequencer (hidden),
 });
 
 test("Performance: shadow-claw-daw-status-bar._sync() and shadow-claw-daw-timeline._updatePlayhead() never call scdaw.getProject()", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawStatusBar } =
     await import("../.agents/scripts/components/shadow-claw-daw-status-bar.js");
   const { ShadowClawDawTimeline } =
@@ -3955,7 +3962,8 @@ test("Performance: shadow-claw-daw-status-bar._sync() and shadow-claw-daw-timeli
 });
 
 test("shadow-claw-daw-mixer: clicking or releasing track slider/knob does not trigger scdaw.selectTrack", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawMixer } =
     await import("../.agents/scripts/components/shadow-claw-daw-mixer.js");
 
@@ -3999,7 +4007,8 @@ test("shadow-claw-daw-mixer: clicking or releasing track slider/knob does not tr
 });
 
 test("Performance: shadow-claw-daw-sequencer and shadow-claw-daw-timeline update in-place without rebuilding Shadow DOM on toggle_step", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawSequencer } =
     await import("../.agents/scripts/components/shadow-claw-daw-sequencer.js");
   const { ShadowClawDawTimeline } =
@@ -4196,7 +4205,8 @@ test("shadow-claw-daw-transport: calculateBarsAdjustment and parseSignatureStrin
     ShadowClawDawTransport,
   } =
     await import("../.agents/scripts/components/shadow-claw-daw-transport.js");
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
 
   assert.equal(calculateBarsAdjustment(1, 1, false), 2);
   assert.equal(calculateBarsAdjustment(1, -1, false), 1); // clamped at 1
@@ -4238,7 +4248,8 @@ test("shadow-claw-daw-transport: calculateBarsAdjustment and parseSignatureStrin
 test("shadow-claw-daw-timeline: renders ARIA end-bar slider, + Bar button, and computes drag bars accurately", async () => {
   const { calculateProjectBarsFromDrag, ShadowClawDawTimeline } =
     await import("../.agents/scripts/components/shadow-claw-daw-timeline.js");
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
 
   assert.equal(
     calculateProjectBarsFromDrag({ startBars: 4, deltaX: 120, pxPerBar: 60 }),
@@ -4274,7 +4285,8 @@ test("shadow-claw-daw-timeline: renders ARIA end-bar slider, + Bar button, and c
 });
 
 test("shadow-claw-daw-editor & shadow-claw-daw-sequencer: honor signature-aware stepsPerBar (3/4 = 12 steps per bar)", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawEditor } =
     await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
   const { ShadowClawDawSequencer } =
@@ -4313,7 +4325,8 @@ test("shadow-claw-daw-editor & shadow-claw-daw-sequencer: honor signature-aware 
 });
 
 test("shadow-claw-daw-workbench: New Project button (#new-btn) creates a completely blank project while Reset (#reset-btn) restores starter template", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawWorkbench } =
     await import("../.agents/scripts/components/shadow-claw-daw-workbench.js");
 
@@ -4381,7 +4394,8 @@ test("shadow-claw-daw-workbench: New Project button (#new-btn) creates a complet
 });
 
 test("shadow-claw-daw-editor: chord selector (#add-chord-select) offers all 12 major and 12 minor chords and inserts selected chord notes", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const editorMod =
     await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
   const { ShadowClawDawEditor, CHORD_OPTIONS, buildChordNotes } = editorMod;
@@ -4471,8 +4485,9 @@ test("shadow-claw-daw-editor: chord selector (#add-chord-select) offers all 12 m
 });
 
 test("shadow-claw-daw-editor: chord selector inserts chord at current timeline playhead position (e.g. Measure 1 then Measure 2)", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
-  const { PPQN } = await import("../.agents/scripts/scdaw.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
+  const { PPQN } = await import("../.agents/scripts/shadow-claw-daw.js");
   const { ShadowClawDawEditor } =
     await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
 
@@ -4538,7 +4553,8 @@ test("shadow-claw-daw-editor: chord selector inserts chord at current timeline p
 });
 
 test("shadow-claw-daw-editor & shadow-claw-daw-sequencer: audition note via scdaw.previewNote only when adding a note (toggled === 'on')", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawEditor } =
     await import("../.agents/scripts/components/shadow-claw-daw-editor.js");
   const { ShadowClawDawSequencer } =
@@ -4711,7 +4727,8 @@ test("shadow-claw-daw-synth: pure helpers, mobile-first @container CSS, BEM, ARI
 });
 
 test("MIDI Learn UI & Live Redraw (Gaps 1 & 4): transport MIDI dialog, mixer Learn toggle & contextmenu, synth/devices contextmenu, and immediate liveRevision redraw", async () => {
-  const { scdaw } = await import("../.agents/scripts/scdaw-engine.js");
+  const { scdaw } =
+    await import("../.agents/scripts/shadow-claw-daw-engine.js");
   const { ShadowClawDawTransport } =
     await import("../.agents/scripts/components/shadow-claw-daw-transport.js");
   const { ShadowClawDawMixer } =

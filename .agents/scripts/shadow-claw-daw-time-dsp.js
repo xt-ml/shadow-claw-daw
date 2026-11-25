@@ -1,9 +1,9 @@
 /**
- * .agents/scripts/scdaw-time-dsp.js
+ * .agents/scripts/shadow-claw-daw-time-dsp.js
  *
  * Pure zero-dependency Float32Array time-stretching (WSOLA), pitch-shifting,
  * speed/resampling, and Truncate Silence DSP kernels.
- * Leaf module (no imports from scdaw-audio-dsp.js to keep module graph acyclic).
+ * Leaf module (no imports from shadow-claw-daw-audio-dsp.js to keep module graph acyclic).
  */
 
 function normalizeChannels(channels) {

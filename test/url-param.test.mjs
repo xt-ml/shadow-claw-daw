@@ -8,21 +8,21 @@ import {
   createProject,
   serializeProject,
   deserializeProject,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 import {
   compressToBase64Url,
   decompressFromBase64Url,
-} from "../.agents/scripts/scdaw-compress.js";
+} from "../.agents/scripts/shadow-claw-daw-compress.js";
 import {
   getBaseHref,
   createCompressedUrl,
   getCompressedParam,
   clearUrlParam,
-} from "../.agents/scripts/scdaw-url-param.js";
+} from "../.agents/scripts/shadow-claw-daw-url-param.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-test("scdaw-compress: compresses and decompresses serialized .scdaw.json project", async () => {
+test("shadow-claw-daw-compress: compresses and decompresses serialized .shadow-claw-daw.json project", async () => {
   const project = createProject({ name: "Test Beat" });
   const jsonStr = JSON.stringify(JSON.parse(serializeProject(project)));
 
@@ -41,7 +41,7 @@ test("scdaw-compress: compresses and decompresses serialized .scdaw.json project
   assert.equal(restored.name, "Test Beat");
 });
 
-test("scdaw-url-param: createCompressedUrl defaults to #file= hash fragment to prevent HTTP 431", async () => {
+test("shadow-claw-daw-url-param: createCompressedUrl defaults to #file= hash fragment to prevent HTTP 431", async () => {
   const project = createProject({ name: "Shared Song" });
   const jsonStr = JSON.stringify(JSON.parse(serializeProject(project)));
 
@@ -80,7 +80,7 @@ test("scdaw-url-param: createCompressedUrl defaults to #file= hash fragment to p
   assert.ok(ghUrl.startsWith("https://xt-ml.github.io/shadow-claw-daw#file="));
 });
 
-test("scdaw-url-param: clearUrlParam removes file param from both search and hash", () => {
+test("shadow-claw-daw-url-param: clearUrlParam removes file param from both search and hash", () => {
   let replacedWith = null;
   const origHistory = globalThis.history;
   globalThis.history = {
@@ -251,8 +251,9 @@ test("shadow-claw-daw-workbench: _checkFileUrlParam guards re-entrancy and handl
   );
 });
 
-test("scdaw-url-param: getUrlParam reads autoplay from query string or hash fragment", async () => {
-  const { getUrlParam } = await import("../.agents/scripts/scdaw-url-param.js");
+test("shadow-claw-daw-url-param: getUrlParam reads autoplay from query string or hash fragment", async () => {
+  const { getUrlParam } =
+    await import("../.agents/scripts/shadow-claw-daw-url-param.js");
   assert.equal(typeof getUrlParam, "function");
   assert.equal(
     getUrlParam(

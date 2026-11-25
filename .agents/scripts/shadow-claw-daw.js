@@ -1,6 +1,6 @@
 // Ported from openDAW packages/lib/dsp @10088021 (AGPL-3.0-or-later, © André Michelle)
 /**
- * .agents/scripts/scdaw.js
+ * .agents/scripts/shadow-claw-daw.js
  *
  * Pure musical logic, PPQN timebase conversions, project schemas,
  * transactional reducers, WAV encoding, and signal telemetry.
@@ -22,14 +22,17 @@ import {
   migrateProject,
   validateAndFilterParams,
   normalizeFxParams,
-} from "./scdaw-schema.js";
+} from "./shadow-claw-daw-schema.js";
 import {
   INSTRUMENT_PRESETS,
   GENRE_TEMPLATES,
   generateGenrePattern,
-} from "./scdaw-presets.js";
-import { compileSong } from "./scdaw-compose.js";
-import { analyzeAudioBuffer, processTrackOfflineFx } from "./scdaw-dsp.js";
+} from "./shadow-claw-daw-presets.js";
+import { compileSong } from "./shadow-claw-daw-compose.js";
+import {
+  analyzeAudioBuffer,
+  processTrackOfflineFx,
+} from "./shadow-claw-daw-dsp.js";
 
 export {
   MIN_BPM,

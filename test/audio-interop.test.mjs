@@ -1,13 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { createProject, encodeWav } from "../.agents/scripts/scdaw.js";
-import { scdaw } from "../.agents/scripts/scdaw-engine.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import {
+  createProject,
+  encodeWav,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { scdaw } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import {
   encodeDawProject,
   decodeDawProject,
-} from "../.agents/scripts/scdaw-dawproject.js";
+} from "../.agents/scripts/shadow-claw-daw-dawproject.js";
 import { extractDroppedAudioFiles } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 import {
   createDspWorkerRunner,
@@ -15,8 +18,8 @@ import {
   disableDspWorker,
   processAudioChannelsAsync,
   loadWasmDspBackend,
-} from "../.agents/scripts/scdaw-audio-dsp-worker.js";
-import { processAudioChannels } from "../.agents/scripts/scdaw-audio-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-audio-dsp-worker.js";
+import { processAudioChannels } from "../.agents/scripts/shadow-claw-daw-audio-dsp.js";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5) {
   const len = Math.round(sampleRate * durationSec);

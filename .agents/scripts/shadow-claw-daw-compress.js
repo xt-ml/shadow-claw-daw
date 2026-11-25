@@ -1,5 +1,5 @@
 /**
- * .agents/scripts/scdaw-compress.js
+ * .agents/scripts/shadow-claw-daw-compress.js
  *
  * Universal Web Standards compression & decompression module.
  * Works natively in modern browsers and Node.js (18+) with zero dependencies.

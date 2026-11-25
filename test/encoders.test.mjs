@@ -10,9 +10,12 @@ import {
   loadFfmpegInstance,
   buildFfmpegAudioArgs,
   transcodeWavWithFfmpeg,
-} from "../.agents/scripts/scdaw-encoders.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
-import { createProject, encodeWav } from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw-encoders.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import {
+  createProject,
+  encodeWav,
+} from "../.agents/scripts/shadow-claw-daw.js";
 import { TOOLS } from "../bin/tool-manifest.mjs";
 import {
   FakeAudioContext,

@@ -20,9 +20,9 @@ import {
   generateDtmfAudio,
   generateSilenceAudio,
   processAudioChannels,
-} from "../.agents/scripts/scdaw-audio-dsp.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw-audio-dsp.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 
 function makeSine(freq, sampleRate, durationSec, amp = 0.5, dcOffset = 0) {

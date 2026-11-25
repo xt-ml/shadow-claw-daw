@@ -4,9 +4,12 @@ import {
   encodeMidiFile,
   decodeMidiFile,
   midiToProject,
-} from "../.agents/scripts/scdaw-midi.js";
-import { createProject, validateProject } from "../.agents/scripts/scdaw.js";
-import { migrateProject } from "../.agents/scripts/scdaw-schema.js";
+} from "../.agents/scripts/shadow-claw-daw-midi.js";
+import {
+  createProject,
+  validateProject,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { migrateProject } from "../.agents/scripts/shadow-claw-daw-schema.js";
 
 test("WP6.1: midiToProject emits valid project with kind, canonical velocity, and lengthBars", () => {
   // Synthesize a 16-bar multi-track MIDI project

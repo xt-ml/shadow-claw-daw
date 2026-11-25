@@ -408,13 +408,6 @@
           "url": "../../.agents/tools/scdaw_set_track_send.json",
           "digest": "sha256:e123b7207d2227580cc54002528acaa89c0aad5d8ff1726226c0420eb1fb7bed"
         }
-      ],
-      "scripts": [
-        {
-          "name": "scdaw",
-          "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
-        }
       ]
     },
     {
@@ -444,13 +437,6 @@
           "url": "../../.agents/tools/scdaw_set_track.json",
           "digest": "sha256:48c74530c30be21fbfd8620ddd3a69f92dd38c353fe0a5fff274ba7859437f5b"
         }
-      ],
-      "scripts": [
-        {
-          "name": "scdaw",
-          "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
-        }
       ]
     },
     {
@@ -469,13 +455,6 @@
           "name": "scdaw_get_status",
           "url": "../../.agents/tools/scdaw_get_status.json",
           "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
-        }
-      ],
-      "scripts": [
-        {
-          "name": "scdaw",
-          "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
         }
       ]
     },
@@ -516,18 +495,6 @@
           "url": "../../.agents/tools/scdaw_stop.json",
           "digest": "sha256:382a85abab961ab9ce9cc7e5b6b764dce35c429d5f52c604699d539801ef4196"
         }
-      ],
-      "scripts": [
-        {
-          "name": "scdaw-recorder",
-          "url": "../../.agents/scripts/scdaw-recorder.js",
-          "digest": "sha256:54fc25d5aed238857b0a7fb587a29405b4d8f7960f13d994e326d3b64817140a"
-        },
-        {
-          "name": "scdaw",
-          "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
-        }
       ]
     },
     {
@@ -546,13 +513,6 @@
           "name": "scdaw_get_status",
           "url": "../../.agents/tools/scdaw_get_status.json",
           "digest": "sha256:0d277849593a8ce76ddfb348924f5342dc16c415b498194556ba4a5c96064a51"
-        }
-      ],
-      "scripts": [
-        {
-          "name": "scdaw",
-          "url": "../../.agents/scripts/scdaw.js",
-          "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
         }
       ]
     },
@@ -1074,37 +1034,37 @@
       "name": "shadow-claw-daw-browser",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-browser.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-browser.js",
-      "digest": "sha256:3d52e4dc23089d319f37a616c90a046b0bd7b26f08c7b1a918ff887f26b9cf13"
+      "digest": "sha256:59148956b1e84902c56f82d47b4e695285b3776f193101341ca859cd1e2b8400"
     },
     {
       "name": "shadow-claw-daw-devices",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-devices.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-devices.js",
-      "digest": "sha256:db8cd6ed05418513ca7749f0771b4f9ca69ddea7995b2b00c0c8be62ecaf001d"
+      "digest": "sha256:d241152a2d6d634b6567bb04924133a4d2f423583f66ae10347a46609105ac0a"
     },
     {
       "name": "shadow-claw-daw-editor",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-editor.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-editor.js",
-      "digest": "sha256:99cbbc03ca701df77df6724a43a22a502eada622051ee6636d22ea6cf2606b53"
+      "digest": "sha256:824ceca1f9579299a6baa2dd97ef7ac442b7f9a41cc0ac23938ceb2319809cb2"
     },
     {
       "name": "shadow-claw-daw-knob",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-knob.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-knob.js",
-      "digest": "sha256:02dd49056aa130353151b93e960d5460baa6dd87243a5612f82f86ed11b3a0ef"
+      "digest": "sha256:721de4ddfbc61453d979f725aa508a84a8fd6662752d5680a360157c1bce0c31"
     },
     {
       "name": "shadow-claw-daw-midi-keyboard",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-midi-keyboard.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-midi-keyboard.js",
-      "digest": "sha256:ca068f674dc6dea9af755025b70572977140454751e556a2c1f269948daaf875"
+      "digest": "sha256:3b99353a888754a7312cf20bc9c53d4b083a5c49462b1ac6dda6d78067593d0c"
     },
     {
       "name": "shadow-claw-daw-mixer",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-mixer.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-mixer.js",
-      "digest": "sha256:0c147dac92c134474ea363be77314b607a0974c0fc499f4630188bf3834266e9"
+      "digest": "sha256:919de63c020b375d082990737426300d5d2dc74a7c6a47881702e286144c9db7"
     },
     {
       "name": "shadow-claw-daw-resize-handle",
@@ -1116,19 +1076,19 @@
       "name": "shadow-claw-daw-sequencer",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-sequencer.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-sequencer.js",
-      "digest": "sha256:ed188d823c027be7b8c6ea660f9fc447569237999c3b66fe47a6e0cfd6cb726d"
+      "digest": "sha256:e81f3aaf91d8fa879ac568f77432f2b612519d5d97725286368926404930c794"
     },
     {
       "name": "shadow-claw-daw-spectrum",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-spectrum.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-spectrum.js",
-      "digest": "sha256:7625e02360dc776add1a1ff30dc3d4df61678c426a5e5c7c09912f891d3f6428"
+      "digest": "sha256:a04e70aada75abed3f612ea9e581e57f4ca8204da43a6ac18e0c36bd19b0d790"
     },
     {
       "name": "shadow-claw-daw-status-bar",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-status-bar.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-status-bar.js",
-      "digest": "sha256:5cbc77fab55e8bb29df9ca67ee931b06aec56ba36f5305920b3b10fd5e1cb157"
+      "digest": "sha256:b152eb72a492db177b86b6546240142776af4da09dcca847e527d8fb0ae0e709"
     },
     {
       "name": "shadow-claw-daw-styles",
@@ -1140,187 +1100,187 @@
       "name": "shadow-claw-daw-synth",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-synth.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-synth.js",
-      "digest": "sha256:758293af2643fc2bae32d308e034452f81fbb3adf1dfc55e7df57389f57789d8"
+      "digest": "sha256:4df4a6dd2f2883536ac7a5067c8c446ec66cc710abae46dbda53afb18b4ee345"
     },
     {
       "name": "shadow-claw-daw-timeline",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-timeline.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-timeline.js",
-      "digest": "sha256:f0070e0d279e5d4fe48f4528401d4188459f9dbc2ee43734ed1ba16025e5b76c"
+      "digest": "sha256:2b1277fef4c9f8212cd0ec7940cd5c124c4e207bc3115b324007f309081a3042"
     },
     {
       "name": "shadow-claw-daw-transport",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-transport.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-transport.js",
-      "digest": "sha256:42a9d1bfb46dacb6e1d910b281a20664831f53853db1560515b44d0dcd631284"
+      "digest": "sha256:0b75e863764ab31394e1d74cd734d414e341632898c7c48e7e62562e17909f91"
     },
     {
       "name": "shadow-claw-daw-wave-editor",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-wave-editor.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
-      "digest": "sha256:b6ae39c59caa02adbcd6650bf819cd602f909156666e90480e1da73024ed5e43"
+      "digest": "sha256:a5b5b5b3933b2022205b852ffd2be0c05b76970b10245784996082f0438b0ffd"
     },
     {
       "name": "shadow-claw-daw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-workbench.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-workbench.js",
-      "digest": "sha256:01bc6c422affeb510a55f5c4ecc0e79849129bf24a26311ae6afc1f36de9d0ab"
+      "digest": "sha256:d255d1a542457952726a4bac9d21d2aed03ab94695edd7d4b346fd0798b0d14b"
     },
     {
-      "name": "scdaw-adapter",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-adapter.",
-      "url": "../../.agents/scripts/scdaw-adapter.js",
-      "digest": "sha256:3bd2376c1dcce6fa831cc3fe4fa5fd4dcb2a1355c77d60c80db3ad240ec08185"
+      "name": "shadow-claw-daw-adapter",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-adapter.",
+      "url": "../../.agents/scripts/shadow-claw-daw-adapter.js",
+      "digest": "sha256:5d904a0200c4c8c18b49dd68e0f8409bd262244eb9c0eba446807a809ceddeab"
     },
     {
-      "name": "scdaw-audio-dsp-worker",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-audio-dsp-worker.",
-      "url": "../../.agents/scripts/scdaw-audio-dsp-worker.js",
-      "digest": "sha256:532eba4e6c37960066ad4b7b87862fb7d243df40daeeef4e5a7e75c222e6b2fb"
+      "name": "shadow-claw-daw-audio-dsp-worker",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-audio-dsp-worker.",
+      "url": "../../.agents/scripts/shadow-claw-daw-audio-dsp-worker.js",
+      "digest": "sha256:ef3f3e4ccae2dc88077177ae8677c1c24a2153a3223b6a0071e51bd2e7fb9d9e"
     },
     {
-      "name": "scdaw-audio-dsp",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-audio-dsp.",
-      "url": "../../.agents/scripts/scdaw-audio-dsp.js",
-      "digest": "sha256:b67d5b1bb103152cdb43654188b6996d03b0c8029db1128740370b58f1ea1987"
+      "name": "shadow-claw-daw-audio-dsp",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-audio-dsp.",
+      "url": "../../.agents/scripts/shadow-claw-daw-audio-dsp.js",
+      "digest": "sha256:fd3a49f4c203864c62066acfd0569f1afae57084a9094f99e05c53ab9a9057d7"
     },
     {
-      "name": "scdaw-compose",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-compose.",
-      "url": "../../.agents/scripts/scdaw-compose.js",
-      "digest": "sha256:9a2d9eb27a1b15358aa0bc361563e54af85309185f96add6469826c4acf15919"
+      "name": "shadow-claw-daw-compose",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-compose.",
+      "url": "../../.agents/scripts/shadow-claw-daw-compose.js",
+      "digest": "sha256:71f7172cfcd5700b3c082f5bd45604c95f8edba7a1a33cf6f1e3cccbced347ae"
     },
     {
-      "name": "scdaw-compress",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-compress.",
-      "url": "../../.agents/scripts/scdaw-compress.js",
-      "digest": "sha256:bf3ab4d01fb96440d576a22fa928dc60dcb7e0a1e32d3df46ad68a9719ec474d"
+      "name": "shadow-claw-daw-compress",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-compress.",
+      "url": "../../.agents/scripts/shadow-claw-daw-compress.js",
+      "digest": "sha256:bde210fd1ad2c9540cd645da3a6f030b3ac7caed5656a31ab72034debcc83f16"
     },
     {
-      "name": "scdaw-dawproject",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-dawproject.",
-      "url": "../../.agents/scripts/scdaw-dawproject.js",
-      "digest": "sha256:8088a05e1416f7044149ccc19405675d3a45eec4e93176e96e35d19503cef0af"
+      "name": "shadow-claw-daw-dawproject",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-dawproject.",
+      "url": "../../.agents/scripts/shadow-claw-daw-dawproject.js",
+      "digest": "sha256:6aced9bf76f0bb69a3a1250cddea64d12d1880adffd5a3a61f536d0a7a8f7720"
     },
     {
-      "name": "scdaw-dsp",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-dsp.",
-      "url": "../../.agents/scripts/scdaw-dsp.js",
-      "digest": "sha256:ba1040b3ea7b4bebebc3bee848cad0e4d0182f6d2f079827fee5b2e6641696e4"
-    },
-    {
-      "name": "scdaw-encoders",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-encoders.",
-      "url": "../../.agents/scripts/scdaw-encoders.js",
-      "digest": "sha256:fd5d829e343e76f35e01e9afc091a19fc324e6ccc1c2d141afba5fd57e8f64ea"
-    },
-    {
-      "name": "scdaw-engine",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-engine.",
-      "url": "../../.agents/scripts/scdaw-engine.js",
-      "digest": "sha256:b18e1c6964bed075efa93dc19753aef6c70983f8f185aefe498c5ccac37a42ee"
-    },
-    {
-      "name": "scdaw-fs",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-fs.",
-      "url": "../../.agents/scripts/scdaw-fs.js",
-      "digest": "sha256:7eb792aa33d7eef2d5e32c5bda7c3695a9a43b63003b8822408d2318b3b36f06"
-    },
-    {
-      "name": "scdaw-instruments",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-instruments.",
-      "url": "../../.agents/scripts/scdaw-instruments.js",
-      "digest": "sha256:53615b5a8eab39a1eee0aebc6035d057b4343954e3d7eebd321ca8d5b3128883"
-    },
-    {
-      "name": "scdaw-midi-io",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-midi-io.",
-      "url": "../../.agents/scripts/scdaw-midi-io.js",
-      "digest": "sha256:2c9065b2eec724aea14b596aa1838c6c7c9edce4ae85c437a6abb22bd7765c97"
-    },
-    {
-      "name": "scdaw-midi",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-midi.",
-      "url": "../../.agents/scripts/scdaw-midi.js",
-      "digest": "sha256:afbec2c41d273977c41a0b1aab98e401e7b3b056a6e3f9e0f882393755ae28d0"
-    },
-    {
-      "name": "scdaw-presets",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-presets.",
-      "url": "../../.agents/scripts/scdaw-presets.js",
-      "digest": "sha256:34fca86a020e229261e89947b86afd33266bc41ecf6d51412f9853da55bedc52"
-    },
-    {
-      "name": "scdaw-recorder",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-recorder.",
-      "url": "../../.agents/scripts/scdaw-recorder.js",
-      "digest": "sha256:54fc25d5aed238857b0a7fb587a29405b4d8f7960f13d994e326d3b64817140a"
-    },
-    {
-      "name": "scdaw-schema",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-schema.",
-      "url": "../../.agents/scripts/scdaw-schema.js",
-      "digest": "sha256:86c44db48d083ffb3d4a1db65aeafa5675a7bc4be4d9695d2bc815f0c5e8a99b"
-    },
-    {
-      "name": "scdaw-signals",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-signals.",
-      "url": "../../.agents/scripts/scdaw-signals.js",
-      "digest": "sha256:261f87189059a0251ab14fa65c55c3ebede9a053965555f0324400658f6ff8cf"
-    },
-    {
-      "name": "scdaw-soundfont",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-soundfont.",
-      "url": "../../.agents/scripts/scdaw-soundfont.js",
-      "digest": "sha256:b57ebc6df27f224606fb95de3b4cea93c775beefaf04a7ee2ba0e1a9f80b0298"
-    },
-    {
-      "name": "scdaw-spectral-dsp",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-spectral-dsp.",
-      "url": "../../.agents/scripts/scdaw-spectral-dsp.js",
-      "digest": "sha256:174a39a93e5d077e3037e6a4495328f6c00f2249ae14aadcf4e672babb3e53b0"
-    },
-    {
-      "name": "scdaw-syx",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-syx.",
-      "url": "../../.agents/scripts/scdaw-syx.js",
-      "digest": "sha256:82531ccd332facf3b3d0bda9f0ada442f242018537b988477828c81fbe4fc024"
-    },
-    {
-      "name": "scdaw-time-dsp",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-time-dsp.",
-      "url": "../../.agents/scripts/scdaw-time-dsp.js",
-      "digest": "sha256:2b0535323c330ba6cdd411c08159939670e3b18cea145f86b797610bfe4985e5"
-    },
-    {
-      "name": "scdaw-tools-metadata",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-tools-metadata.",
-      "url": "../../.agents/scripts/scdaw-tools-metadata.js",
-      "digest": "sha256:fa1c7aa9df2284bff2807092d45d887de98148f20647b8bfb2d698fab3d5c073"
-    },
-    {
-      "name": "scdaw-url-param",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-url-param.",
-      "url": "../../.agents/scripts/scdaw-url-param.js",
-      "digest": "sha256:ef004c2acc13c5be093db1d1a059ab6e58447fc73c2f5c12c5e2405dec4d263e"
-    },
-    {
-      "name": "scdaw-zip",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw-zip.",
-      "url": "../../.agents/scripts/scdaw-zip.js",
-      "digest": "sha256:7caa53828fe2ac7aea6baa0528799df6d30e8217ac73d9317d2165f7d73bec9a"
-    },
-    {
-      "name": "scdaw",
-      "description": "Portable ESM engine logic and tool execution handler for scdaw.",
-      "url": "../../.agents/scripts/scdaw.js",
-      "digest": "sha256:335a02661d647641ab2a3355db03c3fef2b60a10e3c15a1f08fbf74866877aa0"
+      "name": "shadow-claw-daw-dsp",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-dsp.",
+      "url": "../../.agents/scripts/shadow-claw-daw-dsp.js",
+      "digest": "sha256:339d64956990ad7d4c1d9d00015cc4d34e68df3021e701fed5e04abfdb9416c3"
     },
     {
       "name": "shadow-claw-daw-element",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-element.",
       "url": "../../.agents/scripts/shadow-claw-daw-element.js",
       "digest": "sha256:e6c3bb36903298c10a5d297c8c20db4b9e6112f5517981d69e90c4b12a5edd6f"
+    },
+    {
+      "name": "shadow-claw-daw-encoders",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-encoders.",
+      "url": "../../.agents/scripts/shadow-claw-daw-encoders.js",
+      "digest": "sha256:d447070ccd453fd1a604a77c9d366d7d35d8a98a0d450d0a9647374c795a05b8"
+    },
+    {
+      "name": "shadow-claw-daw-engine",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-engine.",
+      "url": "../../.agents/scripts/shadow-claw-daw-engine.js",
+      "digest": "sha256:d83f062a380faf1dd026b8d11b05a8ace50fd578d048e953abe668a996f2e4e8"
+    },
+    {
+      "name": "shadow-claw-daw-fs",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-fs.",
+      "url": "../../.agents/scripts/shadow-claw-daw-fs.js",
+      "digest": "sha256:a810ba0eff68d4fc897f2ec79b3a1b1362a10805668c3779f7de00d9a3f17db0"
+    },
+    {
+      "name": "shadow-claw-daw-instruments",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-instruments.",
+      "url": "../../.agents/scripts/shadow-claw-daw-instruments.js",
+      "digest": "sha256:30b75e1efebce6ad9826e5bd678c72b4c17079570a17b3d44e9f07f7cd23aae7"
+    },
+    {
+      "name": "shadow-claw-daw-midi-io",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-midi-io.",
+      "url": "../../.agents/scripts/shadow-claw-daw-midi-io.js",
+      "digest": "sha256:ad8ff6a359f03fa2f2b516fcaefb9e7eceaaed6d9c53249b662bdc1ea0515e09"
+    },
+    {
+      "name": "shadow-claw-daw-midi",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-midi.",
+      "url": "../../.agents/scripts/shadow-claw-daw-midi.js",
+      "digest": "sha256:37ae49326bd4c7bec30002b4495872dcdb4838fb05b0349c75fae3f75e561332"
+    },
+    {
+      "name": "shadow-claw-daw-presets",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-presets.",
+      "url": "../../.agents/scripts/shadow-claw-daw-presets.js",
+      "digest": "sha256:beb7be712dace7fcd094d76d0231797275369546ceb67aff9983ab285ec04989"
+    },
+    {
+      "name": "shadow-claw-daw-recorder",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-recorder.",
+      "url": "../../.agents/scripts/shadow-claw-daw-recorder.js",
+      "digest": "sha256:af42f3458398cf01a7eba8f6a4b0026a698f14376fdab3435a659ab678b0f81d"
+    },
+    {
+      "name": "shadow-claw-daw-schema",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-schema.",
+      "url": "../../.agents/scripts/shadow-claw-daw-schema.js",
+      "digest": "sha256:c6fea45116f9e306e205ce309acc385ec2444357c6ed5b7c4cc7591b3173032f"
+    },
+    {
+      "name": "shadow-claw-daw-signals",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-signals.",
+      "url": "../../.agents/scripts/shadow-claw-daw-signals.js",
+      "digest": "sha256:7010ae07770e3a529d088beb4c5a936fa1825cc8c56b1f1319f6443af5bd0b02"
+    },
+    {
+      "name": "shadow-claw-daw-soundfont",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-soundfont.",
+      "url": "../../.agents/scripts/shadow-claw-daw-soundfont.js",
+      "digest": "sha256:079c1dda8d48fe588122a386933604771955eb9c60c174d3d78438b4387f3e72"
+    },
+    {
+      "name": "shadow-claw-daw-spectral-dsp",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-spectral-dsp.",
+      "url": "../../.agents/scripts/shadow-claw-daw-spectral-dsp.js",
+      "digest": "sha256:761d240d6beece0f78ce13918d175de21982deb32f9ce1355dd3ed9d81fe82dd"
+    },
+    {
+      "name": "shadow-claw-daw-syx",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-syx.",
+      "url": "../../.agents/scripts/shadow-claw-daw-syx.js",
+      "digest": "sha256:54be923823a84c1cc85a4f5120bfa4460f1e2d34b49e59f9363a288da7b2d661"
+    },
+    {
+      "name": "shadow-claw-daw-time-dsp",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-time-dsp.",
+      "url": "../../.agents/scripts/shadow-claw-daw-time-dsp.js",
+      "digest": "sha256:94a911d3a9295bddecd33c258ca4e3d9957b25e4bcddd1dfa8fd89babb401516"
+    },
+    {
+      "name": "shadow-claw-daw-tools-metadata",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-tools-metadata.",
+      "url": "../../.agents/scripts/shadow-claw-daw-tools-metadata.js",
+      "digest": "sha256:940a0dc61a107a8879045a1ca2083308c2964749d4a46ac592e13dfa05bee80f"
+    },
+    {
+      "name": "shadow-claw-daw-url-param",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-url-param.",
+      "url": "../../.agents/scripts/shadow-claw-daw-url-param.js",
+      "digest": "sha256:e700aa5046614dfacfbab23a05223b7725c79cdbdceab41ad8e2564380989825"
+    },
+    {
+      "name": "shadow-claw-daw-zip",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-zip.",
+      "url": "../../.agents/scripts/shadow-claw-daw-zip.js",
+      "digest": "sha256:4e83cd89864f45dbe004886e9e9afc9224dc004187d000fa8d5de3c4af69d58d"
+    },
+    {
+      "name": "shadow-claw-daw",
+      "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw.",
+      "url": "../../.agents/scripts/shadow-claw-daw.js",
+      "digest": "sha256:980aa5912aad85e242c8ca6673d70bf8333b620f30886c97a077549d10db2bd9"
     },
     {
       "name": "starter-tools",
@@ -1400,32 +1360,32 @@
       "../../.agents/scripts/components/shadow-claw-daw-transport.js",
       "../../.agents/scripts/components/shadow-claw-daw-wave-editor.js",
       "../../.agents/scripts/components/shadow-claw-daw-workbench.js",
-      "../../.agents/scripts/scdaw-adapter.js",
-      "../../.agents/scripts/scdaw-audio-dsp-worker.js",
-      "../../.agents/scripts/scdaw-audio-dsp.js",
-      "../../.agents/scripts/scdaw-compose.js",
-      "../../.agents/scripts/scdaw-compress.js",
-      "../../.agents/scripts/scdaw-dawproject.js",
-      "../../.agents/scripts/scdaw-dsp.js",
-      "../../.agents/scripts/scdaw-encoders.js",
-      "../../.agents/scripts/scdaw-engine.js",
-      "../../.agents/scripts/scdaw-fs.js",
-      "../../.agents/scripts/scdaw-instruments.js",
-      "../../.agents/scripts/scdaw-midi-io.js",
-      "../../.agents/scripts/scdaw-midi.js",
-      "../../.agents/scripts/scdaw-presets.js",
-      "../../.agents/scripts/scdaw-recorder.js",
-      "../../.agents/scripts/scdaw-schema.js",
-      "../../.agents/scripts/scdaw-signals.js",
-      "../../.agents/scripts/scdaw-soundfont.js",
-      "../../.agents/scripts/scdaw-spectral-dsp.js",
-      "../../.agents/scripts/scdaw-syx.js",
-      "../../.agents/scripts/scdaw-time-dsp.js",
-      "../../.agents/scripts/scdaw-tools-metadata.js",
-      "../../.agents/scripts/scdaw-url-param.js",
-      "../../.agents/scripts/scdaw-zip.js",
-      "../../.agents/scripts/scdaw.js",
+      "../../.agents/scripts/shadow-claw-daw-adapter.js",
+      "../../.agents/scripts/shadow-claw-daw-audio-dsp-worker.js",
+      "../../.agents/scripts/shadow-claw-daw-audio-dsp.js",
+      "../../.agents/scripts/shadow-claw-daw-compose.js",
+      "../../.agents/scripts/shadow-claw-daw-compress.js",
+      "../../.agents/scripts/shadow-claw-daw-dawproject.js",
+      "../../.agents/scripts/shadow-claw-daw-dsp.js",
       "../../.agents/scripts/shadow-claw-daw-element.js",
+      "../../.agents/scripts/shadow-claw-daw-encoders.js",
+      "../../.agents/scripts/shadow-claw-daw-engine.js",
+      "../../.agents/scripts/shadow-claw-daw-fs.js",
+      "../../.agents/scripts/shadow-claw-daw-instruments.js",
+      "../../.agents/scripts/shadow-claw-daw-midi-io.js",
+      "../../.agents/scripts/shadow-claw-daw-midi.js",
+      "../../.agents/scripts/shadow-claw-daw-presets.js",
+      "../../.agents/scripts/shadow-claw-daw-recorder.js",
+      "../../.agents/scripts/shadow-claw-daw-schema.js",
+      "../../.agents/scripts/shadow-claw-daw-signals.js",
+      "../../.agents/scripts/shadow-claw-daw-soundfont.js",
+      "../../.agents/scripts/shadow-claw-daw-spectral-dsp.js",
+      "../../.agents/scripts/shadow-claw-daw-syx.js",
+      "../../.agents/scripts/shadow-claw-daw-time-dsp.js",
+      "../../.agents/scripts/shadow-claw-daw-tools-metadata.js",
+      "../../.agents/scripts/shadow-claw-daw-url-param.js",
+      "../../.agents/scripts/shadow-claw-daw-zip.js",
+      "../../.agents/scripts/shadow-claw-daw.js",
       "../../.agents/scripts/starter-tools.js"
     ]
   }

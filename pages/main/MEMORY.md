@@ -29,15 +29,15 @@ You are **Daw**, the intelligent audio workstation copilot and electronic music 
 
 3. **Zero Dependencies & Storage**:
    - 100% native Web Audio API (`OscillatorNode`, `BiquadFilterNode`, `GainNode`, `StereoPannerNode`, `DynamicsCompressorNode`, `WaveShaperNode`, `ConvolverNode`, `DelayNode`, `AnalyserNode`, `OfflineAudioContext`).
-   - Pure-JS offline `Float32Array` DSP, FFT/STFT spectral, WSOLA time/pitch, and optional Web Worker / Rust-WASM modules (`scdaw-audio-dsp.js`, `scdaw-spectral-dsp.js`, `scdaw-time-dsp.js`, `scdaw-audio-dsp-worker.js`) with zero-config pure-JS fallback.
-   - SoundFont 2 (SF2) RIFF parser and voice DSP (`scdaw-soundfont.js`) bundling General MIDI SoundFonts (`A320U.sf2`, `gm-lofi.sf2`) with 128 GM instruments and dynamic sample caching.
-   - Autonomous multi-bar arrangement compiler (`scdaw-compose.js`) and mix analysis DSP (`scdaw-dsp.js`, `scdaw.js`).
-   - TC39 Signals proposal implementation (`.agents/scripts/scdaw-signals.js` backed by vendored `signal-polyfill` and ShadowClaw `effect`).
+   - Pure-JS offline `Float32Array` DSP, FFT/STFT spectral, WSOLA time/pitch, and optional Web Worker / Rust-WASM modules (`shadow-claw-daw-audio-dsp.js`, `shadow-claw-daw-spectral-dsp.js`, `shadow-claw-daw-time-dsp.js`, `shadow-claw-daw-audio-dsp-worker.js`) with zero-config pure-JS fallback.
+   - SoundFont 2 (SF2) RIFF parser and voice DSP (`shadow-claw-daw-soundfont.js`) bundling General MIDI SoundFonts (`A320U.sf2`, `gm-lofi.sf2`) with 128 GM instruments and dynamic sample caching.
+   - Autonomous multi-bar arrangement compiler (`shadow-claw-daw-compose.js`) and mix analysis DSP (`shadow-claw-daw-dsp.js`, `scdaw.js`).
+   - TC39 Signals proposal implementation (`.agents/scripts/shadow-claw-daw-signals.js` backed by vendored `signal-polyfill` and ShadowClaw `effect`).
    - Inline Blob-URL worker clock for timing lookahead scheduler immune to tab throttling.
-   - Direct OPFS conversation storage (`.agents/scripts/scdaw-fs.js`) supporting `.scdaw.json`, `.dawproject` v1.0 ZIP archives (with clip fades, gain envelopes, and project labels), `.mid` SMF files, stem ZIP bundles, and 16/24/32-bit `.wav` mixdowns.
+   - Direct OPFS conversation storage (`.agents/scripts/shadow-claw-daw-fs.js`) supporting `.scdaw.json`, `.dawproject` v1.0 ZIP archives (with clip fades, gain envelopes, and project labels), `.mid` SMF files, stem ZIP bundles, and 16/24/32-bit `.wav` mixdowns.
 
 4. **Leader Election**:
-   - Coordinated via Web Locks (`navigator.locks.request("scdaw-engine")`). Only one active workbench holds the AudioContext and replies to agent tool requests over `BroadcastChannel`.
+   - Coordinated via Web Locks (`navigator.locks.request("shadow-claw-daw-engine")`). Only one active workbench holds the AudioContext and replies to agent tool requests over `BroadcastChannel`.
 
 5. **Attribution & Provenance**:
    - Ported concepts and mathematical models from `andremichelle/openDAW` (AGPLv3) and `audacity/audacity` (GPLv3/GPLv2+). Recorded in `05-porting-and-attribution.md` and file headers.

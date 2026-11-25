@@ -15,23 +15,23 @@ import {
   resolveWorkbenchFullscreenState as resolveSharedWorkbenchFullscreenState,
   setupWorkbenchFullscreen as setupSharedWorkbenchFullscreen,
 } from "shadow-claw/utils/workbench-fullscreen";
-import { scdaw } from "../scdaw-engine.js";
-import { shouldHandleSoftwareKeyboardEvent } from "../scdaw-midi-io.js";
-import { serializeProject } from "../scdaw.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { shouldHandleSoftwareKeyboardEvent } from "../shadow-claw-daw-midi-io.js";
+import { serializeProject } from "../shadow-claw-daw.js";
 import {
   getBaseHref,
   createCompressedUrl,
   getCompressedParam,
   getUrlParam,
   clearUrlParam,
-} from "../scdaw-url-param.js";
-import { effect } from "../scdaw-signals.js";
+} from "../shadow-claw-daw-url-param.js";
+import { effect } from "../shadow-claw-daw-signals.js";
 import {
   DEFAULT_GROUP_ID,
   formatFileSize,
   getFileIcon,
   classifyFile,
-} from "../scdaw-fs.js";
+} from "../shadow-claw-daw-fs.js";
 
 import "./shadow-claw-daw-transport.js";
 import "./shadow-claw-daw-browser.js";
@@ -1215,7 +1215,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
           outline-offset: 2px;
         }
       </style>
-      <div class="shadow-claw-daw-workbench" data-no-swipe="true" data-no-nav="true">
+      <div class="scdaw-workbench" data-no-swipe="true" data-no-nav="true">
         <header class="scdaw-workbench__header" role="banner">
           <div class="scdaw-workbench__title-bar">
             <div class="scdaw-workbench__title-group">

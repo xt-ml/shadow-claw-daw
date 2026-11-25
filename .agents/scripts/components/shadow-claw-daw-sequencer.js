@@ -6,9 +6,9 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
-import { pitchToName, ppqnToStep, stepsPerBar } from "../scdaw.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
+import { pitchToName, ppqnToStep, stepsPerBar } from "../shadow-claw-daw.js";
 
 import {
   BaseElement,

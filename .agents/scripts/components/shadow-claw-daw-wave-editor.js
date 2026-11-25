@@ -9,17 +9,17 @@ import {
   SHARED_STYLES,
   installPageSwipeGuard,
 } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
-import { evaluateClipGainEnvelope, PPQN } from "../scdaw.js";
-import { findNearestZeroCrossing } from "../scdaw-audio-dsp.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
+import { evaluateClipGainEnvelope, PPQN } from "../shadow-claw-daw.js";
+import { findNearestZeroCrossing } from "../shadow-claw-daw-audio-dsp.js";
 import { extractDroppedAudioFiles } from "./shadow-claw-daw-timeline.js";
 import {
   SPECTROGRAM_PALETTES,
   SPECTROGRAM_SCALES,
   computeSpectrogram,
   mapSpectrogramColor,
-} from "../scdaw-spectral-dsp.js";
+} from "../shadow-claw-daw-spectral-dsp.js";
 import "./shadow-claw-daw-spectrum.js";
 
 import {

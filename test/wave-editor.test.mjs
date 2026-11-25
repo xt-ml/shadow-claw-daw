@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { DawEngine, formatUserError } from "../.agents/scripts/scdaw-engine.js";
+import {
+  DawEngine,
+  formatUserError,
+} from "../.agents/scripts/shadow-claw-daw-engine.js";
 import { formatTelemetryStatus } from "../.agents/scripts/components/shadow-claw-daw-status-bar.js";
 import {
   computeWaveformEnvelope,
@@ -13,13 +16,13 @@ import {
   extractClipDisplayWindow,
   computeWavePlayheadState,
 } from "../.agents/scripts/components/shadow-claw-daw-wave-editor.js";
-import { PPQN } from "../.agents/scripts/scdaw.js";
+import { PPQN } from "../.agents/scripts/shadow-claw-daw.js";
 import {
   resolveWorkbenchResponsiveLayout,
   resolveWorkbenchButtonStates,
   resolveWorkbenchPanels,
 } from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import { installPageSwipeGuard } from "../.agents/scripts/components/shadow-claw-daw-styles.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 
@@ -384,7 +387,7 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
   );
   assert.match(
     wbSrc,
-    /shadow-claw-daw-workbench[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+    /scdaw-workbench[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
   );
 
   assert.match(waveSrc, /installPageSwipeGuard/);
@@ -403,7 +406,7 @@ test("Page swipe guard: installPageSwipeGuard ref-counts ancestor data-no-swipe/
 
   assert.match(
     timelineSrc,
-    /shadow-claw-daw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
+    /scdaw-timeline daw-panel[^>]*data-no-swipe=["']true["'][^>]*data-no-nav=["']true["']/,
   );
 });
 

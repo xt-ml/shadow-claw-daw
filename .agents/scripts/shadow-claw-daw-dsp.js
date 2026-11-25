@@ -1,6 +1,6 @@
 // Ported from openDAW packages/lib/dsp @10088021 (AGPL-3.0-or-later, © André Michelle)
 /**
- * .agents/scripts/scdaw-dsp.js
+ * .agents/scripts/shadow-claw-daw-dsp.js
  *
  * Pure Float32Array DSP kernels for audio effects, transfer curves, and impulse responses.
  * 100% environment agnostic (runs identically in Node.js, Web Workers, and AudioWorklet).

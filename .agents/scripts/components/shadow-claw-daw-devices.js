@@ -6,8 +6,8 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
+import { scdaw } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
 import "./shadow-claw-daw-knob.js";
 
 import {
@@ -495,7 +495,7 @@ export class ShadowClawDawDevices extends BaseElement {
           }
         }
       </style>
-      <div class="shadow-claw-daw-devices daw-panel" role="region" aria-label="Track Device Rack">
+      <div class="scdaw-devices daw-panel" role="region" aria-label="Track Device Rack">
         <div class="scdaw-devices__header daw-panel-header">
           <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
             <span>🎛️ Device Rack: <strong>${track?.name || "None"}</strong></span>

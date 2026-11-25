@@ -5,22 +5,25 @@ import {
   FX_SCHEMAS,
   validateAndFilterParams,
   normalizeFxParams,
-} from "../.agents/scripts/scdaw-schema.js";
+} from "../.agents/scripts/shadow-claw-daw-schema.js";
 import {
   createWaveshaperCurve,
   buildTrackFxChain,
   processTrackOfflineFx,
   analyzeAudioBuffer,
-} from "../.agents/scripts/scdaw-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-dsp.js";
 import {
   triggerSynth,
   triggerNano,
   synthesizeSfxBuffer,
-} from "../.agents/scripts/scdaw-instruments.js";
-import { INSTRUMENT_PRESETS } from "../.agents/scripts/scdaw-presets.js";
-import { createProject, applyCommand } from "../.agents/scripts/scdaw.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw-instruments.js";
+import { INSTRUMENT_PRESETS } from "../.agents/scripts/shadow-claw-daw-presets.js";
+import {
+  createProject,
+  applyCommand,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,

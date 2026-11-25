@@ -5,12 +5,12 @@ import {
   createProject,
   applyCommand,
   encodeWav,
-} from "../.agents/scripts/scdaw.js";
-import { DawEngine } from "../.agents/scripts/scdaw-engine.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { DawEngine } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   AudioRecorder,
   computeWaveformPeaks,
-} from "../.agents/scripts/scdaw-recorder.js";
+} from "../.agents/scripts/shadow-claw-daw-recorder.js";
 import { computeClipOverlapLayout } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
 
 test("AudioRecorder: tracks recording lifecycle, gathers PCM, and encodes WAV", async () => {

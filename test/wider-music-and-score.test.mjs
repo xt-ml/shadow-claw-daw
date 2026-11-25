@@ -17,42 +17,42 @@ import {
   getBarTimeline,
   pulseToBarBeat,
   computeProjectTotalPulses,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 import {
   TRANSPORT_SCHEMA,
   migrateProject,
-} from "../.agents/scripts/scdaw-schema.js";
+} from "../.agents/scripts/shadow-claw-daw-schema.js";
 import {
   parseMotif,
   compileSong,
   SCALES,
   CHORD_INTERVALS,
   STYLE_PRESETS,
-} from "../.agents/scripts/scdaw-compose.js";
+} from "../.agents/scripts/shadow-claw-daw-compose.js";
 import {
   GM_INSTRUMENTS,
   resolveGmProgram,
-} from "../.agents/scripts/scdaw-soundfont.js";
+} from "../.agents/scripts/shadow-claw-daw-soundfont.js";
 import {
   encodeMidiFile,
   decodeMidiFile,
   midiToProject,
-} from "../.agents/scripts/scdaw-midi.js";
+} from "../.agents/scripts/shadow-claw-daw-midi.js";
 import {
   encodeDawProject,
   decodeDawProject,
-} from "../.agents/scripts/scdaw-dawproject.js";
+} from "../.agents/scripts/shadow-claw-daw-dawproject.js";
 import {
   compressToBase64Url,
   validateBase64UrlLength,
-} from "../.agents/scripts/scdaw-compress.js";
+} from "../.agents/scripts/shadow-claw-daw-compress.js";
 import {
   MAX_HASH_URL_LENGTH,
   MAX_QUERY_URL_LENGTH,
   createCompressedUrl,
   validateCompressedUrl,
-} from "../.agents/scripts/scdaw-url-param.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw-url-param.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import {
   computeTimelineTicks,
   calculateTimelineSeekPpqn,

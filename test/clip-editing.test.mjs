@@ -5,17 +5,17 @@ import {
   createProject,
   applyCommand,
   evaluateClipGainEnvelope,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 import {
   DawEngine,
   scheduleClipGainAutomation,
-} from "../.agents/scripts/scdaw-engine.js";
+} from "../.agents/scripts/shadow-claw-daw-engine.js";
 import {
   calculateClipFadeHandleDrag,
   renderClipFadeOverlaySvg,
   setupClipInteraction,
 } from "../.agents/scripts/components/shadow-claw-daw-timeline.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 import {
   FakeAudioContext,
   FakeOfflineAudioContext,

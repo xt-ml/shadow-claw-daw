@@ -59,9 +59,12 @@ for (const tool of TOOLS) {
   }
 }
 
-const metadataPath = resolve(ROOT, ".agents/scripts/scdaw-tools-metadata.js");
+const metadataPath = resolve(
+  ROOT,
+  ".agents/scripts/shadow-claw-daw-tools-metadata.js",
+);
 const metadataContent = `/**
- * .agents/scripts/scdaw-tools-metadata.js
+ * .agents/scripts/shadow-claw-daw-tools-metadata.js
  *
  * Generated automatically from bin/tool-manifest.mjs via bin/generate-tools.mjs.
  * Exposes declarative tool definitions to the WebMCP browser adapter.
@@ -81,7 +84,9 @@ export const TOOLS_METADATA = ${JSON.stringify(
 
 if (!isCheck) {
   writeFileSync(metadataPath, metadataContent, "utf8");
-  console.log(`[GEN] Generated .agents/scripts/scdaw-tools-metadata.js`);
+  console.log(
+    `[GEN] Generated .agents/scripts/shadow-claw-daw-tools-metadata.js`,
+  );
 }
 
 if (isCheck) {

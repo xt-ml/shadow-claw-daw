@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { TOOLS } from "../bin/tool-manifest.mjs";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
-import { scdaw } from "../.agents/scripts/scdaw-engine.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
+import { scdaw } from "../.agents/scripts/shadow-claw-daw-engine.js";
 
 test("shadow-claw.config.json: registers shadow-claw-daw-midi-keyboard and MIDI tools", async () => {
   const raw = await fs.readFile("shadow-claw.config.json", "utf8");
@@ -34,7 +34,7 @@ test("bin/tool-manifest.mjs: defines Web MIDI tools", () => {
   assert.ok(names.has("scdaw_trigger_midi"));
 });
 
-test("scdaw-adapter: handleToolDispatch supports scdaw_get_midi_status, scdaw_configure_midi, scdaw_trigger_midi", async () => {
+test("shadow-claw-daw-adapter: handleToolDispatch supports scdaw_get_midi_status, scdaw_configure_midi, scdaw_trigger_midi", async () => {
   const statusRes = await handleToolDispatch("scdaw_get_midi_status", {});
   assert.equal(typeof statusRes.status, "string");
   assert.ok(Array.isArray(statusRes.inputs));

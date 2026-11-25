@@ -7,7 +7,7 @@ import {
   resolveKeyElementFromPoint,
   ShadowClawDawMidiKeyboard,
 } from "../.agents/scripts/components/shadow-claw-daw-midi-keyboard.js";
-import { scdaw } from "../.agents/scripts/scdaw-engine.js";
+import { scdaw } from "../.agents/scripts/shadow-claw-daw-engine.js";
 import { setupWorkbenchMidiKeyboard } from "../.agents/scripts/components/shadow-claw-daw-workbench.js";
 import { formatTelemetryStatus } from "../.agents/scripts/components/shadow-claw-daw-status-bar.js";
 import {

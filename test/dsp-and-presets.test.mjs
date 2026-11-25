@@ -12,12 +12,12 @@ import {
   processTransientShaper,
   processSidechainDucking,
   TidalComputer,
-} from "../.agents/scripts/scdaw-dsp.js";
+} from "../.agents/scripts/shadow-claw-daw-dsp.js";
 import {
   INSTRUMENT_PRESETS,
   GENRE_TEMPLATES,
   generateGenrePattern,
-} from "../.agents/scripts/scdaw-presets.js";
+} from "../.agents/scripts/shadow-claw-daw-presets.js";
 import {
   triggerSynth,
   triggerDrums,
@@ -35,7 +35,7 @@ import {
   setCachedSoundfont,
   getCachedSoundfont,
   clearSoundfontCache,
-} from "../.agents/scripts/scdaw-instruments.js";
+} from "../.agents/scripts/shadow-claw-daw-instruments.js";
 import {
   DX7_ALGORITHMS,
   describeDx7Algorithm,
@@ -43,19 +43,19 @@ import {
   parseDx7Sysex,
   encodeDx7SysexVoice,
   encodeDx7SysexBank,
-} from "../.agents/scripts/scdaw-syx.js";
+} from "../.agents/scripts/shadow-claw-daw-syx.js";
 import {
   INSTRUMENT_SCHEMAS,
   getDefaultParams,
-} from "../.agents/scripts/scdaw-schema.js";
+} from "../.agents/scripts/shadow-claw-daw-schema.js";
 import { FakeAudioContext } from "./helpers/fake-audio-context.mjs";
 import {
   computeEventsInRange,
   createProject,
   applyCommand,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 
-test("scdaw-dsp: createWavefolderCurve produces symmetric saturating transfer curve", () => {
+test("shadow-claw-daw-dsp: createWavefolderCurve produces symmetric saturating transfer curve", () => {
   const curve = createWavefolderCurve(6.0, 1024);
   assert.ok(curve instanceof Float32Array);
   assert.equal(curve.length, 1024);
@@ -66,7 +66,7 @@ test("scdaw-dsp: createWavefolderCurve produces symmetric saturating transfer cu
   assert.ok(curve[1023] >= -1 && curve[1023] <= 1);
 });
 
-test("scdaw-dsp: processCrusherBuffer reduces bit depth and sample rate", () => {
+test("shadow-claw-daw-dsp: processCrusherBuffer reduces bit depth and sample rate", () => {
   const input = new Float32Array([0.1, 0.25, 0.45, 0.8, -0.3, -0.7]);
   const crushed = processCrusherBuffer(input, 4, 2);
   assert.equal(crushed.length, input.length);
@@ -77,7 +77,7 @@ test("scdaw-dsp: processCrusherBuffer reduces bit depth and sample rate", () => 
   assert.equal(crushed[0], crushed[1]);
 });
 
-test("scdaw-dsp: processStereoTool adjusts width and stereo placement", () => {
+test("shadow-claw-daw-dsp: processStereoTool adjusts width and stereo placement", () => {
   const left = new Float32Array([0.5, 0.2, -0.4]);
   const right = new Float32Array([0.5, -0.2, 0.4]);
   const { outLeft, outRight } = processStereoTool(left, right, 1.5, 0);
@@ -89,7 +89,7 @@ test("scdaw-dsp: processStereoTool adjusts width and stereo placement", () => {
   }
 });
 
-test("scdaw-dsp: generateReverbImpulse generates decaying stereo impulse response", () => {
+test("shadow-claw-daw-dsp: generateReverbImpulse generates decaying stereo impulse response", () => {
   const impulse = generateReverbImpulse(44100, 1.0, 0.5, 10);
   assert.equal(impulse.left.length, 44100);
   assert.equal(impulse.right.length, 44100);
@@ -104,7 +104,7 @@ test("scdaw-dsp: generateReverbImpulse generates decaying stereo impulse respons
   assert.ok(initialEnergy > tailEnergy);
 });
 
-test("scdaw-presets: provides rich synth presets and genre templates without duplicating techno-bass", () => {
+test("shadow-claw-daw-presets: provides rich synth presets and genre templates without duplicating techno-bass", () => {
   assert.equal(INSTRUMENT_PRESETS["techno-bass"], undefined);
   assert.ok(GENRE_TEMPLATES["techno-bass"]);
   assert.equal(GENRE_TEMPLATES["techno-bass"].bpm, 132);
@@ -523,7 +523,7 @@ test("SoundFont Caching & Bundling: stores, retrieves, and clears binary soundfo
   assert.equal(getCachedSoundfont("A320U_drums.sf2"), undefined);
 });
 
-test("scdaw-dsp: TidalComputer computes non-linear LFO modulation curve with slope and symmetry", () => {
+test("shadow-claw-daw-dsp: TidalComputer computes non-linear LFO modulation curve with slope and symmetry", () => {
   const computer = new TidalComputer();
   computer.set(1.0, 0.0, 0.5); // Triangle shape
   assert.ok(Math.abs(computer.compute(0.0)) < 1e-4);
@@ -535,7 +535,7 @@ test("scdaw-dsp: TidalComputer computes non-linear LFO modulation curve with slo
   }
 });
 
-test("scdaw-dsp: processTidal modulates stereo audio with rate, depth, and stereo channel offset", () => {
+test("shadow-claw-daw-dsp: processTidal modulates stereo audio with rate, depth, and stereo channel offset", () => {
   const len = 4410; // 100ms at 44.1kHz
   const left = new Float32Array(len).fill(0.5);
   const right = new Float32Array(len).fill(0.5);
@@ -564,7 +564,7 @@ test("scdaw-dsp: processTidal modulates stereo audio with rate, depth, and stere
   }
 });
 
-test("scdaw-dsp: processMaximizer limits peaks and applies automatic makeup gain transparently", () => {
+test("shadow-claw-daw-dsp: processMaximizer limits peaks and applies automatic makeup gain transparently", () => {
   const len = 2048;
   const left = new Float32Array(len);
   const right = new Float32Array(len);
@@ -598,7 +598,7 @@ test("scdaw-dsp: processMaximizer limits peaks and applies automatic makeup gain
   assert.ok(maxPeakR <= 1.0, `Peak ${maxPeakR} should be bounded under 1.0`);
 });
 
-test("scdaw-dsp: processTransientShaper enhances or cuts attack and sustain envelopes", () => {
+test("shadow-claw-daw-dsp: processTransientShaper enhances or cuts attack and sustain envelopes", () => {
   const len = 4410;
   const left = new Float32Array(len);
   const right = new Float32Array(len);
@@ -626,7 +626,7 @@ test("scdaw-dsp: processTransientShaper enhances or cuts attack and sustain enve
   assert.ok(boosted.outLeft[1500] <= left[1500]);
 });
 
-test("scdaw-dsp: processAutotune quantizes pitch to musical scales with retune speed", () => {
+test("shadow-claw-daw-dsp: processAutotune quantizes pitch to musical scales with retune speed", () => {
   const len = 2048;
   const left = new Float32Array(len);
   const right = new Float32Array(len);
@@ -655,7 +655,7 @@ test("scdaw-dsp: processAutotune quantizes pitch to musical scales with retune s
   assert.ok(res.targetPitch > 0);
 });
 
-test("scdaw-dsp: processVocoder modulates carrier with speech or noise modulator bands", () => {
+test("shadow-claw-daw-dsp: processVocoder modulates carrier with speech or noise modulator bands", () => {
   const len = 2048;
   const carrier = new Float32Array(len).fill(0.3);
   const modulator = new Float32Array(len);
@@ -684,7 +684,7 @@ test("scdaw-dsp: processVocoder modulates carrier with speech or noise modulator
   assert.ok(activeEnergy > silentEnergy);
 });
 
-test("scdaw-dsp: processSidechainDucking ducks target audio based on trigger volume", () => {
+test("shadow-claw-daw-dsp: processSidechainDucking ducks target audio based on trigger volume", () => {
   const len = 4410;
   const targetL = new Float32Array(len).fill(0.8);
   const targetR = new Float32Array(len).fill(0.8);
@@ -721,7 +721,7 @@ test("scdaw-dsp: processSidechainDucking ducks target audio based on trigger vol
   );
 });
 
-test("scdaw-schema: defines complete schemas and defaults for new Audio FX", () => {
+test("shadow-claw-daw-schema: defines complete schemas and defaults for new Audio FX", () => {
   const fxTypes = [
     "autotune",
     "vocoder",
@@ -744,7 +744,7 @@ test("scdaw-schema: defines complete schemas and defaults for new Audio FX", () 
   assert.equal(getDefaultParams("zeitgeist").template, "swing16");
 });
 
-test("scdaw-syx: decodes all 32 DX7 algorithms, generates SVG diagrams, and round-trips .syx voice & 32-voice banks", () => {
+test("shadow-claw-daw-syx: decodes all 32 DX7 algorithms, generates SVG diagrams, and round-trips .syx voice & 32-voice banks", () => {
   assert.equal(DX7_ALGORITHMS.length, 32);
 
   // Alg 1: carriers OP1 & OP3, feedback on OP6

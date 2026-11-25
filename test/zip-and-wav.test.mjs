@@ -6,7 +6,7 @@ import {
   serializeProject,
   deserializeProject,
   createProject,
-} from "../.agents/scripts/scdaw.js";
+} from "../.agents/scripts/shadow-claw-daw.js";
 import {
   DAWPROJECT_UNITS,
   DEVICE_ROLES,
@@ -14,13 +14,13 @@ import {
   ParameterEncoder,
   ParameterDecoder,
   migrateProject,
-} from "../.agents/scripts/scdaw-schema.js";
+} from "../.agents/scripts/shadow-claw-daw-schema.js";
 import {
   encodeZip,
   decodeZip,
   createResourcePacker,
   createResourceProvider,
-} from "../.agents/scripts/scdaw-zip.js";
+} from "../.agents/scripts/shadow-claw-daw-zip.js";
 
 test("encodeWav and decodeWavHeader: supports 16-bit, 24-bit PCM and 32-bit Float", () => {
   const sampleRate = 44100;
@@ -113,7 +113,7 @@ test("encodeZip and decodeZip: packages and extracts multiple files with CRC-32 
   assert.equal(decodedPacked.length, 2);
 });
 
-test("scdaw-schema: exports DAWproject enums and ParameterEncoder/Decoder", () => {
+test("shadow-claw-daw-schema: exports DAWproject enums and ParameterEncoder/Decoder", () => {
   assert.equal(DAWPROJECT_UNITS.LINEAR, "linear");
   assert.equal(DAWPROJECT_UNITS.NORMALIZED, "normalized");
   assert.equal(DAWPROJECT_UNITS.BPM, "bpm");

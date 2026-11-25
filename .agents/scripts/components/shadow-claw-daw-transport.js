@@ -7,9 +7,13 @@
  */
 
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
-import { scdaw, formatUserError } from "../scdaw-engine.js";
-import { effect } from "../scdaw-signals.js";
-import { PPQN, RESERVED_MIDI_CCS, MIDI_CONTROLLER_PRESETS } from "../scdaw.js";
+import { scdaw, formatUserError } from "../shadow-claw-daw-engine.js";
+import { effect } from "../shadow-claw-daw-signals.js";
+import {
+  PPQN,
+  RESERVED_MIDI_CCS,
+  MIDI_CONTROLLER_PRESETS,
+} from "../shadow-claw-daw.js";
 
 /**
  * Format an audio/recording error into user-facing modal dialog copy.
@@ -975,7 +979,7 @@ export class ShadowClawDawTransport extends BaseElement {
           }
         }
       </style>
-      <div class="shadow-claw-daw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
+      <div class="scdaw-transport transport-bar" role="region" aria-label="Audio Transport Controls">
         <div class="scdaw-transport__group scdaw-transport__group--playback transport-group" role="group" aria-label="Playback Controls">
           <button id="play-btn" type="button" class="scdaw-transport__btn scdaw-transport__btn--play btn ${s.playing ? "btn-primary" : ""}" aria-label="${s.playing ? "Pause playback" : "Start playback"}">
             ${s.playing ? "⏸ Pause" : "▶ Play"}

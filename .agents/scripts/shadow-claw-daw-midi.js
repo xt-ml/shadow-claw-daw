@@ -1,5 +1,5 @@
 /**
- * ShadowClaw DAW — Standard MIDI File (SMF) Multi-Track Codec (scdaw-midi.js)
+ * ShadowClaw DAW — Standard MIDI File (SMF) Multi-Track Codec (shadow-claw-daw-midi.js)
  *
  * Implements pure-JS zero-dependency Standard MIDI File (SMF) Format 0 and Format 1
  * encoder and decoder, fully aligned with openDAW PPQN (960 ticks per quarter note)
@@ -12,12 +12,17 @@
  * - Note ordering: NOTE_OFF before NOTE_ON on identical ticks to prevent note choking
  * - Running status decoding and SysEx skipping
  * - Resolution scaling between arbitrary file TPQN and DAW PPQN (960)
- * - Integration with scdaw.js resolveTrackNotes() for MIDI FX and swing baking
+ * - Integration with shadow-claw-daw.js resolveTrackNotes() for MIDI FX and swing baking
  *
  * @license AGPL-3.0-or-later
  */
 
-import { PPQN, barPulses, createProject, resolveTrackNotes } from "./scdaw.js";
+import {
+  PPQN,
+  barPulses,
+  createProject,
+  resolveTrackNotes,
+} from "./shadow-claw-daw.js";
 
 export const SMF_FORMAT_SINGLE_TRACK = 0;
 export const SMF_FORMAT_MULTI_TRACK = 1;

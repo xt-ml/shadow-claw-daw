@@ -1,19 +1,19 @@
 // Ported from openDAW packages/lib/dsp/src/adsr.ts @10088021 (AGPL-3.0-or-later, © André Michelle)
 /**
- * .agents/scripts/scdaw-instruments.js
+ * .agents/scripts/shadow-claw-daw-instruments.js
  *
  * Procedural synthesizers (Vaporisateur dual-oscillator + sub + filter ADSR),
  * Playfield 12-piece drum synthesizer, and sample playback engine.
  * Context-agnostic: operates identically with AudioContext & OfflineAudioContext.
  */
 
-import { pulsesToSeconds } from "./scdaw.js";
+import { pulsesToSeconds } from "./shadow-claw-daw.js";
 import {
   triggerDrumSoundfont,
   triggerSoundfontNote,
-} from "./scdaw-soundfont.js";
-import { createWavefolderCurve } from "./scdaw-dsp.js";
-import { describeDx7Algorithm } from "./scdaw-syx.js";
+} from "./shadow-claw-daw-soundfont.js";
+import { createWavefolderCurve } from "./shadow-claw-daw-dsp.js";
+import { describeDx7Algorithm } from "./shadow-claw-daw-syx.js";
 
 // Global cache for preloaded sample audio buffers (decoded via ctx.decodeAudioData)
 const sampleCache = new Map();

@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import {
   createGuitarOverdriveCurve,
   analyzeAudioBuffer,
-} from "../.agents/scripts/scdaw-dsp.js";
-import { applyCommand, createProject } from "../.agents/scripts/scdaw.js";
-import { compileSong } from "../.agents/scripts/scdaw-compose.js";
-import { handleToolDispatch } from "../.agents/scripts/scdaw-adapter.js";
+} from "../.agents/scripts/shadow-claw-daw-dsp.js";
+import {
+  applyCommand,
+  createProject,
+} from "../.agents/scripts/shadow-claw-daw.js";
+import { compileSong } from "../.agents/scripts/shadow-claw-daw-compose.js";
+import { handleToolDispatch } from "../.agents/scripts/shadow-claw-daw-adapter.js";
 
 test("WP5.1: createGuitarOverdriveCurve generates warm analog saturation transfer curve", () => {
   const curve = createGuitarOverdriveCurve(12, 0.4);

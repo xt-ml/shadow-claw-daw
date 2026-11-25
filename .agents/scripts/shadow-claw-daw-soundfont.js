@@ -1,7 +1,7 @@
 // Ported concepts from openDAW packages/studio/core-wasm (AGPL-3.0, © André Michelle)
 // and crates/stock-devices/device-soundfont (AGPL-3.0, © André Michelle).
 /**
- * .agents/scripts/scdaw-soundfont.js
+ * .agents/scripts/shadow-claw-daw-soundfont.js
  *
  * Pure ESM SoundFont 2 (SF2) parser, zone simplifier, voice DSP, and General MIDI engine.
  * Zero external third-party dependencies.

@@ -1,10 +1,10 @@
 /**
- * .agents/scripts/scdaw-encoders.js
+ * .agents/scripts/shadow-claw-daw-encoders.js
  *
  * Audio Export Encoders & Lazy FFmpeg WASM Bridge for ShadowClaw DAW.
  *
  * Local-First (100% Offline):
- * - Native PCM WAV (`encodeWav` in `scdaw.js`)
+ * - Native PCM WAV (`encodeWav` in `shadow-claw-daw.js`)
  *
  * Optional Lazy CDN Encoder (opt-in when exporting MP3 / OGG / Opus / FLAC / M4A):
  * - @ffmpeg/ffmpeg@0.12.15 + @ffmpeg/core@0.12.10

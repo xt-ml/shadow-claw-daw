@@ -1,13 +1,13 @@
 // Ported from openDAW packages/studio/core @10088021 (AGPL-3.0-or-later, © André Michelle)
 /**
- * .agents/scripts/scdaw-engine.js
+ * .agents/scripts/shadow-claw-daw-engine.js
  *
  * Real-time Web Audio API transport, lookahead scheduler, graph manager,
  * and offline WAV rendering engine.
  * Exposes the global singleton `globalThis.__scdaw`.
  */
 
-import { State } from "./scdaw-signals.js";
+import { State } from "./shadow-claw-daw-signals.js";
 import {
   PPQN,
   MIN_BPM,
@@ -33,23 +33,26 @@ import {
   automationValueAt,
   evaluateClipGainEnvelope,
   computeClipPlaybackParams,
-} from "./scdaw.js";
-import { encodeZip } from "./scdaw-zip.js";
+} from "./shadow-claw-daw.js";
+import { encodeZip } from "./shadow-claw-daw-zip.js";
 import {
   encodeMidiFile,
   midiToProject,
   resolveCapturedMidiNotes,
   transformLiveMidiNote,
-} from "./scdaw-midi.js";
-import { encodeDawProject, decodeDawProject } from "./scdaw-dawproject.js";
-import { triggerInstrumentVoice } from "./scdaw-instruments.js";
+} from "./shadow-claw-daw-midi.js";
+import {
+  encodeDawProject,
+  decodeDawProject,
+} from "./shadow-claw-daw-dawproject.js";
+import { triggerInstrumentVoice } from "./shadow-claw-daw-instruments.js";
 import {
   processMaximizer,
   processStereoTool,
   buildTrackFxChain,
   processTrackOfflineFx,
   analyzeAudioBuffer,
-} from "./scdaw-dsp.js";
+} from "./shadow-claw-daw-dsp.js";
 import {
   processAudioChannels,
   measureLufs,
@@ -57,7 +60,7 @@ import {
   generateNoiseAudio,
   generateDtmfAudio,
   generateSilenceAudio,
-} from "./scdaw-audio-dsp.js";
+} from "./shadow-claw-daw-audio-dsp.js";
 import {
   captureNoiseProfile,
   computePowerSpectrum,
@@ -65,21 +68,21 @@ import {
   findClippingRegions,
   findSilenceRegions,
   findBeatOnsets,
-} from "./scdaw-spectral-dsp.js";
+} from "./shadow-claw-daw-spectral-dsp.js";
 import {
   writeConversationFile,
   readConversationFile,
   listConversations,
   listConversationFiles,
   DEFAULT_GROUP_ID,
-} from "./scdaw-fs.js";
-import { AudioRecorder } from "./scdaw-recorder.js";
-import { loadBundledSoundfontAsync } from "./scdaw-soundfont.js";
-import { createMidiIo } from "./scdaw-midi-io.js";
+} from "./shadow-claw-daw-fs.js";
+import { AudioRecorder } from "./shadow-claw-daw-recorder.js";
+import { loadBundledSoundfontAsync } from "./shadow-claw-daw-soundfont.js";
+import { createMidiIo } from "./shadow-claw-daw-midi-io.js";
 import {
   normalizeAudioExportFormat,
   transcodeWavWithFfmpeg,
-} from "./scdaw-encoders.js";
+} from "./shadow-claw-daw-encoders.js";
 
 function decodeBase64AudioBytes(input) {
   const b64 = String(input || "")
@@ -2111,7 +2114,7 @@ export class DawEngine extends EventTarget {
       if (includeProject) {
         const jsonStr = serializeProject(p);
         zipFiles.push({
-          name: `${baseProjectName}.scdaw.json`,
+          name: `${baseProjectName}.shadow-claw-daw.json`,
           data: new TextEncoder().encode(jsonStr),
         });
       }
@@ -2396,7 +2399,7 @@ export class DawEngine extends EventTarget {
     }
 
     const jsonStr = serializeProject(p);
-    const filename = options.filename || `${baseName}.scdaw.json`;
+    const filename = options.filename || `${baseName}.shadow-claw-daw.json`;
 
     if (options.saveToOpfs !== false) {
       try {
@@ -2447,7 +2450,7 @@ export class DawEngine extends EventTarget {
       data = encodeDawProject(p, options);
       bytes = data.byteLength;
     } else {
-      filename = filename || `${baseName}.scdaw.json`;
+      filename = filename || `${baseName}.shadow-claw-daw.json`;
       data = serializeProject(p);
       bytes = new TextEncoder().encode(data).byteLength;
     }
