@@ -37,6 +37,6 @@
   "license": "AGPL-3.0",
   "devDependencies": {
     "prettier": "^3.9.10",
-    "shadow-claw": "^1.66.2"
+    "shadow-claw": "^1.67.0"
   }
 }
