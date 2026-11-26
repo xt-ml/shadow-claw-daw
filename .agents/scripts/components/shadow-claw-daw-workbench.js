@@ -24,6 +24,7 @@ import {
   getCompressedParam,
   getUrlParam,
   clearUrlParam,
+  consumePendingFileParam,
 } from "../shadow-claw-daw-url-param.js";
 import { effect } from "../shadow-claw-daw-signals.js";
 import {
@@ -469,7 +470,14 @@ export class ShadowClawDawWorkbench extends BaseElement {
     this._renderSkeleton();
     this._initFullscreen();
     this._updatePanels();
-    queueMicrotask(() => this._checkFileUrlParam());
+    queueMicrotask(() => {
+      const pending = consumePendingFileParam("shadow-claw-daw-workbench");
+      if (pending?.content) {
+        this.openFileFromUrl(pending);
+      } else {
+        this._checkFileUrlParam();
+      }
+    });
     if (
       typeof window !== "undefined" &&
       typeof window.addEventListener === "function"
@@ -2445,6 +2453,29 @@ export class ShadowClawDawWorkbench extends BaseElement {
         }
       });
     }
+  }
+
+  /**
+   * Entry point invoked by ShadowClaw's `#file=` router when
+   * `settings.defaultViewerComponents` targets `shadow-claw-daw-workbench`.
+   */
+  async openFileFromUrl(payload) {
+    if (!payload?.content) return;
+    const rawAutoplay = getUrlParam("autoplay", payload.url || window.location);
+    const shouldAutoplay = rawAutoplay === "true" || rawAutoplay === "1";
+    let songName = payload.name || "shared song";
+    try {
+      const parsed = JSON.parse(payload.content);
+      if (parsed?.name) songName = parsed.name;
+    } catch (_) {
+      // Non-JSON or unnamed payload
+    }
+    globalThis.__scdawPendingUrlSong = {
+      jsonStr: payload.content,
+      songName,
+      autoplay: shouldAutoplay,
+    };
+    await this._checkFileUrlParam();
   }
 
   /**

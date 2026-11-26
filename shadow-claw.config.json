@@ -97,7 +97,10 @@
     "assistantName": "ShadowClaw DAW",
     "defaultToolsProfile": "none",
     "internetAccess": true,
-    "vm_bash_full_internet_access": true
+    "vm_bash_full_internet_access": true,
+    "defaultViewerComponents": {
+      "/": "shadow-claw-daw-workbench"
+    }
   },
   "enabledTools": [
     "scdaw_get_status",
