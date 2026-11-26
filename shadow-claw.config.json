@@ -60,7 +60,7 @@
       {
         "id": "shadow-claw-daw-element",
         "name": "shadow-claw-daw-workbench",
-        "src": ".agents/scripts/shadow-claw-daw-element.js",
+        "src": "./.agents/scripts/shadow-claw-daw-element.js",
         "global": true,
         "autoload": true,
         "hasInit": false
@@ -68,7 +68,7 @@
       {
         "id": "shadow-claw-daw-adapter",
         "name": "shadow-claw-daw-adapter",
-        "src": ".agents/scripts/shadow-claw-daw-adapter.js",
+        "src": "./.agents/scripts/shadow-claw-daw-adapter.js",
         "global": true,
         "autoload": true,
         "hasInit": true
