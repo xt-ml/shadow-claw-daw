@@ -82,7 +82,7 @@ test("shadow-claw-daw-transport: formatMidiStatusBadge and native <dialog> compl
     "utf8",
   );
   const midiDialogMatch = src.match(
-    /<dialog id="scdaw-midi-dialog"[\s\S]*?<\/dialog>/,
+    /<shadow-claw-dialog id="scdaw-midi-dialog"[\s\S]*?<\/shadow-claw-dialog>/,
   );
   assert.ok(midiDialogMatch, "Expected #scdaw-midi-dialog");
   assert.match(src, /showModal\(\)/);
@@ -102,7 +102,7 @@ test("shadow-claw-daw-transport: formatMidiStatusBadge and native <dialog> compl
   assert.equal(capDone.label, "✓ Captured 4");
 
   const captureDialogMatch = src.match(
-    /<dialog id="scdaw-capture-dialog"[\s\S]*?<\/dialog>/,
+    /<shadow-claw-dialog id="scdaw-capture-dialog"[\s\S]*?<\/shadow-claw-dialog>/,
   );
   assert.ok(captureDialogMatch, "Expected #scdaw-capture-dialog");
   assert.doesNotMatch(captureDialogMatch[0], /role=["']dialog["']/);

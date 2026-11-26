@@ -322,7 +322,7 @@ test("shadow-claw-daw-workbench UI: Open/Load dialog allows loading FROM any con
   // Open modal exists
   assert.match(
     workbenchSrc,
-    /<dialog[^>]+id=["']import-modal["']/i,
+    /<shadow-claw-dialog[^>]+id=["']import-modal["']/i,
     "Workbench must contain import-modal dialog",
   );
 

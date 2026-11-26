@@ -2522,7 +2522,10 @@ test("shadow-claw-daw-workbench: Save/Export and Open/Import dialogs adhere to W
   );
 
   // Export modal dialog exists with accessible form controls and labels
-  assert.match(workbenchContent, /<dialog[^>]+id=["']export-modal["']/);
+  assert.match(
+    workbenchContent,
+    /<shadow-claw-dialog[^>]+id=["']export-modal["']/,
+  );
   assert.match(workbenchContent, /<label[^>]+for=["']export-format-select["']/);
   assert.match(workbenchContent, /<select[^>]+id=["']export-format-select["']/);
   assert.match(workbenchContent, /<label[^>]+for=["']export-bitdepth["']/);
@@ -2532,12 +2535,12 @@ test("shadow-claw-daw-workbench: Save/Export and Open/Import dialogs adhere to W
   // Export and Import dialogs must not use hardcoded slate-blue colors (#1e293b, #0f172a, #334155)
   assert.doesNotMatch(
     workbenchContent,
-    /<dialog[^>]+id=["']export-modal["'][^>]*#[103][ef3][214][971][325][b5a]/i,
+    /<shadow-claw-dialog[^>]+id=["']export-modal["'][^>]*#[103][ef3][214][971][325][b5a]/i,
     "export-modal must not have inline hardcoded blue colors",
   );
   assert.doesNotMatch(
     workbenchContent,
-    /<dialog[^>]+id=["']import-modal["'][^>]*#[103][ef3][214][971][325][b5a]/i,
+    /<shadow-claw-dialog[^>]+id=["']import-modal["'][^>]*#[103][ef3][214][971][325][b5a]/i,
     "import-modal must not have inline hardcoded blue colors",
   );
   assert.doesNotMatch(

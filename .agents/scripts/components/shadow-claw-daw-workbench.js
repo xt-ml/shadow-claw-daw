@@ -11,6 +11,7 @@ import {
   SHARED_STYLES,
   installPageSwipeGuard,
 } from "./shadow-claw-daw-styles.js";
+import "shadow-claw/components/shadow-claw-dialog";
 import {
   resolveWorkbenchFullscreenState as resolveSharedWorkbenchFullscreenState,
   setupWorkbenchFullscreen as setupSharedWorkbenchFullscreen,
@@ -1414,7 +1415,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
         <input type="file" id="import-file-input" style="display:none;" accept=".scdaw.json,.json,.dawproject,.mid,.midi" aria-hidden="true"/>
 
         <!-- Save & Export Modal Dialog -->
-        <dialog id="export-modal" class="scdaw-dialog" aria-labelledby="export-modal-title">
+        <shadow-claw-dialog id="export-modal" dialog-class="scdaw-dialog" dialog-aria-labelledby="export-modal-title">
           <form method="dialog" id="export-form" class="scdaw-dialog__form">
             <div class="scdaw-dialog__header">
               <h3 id="export-modal-title">💾 Save & Export</h3>
@@ -1509,10 +1510,10 @@ export class ShadowClawDawWorkbench extends BaseElement {
               <button type="button" id="export-modal-submit" class="btn btn-primary">Save & Export</button>
             </div>
           </form>
-        </dialog>
+        </shadow-claw-dialog>
 
         <!-- Shareable Compressed Song URL Modal Dialog -->
-        <dialog id="press-url-modal" class="scdaw-dialog" aria-labelledby="press-url-modal-title">
+        <shadow-claw-dialog id="press-url-modal" dialog-class="scdaw-dialog" dialog-aria-labelledby="press-url-modal-title">
           <form method="dialog" id="press-url-form" class="scdaw-dialog__form">
             <div class="scdaw-dialog__header">
               <h3 id="press-url-modal-title">🔗 Compressed Song URL</h3>
@@ -1537,10 +1538,10 @@ export class ShadowClawDawWorkbench extends BaseElement {
               <button type="button" id="press-url-modal-done" class="btn btn-primary">Close</button>
             </div>
           </form>
-        </dialog>
+        </shadow-claw-dialog>
 
         <!-- Open / Load Project Modal Dialog -->
-        <dialog id="import-modal" class="scdaw-dialog" aria-labelledby="import-modal-title">
+        <shadow-claw-dialog id="import-modal" dialog-class="scdaw-dialog" dialog-aria-labelledby="import-modal-title">
           <form method="dialog" id="import-form" class="scdaw-dialog__form">
             <div class="scdaw-dialog__header">
               <h3 id="import-modal-title">📂 Open Project</h3>
@@ -1575,7 +1576,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
               </div>
             </div>
           </form>
-        </dialog>
+        </shadow-claw-dialog>
       </div>
     `;
 
@@ -2161,9 +2162,10 @@ export class ShadowClawDawWorkbench extends BaseElement {
         pressUrlModal?.close();
       });
 
-    pressUrlModal?.addEventListener("click", (e) => {
-      if (e.target === pressUrlModal) {
-        pressUrlModal.close();
+    const pressUrlNativeDialog = pressUrlModal?.dialog || pressUrlModal;
+    pressUrlNativeDialog?.addEventListener("click", (e) => {
+      if (e.target === pressUrlNativeDialog) {
+        pressUrlModal?.close();
       }
     });
 

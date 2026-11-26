@@ -6,6 +6,7 @@
  * Redesigned Mobile-First, Responsive, BEM, and ARIA compliant.
  */
 
+import "shadow-claw/components/shadow-claw-dialog";
 import { SHARED_STYLES } from "./shadow-claw-daw-styles.js";
 import { scdaw, formatUserError } from "../shadow-claw-daw-engine.js";
 import { effect } from "../shadow-claw-daw-signals.js";
@@ -1081,7 +1082,7 @@ export class ShadowClawDawTransport extends BaseElement {
         </div>
       </div>
 
-      <dialog id="scdaw-rec-dialog" class="scdaw-dialog" aria-labelledby="rec-dialog-title" aria-modal="true">
+      <shadow-claw-dialog id="scdaw-rec-dialog" dialog-class="scdaw-dialog" dialog-aria-labelledby="rec-dialog-title">
         <form method="dialog" class="scdaw-dialog__form">
           <div class="scdaw-dialog__header">
             <h3 id="rec-dialog-title" class="scdaw-dialog__title">🎙️ Audio Recording Options</h3>
@@ -1109,10 +1110,13 @@ export class ShadowClawDawTransport extends BaseElement {
           <div class="scdaw-dialog__footer">
             <button type="button" id="rec-dialog-cancel" class="btn">Cancel</button>
           </div>
+          <div class="scdaw-dialog__footer">
+            <button id="error-dialog-ok" type="submit" value="ok" class="btn btn-primary" autofocus>OK</button>
+          </div>
         </form>
-      </dialog>
+      </shadow-claw-dialog>
 
-      <dialog id="scdaw-midi-dialog" class="scdaw-dialog" aria-labelledby="midi-dialog-title">
+      <shadow-claw-dialog id="scdaw-midi-dialog" dialog-class="scdaw-dialog" dialog-aria-labelledby="midi-dialog-title">
         <form method="dialog" class="scdaw-dialog__form">
           <div class="scdaw-dialog__header">
             <h3 id="midi-dialog-title" class="scdaw-dialog__title">MIDI Devices &amp; Routing</h3>
@@ -1122,10 +1126,13 @@ export class ShadowClawDawTransport extends BaseElement {
           <div class="scdaw-dialog__footer">
             <button type="button" id="midi-dialog-done" class="btn btn-primary">Done</button>
           </div>
+          <div class="scdaw-dialog__footer">
+            <button id="error-dialog-ok" type="submit" value="ok" class="btn btn-primary" autofocus>OK</button>
+          </div>
         </form>
-      </dialog>
+      </shadow-claw-dialog>
 
-      <dialog id="scdaw-capture-dialog" class="scdaw-dialog" aria-labelledby="capture-dialog-title">
+      <shadow-claw-dialog id="scdaw-capture-dialog" dialog-class="scdaw-dialog" dialog-aria-labelledby="capture-dialog-title">
         <form method="dialog" class="scdaw-dialog__form">
           <div class="scdaw-dialog__header">
             <h3 id="capture-dialog-title" class="scdaw-dialog__title">Capture MIDI (Retroactive Recording)</h3>
@@ -1140,10 +1147,13 @@ export class ShadowClawDawTransport extends BaseElement {
             <button type="button" id="capture-open-keys" class="btn">Open ⌨ Keys</button>
             <button type="button" id="capture-dialog-ok" class="btn btn-primary">Got it</button>
           </div>
+          <div class="scdaw-dialog__footer">
+            <button id="error-dialog-ok" type="submit" value="ok" class="btn btn-primary" autofocus>OK</button>
+          </div>
         </form>
-      </dialog>
+      </shadow-claw-dialog>
 
-      <dialog id="scdaw-error-dialog" class="scdaw-dialog scdaw-dialog--error" closedby="any" aria-labelledby="error-dialog-title" aria-describedby="error-dialog-message">
+      <shadow-claw-dialog id="scdaw-error-dialog" dialog-class="scdaw-dialog scdaw-dialog--error" dialog-aria-labelledby="error-dialog-title">
         <form method="dialog" class="scdaw-dialog__form">
           <div class="scdaw-dialog__header">
             <h1 id="error-dialog-title" class="scdaw-dialog__title">Recording Error</h1>
@@ -1157,7 +1167,7 @@ export class ShadowClawDawTransport extends BaseElement {
             <button id="error-dialog-ok" type="submit" value="ok" class="btn btn-primary" autofocus>OK</button>
           </div>
         </form>
-      </dialog>
+      </shadow-claw-dialog>
 
       <span id="transport-live-msg" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></span>
     `;
@@ -1168,18 +1178,24 @@ export class ShadowClawDawTransport extends BaseElement {
     const errorHintEl = this.shadowRoot.getElementById("error-dialog-hint");
     const errorCloseBtn = this.shadowRoot.getElementById("error-dialog-close");
 
+    const errorNativeDialog = errorDialog?.dialog || errorDialog;
+    errorNativeDialog?.setAttribute?.("closedby", "any");
+    errorNativeDialog?.setAttribute?.(
+      "aria-describedby",
+      "error-dialog-message",
+    );
     errorCloseBtn?.addEventListener("click", () => errorDialog?.close?.());
-    errorDialog?.addEventListener("close", () => {
-      errorDialog.returnValue = "";
+    errorNativeDialog?.addEventListener?.("close", () => {
+      if (errorDialog) errorDialog.returnValue = "";
     });
     if (
-      errorDialog &&
+      errorNativeDialog &&
       typeof HTMLDialogElement !== "undefined" &&
       !("closedBy" in HTMLDialogElement.prototype)
     ) {
       let pressedOutside = false;
       const isOutside = (e) => {
-        const r = errorDialog.getBoundingClientRect?.();
+        const r = errorNativeDialog.getBoundingClientRect?.();
         if (!r) return false;
         return (
           e.clientX < r.left ||
@@ -1188,10 +1204,10 @@ export class ShadowClawDawTransport extends BaseElement {
           e.clientY > r.bottom
         );
       };
-      errorDialog.addEventListener("pointerdown", (e) => {
+      errorNativeDialog.addEventListener("pointerdown", (e) => {
         pressedOutside = isOutside(e);
       });
-      errorDialog.addEventListener("pointerup", (e) => {
+      errorNativeDialog.addEventListener("pointerup", (e) => {
         if (pressedOutside && isOutside(e)) errorDialog.close?.();
       });
     }
@@ -1521,7 +1537,8 @@ export class ShadowClawDawTransport extends BaseElement {
     this.shadowRoot
       .getElementById("midi-dialog-done")
       ?.addEventListener("click", closeMidiDialog);
-    midiDialog?.addEventListener?.("close", () => {
+    const midiNativeDialog = midiDialog?.dialog || midiDialog;
+    midiNativeDialog?.addEventListener?.("close", () => {
       this._midiDialogOpen = false;
     });
     midiDialogBody?.addEventListener("change", async (e) => {

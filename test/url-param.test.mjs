@@ -123,7 +123,7 @@ test("shadow-claw-daw-workbench: includes Press a URL button, #press-url-modal, 
   const content = await readFile(workbenchPath, "utf8");
 
   assert.match(content, /id=["']export-modal-press-url["']/);
-  assert.match(content, /<dialog[^>]+id=["']press-url-modal["']/);
+  assert.match(content, /<shadow-claw-dialog[^>]+id=["']press-url-modal["']/);
   assert.match(content, /id=["']press-url-link["']/);
   assert.match(content, /_checkFileUrlParam\s*\(/);
   assert.match(content, /hashchange/);

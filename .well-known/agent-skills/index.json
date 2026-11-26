@@ -1112,7 +1112,7 @@
       "name": "shadow-claw-daw-transport",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-transport.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-transport.js",
-      "digest": "sha256:0b75e863764ab31394e1d74cd734d414e341632898c7c48e7e62562e17909f91"
+      "digest": "sha256:101d15f356b86f4f4a627506981611f1e31aab4236f946b8cfb1d7c5f0cebf09"
     },
     {
       "name": "shadow-claw-daw-wave-editor",
@@ -1124,7 +1124,7 @@
       "name": "shadow-claw-daw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-workbench.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-workbench.js",
-      "digest": "sha256:fd522e4074bdc36f6947e377b33f44402cc8710c654cbb64b80c35d4fa23cfb8"
+      "digest": "sha256:5e9aafb583b32b42894aa3f3629b79128d6733cb6b3d1535113dedd9a3f727bb"
     },
     {
       "name": "shadow-claw-daw-adapter",

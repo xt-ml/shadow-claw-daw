@@ -86,22 +86,26 @@ test("Phase 4.1: Transport native modal error dialog surfaces recording errors o
     "utf8",
   );
 
-  // Native <dialog> best practices: no redundant role="dialog" or aria-modal on error dialog
+  // <shadow-claw-dialog> best practices: no redundant role="dialog" or aria-modal on error dialog
   assert.match(
     transportSrc,
-    /<dialog[^>]+id=["']scdaw-error-dialog["'][^>]*closedby=["']any["']/,
+    /<shadow-claw-dialog[^>]+id=["']scdaw-error-dialog["']/,
   );
   assert.match(
     transportSrc,
-    /id=["']scdaw-error-dialog["'][^>]*aria-labelledby=["']error-dialog-title["']/,
+    /errorNativeDialog\?\.setAttribute\?\.\(\s*["']closedby["'],\s*["']any["']\s*\)/,
   );
   assert.match(
     transportSrc,
-    /id=["']scdaw-error-dialog["'][^>]*aria-describedby=["']error-dialog-message["']/,
+    /id=["']scdaw-error-dialog["'][^>]*dialog-aria-labelledby=["']error-dialog-title["']/,
+  );
+  assert.match(
+    transportSrc,
+    /errorNativeDialog\?\.setAttribute\?\.\(\s*["']aria-describedby["'],\s*["']error-dialog-message["'],?\s*\)/,
   );
   assert.doesNotMatch(
     transportSrc,
-    /<dialog[^>]+id=["']scdaw-error-dialog["'][^>]*(?:role=["']dialog["']|aria-modal)/,
+    /<shadow-claw-dialog[^>]+id=["']scdaw-error-dialog["'][^>]*(?:role=["']dialog["']|aria-modal)/,
   );
   assert.match(transportSrc, /<h1[^>]+id=["']error-dialog-title["']/);
   assert.match(transportSrc, /<p[^>]+id=["']error-dialog-message["']/);
