@@ -138,8 +138,8 @@ export function resolveDropAction({
 export function resolveWorkbenchResponsiveLayout({
   containerWidth = 1200,
   viewMode = "studio", // "studio" | "browser-full" | "piano-roll-full" | "sequencer-full" | "synth-full" | "mixer-full"
-  showBrowser = true,
-  showMixer = true,
+  showBrowser = false,
+  showMixer = false,
   browserWidth = 220,
   mixerWidth = 300,
 } = {}) {
@@ -240,8 +240,8 @@ export function resolveWorkbenchPanels(showBrowser, showMixer, editorMode) {
 
 export function resolveWorkbenchButtonStates({
   viewMode = "studio",
-  showBrowser = true,
-  showMixer = true,
+  showBrowser = false,
+  showMixer = false,
   isMobile = false,
 } = {}) {
   const isStudio = viewMode === "studio";
@@ -434,9 +434,10 @@ export class ShadowClawDawWorkbench extends BaseElement {
     if (this.attachShadow) {
       this.attachShadow({ mode: "open" });
     }
-    this._showBrowser = true;
-    this._showMixer = true;
+    this._showBrowser = false;
+    this._showMixer = false;
     this._showDevices = true;
+    this._fullViewMenuOpen = false;
     this._editorMode = "piano-roll"; // "piano-roll" | "step-sequencer"
     this._viewMode = "studio"; // "studio" | "piano-roll-full" | "sequencer-full" | "mixer-full"
     this._browserWidth = 230;
@@ -740,20 +741,49 @@ export class ShadowClawDawWorkbench extends BaseElement {
           width: 100%;
         }
 
-        /* Full-width focus views: 2x2 grid on mobile (no scrollbar) */
+        /* Full-width focus views: compact dropdown menu */
         .scdaw-workbench__toolbar-group--views,
         .scdaw-workbench__view-switcher {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 4px;
-          background: rgba(0, 0, 0, 0.25);
-          padding: 3px;
-          border-radius: 6px;
+          position: relative;
+          display: inline-flex;
           align-items: center;
           width: 100%;
           max-width: 100%;
           min-width: 0;
           box-sizing: border-box;
+        }
+
+        .scdaw-workbench__view-trigger {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .scdaw-workbench__view-dropdown {
+          position: absolute;
+          top: calc(100% + 4px);
+          inset-inline-start: 0;
+          z-index: 40;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 190px;
+          max-width: min(260px, 90vw);
+          padding: 4px;
+          border-radius: 6px;
+          background: var(--bg-panel, #181a20);
+          border: 1px solid var(--border-color, rgba(255, 255, 255, 0.16));
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+        }
+
+        .scdaw-workbench__view-dropdown[hidden] {
+          display: none;
+        }
+
+        .scdaw-workbench__toolbar .scdaw-workbench__view-item {
+          width: 100%;
+          justify-content: flex-start;
+          padding: 0 0.6rem;
+          text-align: start;
         }
 
         .scdaw-workbench__toolbar .btn {
@@ -771,13 +801,6 @@ export class ShadowClawDawWorkbench extends BaseElement {
           white-space: nowrap;
           width: 100%;
           min-width: 0;
-        }
-
-        .scdaw-workbench__view-switcher .btn {
-          padding: 0 0.35rem;
-          font-size: 0.72rem;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
 
         .scdaw-workbench__dock-grid {
@@ -921,6 +944,10 @@ export class ShadowClawDawWorkbench extends BaseElement {
           .scdaw-workbench__view-switcher {
             margin-inline-start: auto;
           }
+          .scdaw-workbench__view-dropdown {
+            inset-inline-start: auto;
+            inset-inline-end: 0;
+          }
           .scdaw-workbench__toolbar .btn,
           .scdaw-workbench__view-switcher .btn {
             width: auto;
@@ -928,6 +955,9 @@ export class ShadowClawDawWorkbench extends BaseElement {
             padding: 0 0.55rem;
             font-size: 0.78rem;
             overflow: visible;
+          }
+          .scdaw-workbench__toolbar .scdaw-workbench__view-item {
+            width: 100%;
           }
           .scdaw-workbench__dock-grid {
             display: grid;
@@ -1242,9 +1272,9 @@ export class ShadowClawDawWorkbench extends BaseElement {
             </div>
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--docks scdaw-workbench__dock-toggles" role="group" aria-label="Panel Docks">
-              <button id="toggle-browser-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Browser Dock" aria-pressed="true" aria-controls="browser-container">📁 Browser</button>
+              <button id="toggle-browser-btn" class="scdaw-workbench__btn btn btn-icon" title="Toggle Browser Dock" aria-pressed="false" aria-controls="browser-container">📁 Browser</button>
               <button id="mode-studio-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Multi-Pane Studio Layout" aria-pressed="true">🎛 Studio</button>
-              <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon btn-primary scdaw-workbench__btn--active" title="Toggle Mixer Dock" aria-pressed="true" aria-controls="mixer-container">🎛 Mixer</button>
+              <button id="toggle-mixer-btn" class="scdaw-workbench__btn btn btn-icon" title="Toggle Mixer Dock" aria-pressed="false" aria-controls="mixer-container">🎛 Mixer</button>
             </div>
 
             <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--actions" role="group" aria-label="History, Output, and Display">
@@ -1262,13 +1292,31 @@ export class ShadowClawDawWorkbench extends BaseElement {
               </button>
             </div>
 
-            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views scdaw-workbench__view-switcher" role="tablist" aria-label="Layout Focus Views">
-              <button id="mode-browser-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Library Browser" aria-pressed="false" aria-selected="false">📁 Browser (Full)</button>
-              <button id="mode-mixer-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Mixer Console" aria-pressed="false" aria-selected="false">🎚 Mixer (Full)</button>
-              <button id="mode-piano-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Piano Roll Editor" aria-pressed="false" aria-selected="false">🎹 Piano Roll (Full)</button>
-              <button id="mode-seq-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Drum Matrix" aria-pressed="false" aria-selected="false">🥁 Drum Matrix (Full)</button>
-              <button id="mode-synth-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Synthesizer Workbench" aria-pressed="false" aria-selected="false">🎛️ Synth (Full)</button>
-              <button id="mode-audio-full-btn" type="button" role="tab" class="scdaw-workbench__btn btn btn-icon" title="Full Width Wave Audio Editor" aria-pressed="false" aria-selected="false">🌊 Audio (Full)</button>
+            <div class="scdaw-workbench__toolbar-group scdaw-workbench__toolbar-group--views scdaw-workbench__view-switcher">
+              <button
+                id="full-view-menu-btn"
+                type="button"
+                class="scdaw-workbench__btn btn btn-icon scdaw-workbench__view-trigger"
+                title="Open a single panel in full-width view"
+                aria-haspopup="menu"
+                aria-expanded="false"
+                aria-controls="full-view-menu">
+                <span class="scdaw-workbench__view-trigger-label">⛶ Full View</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div
+                id="full-view-menu"
+                class="scdaw-workbench__view-dropdown"
+                role="menu"
+                aria-labelledby="full-view-menu-btn"
+                hidden>
+                <button id="mode-browser-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Library Browser" aria-checked="false">📁 Browser</button>
+                <button id="mode-mixer-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Mixer Console" aria-checked="false">🎚 Mixer</button>
+                <button id="mode-piano-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Piano Roll Editor" aria-checked="false">🎹 Piano Roll</button>
+                <button id="mode-seq-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Drum Matrix" aria-checked="false">🥁 Drum Matrix</button>
+                <button id="mode-synth-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Synthesizer Workbench" aria-checked="false">🎛️ Synth</button>
+                <button id="mode-audio-full-btn" type="button" role="menuitemradio" class="scdaw-workbench__btn scdaw-workbench__view-item btn btn-icon" title="Full Width Wave Audio Editor" aria-checked="false">🌊 Audio</button>
+              </div>
             </div>
           </nav>
         </header>
@@ -1526,13 +1574,81 @@ export class ShadowClawDawWorkbench extends BaseElement {
     this._attachEventListeners();
   }
 
+  _setFullViewMenuOpen(
+    open,
+    { focusFirst = false, restoreTriggerFocus = false } = {},
+  ) {
+    this._fullViewMenuOpen = Boolean(open);
+    const trigger = this.shadowRoot?.getElementById("full-view-menu-btn");
+    const menu = this.shadowRoot?.getElementById("full-view-menu");
+    if (trigger) {
+      trigger.setAttribute("aria-expanded", String(this._fullViewMenuOpen));
+    }
+    if (menu) {
+      menu.hidden = !this._fullViewMenuOpen;
+      if (this._fullViewMenuOpen && focusFirst) {
+        menu.querySelector('[role="menuitemradio"]')?.focus();
+      }
+    }
+    if (!this._fullViewMenuOpen && restoreTriggerFocus) {
+      trigger?.focus();
+    }
+  }
+
   _attachEventListeners() {
+    const fullViewTrigger =
+      this.shadowRoot.getElementById("full-view-menu-btn");
+    const fullViewMenu = this.shadowRoot.getElementById("full-view-menu");
+    fullViewTrigger?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._setFullViewMenuOpen(!this._fullViewMenuOpen);
+    });
+    fullViewTrigger?.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this._setFullViewMenuOpen(true, { focusFirst: true });
+      }
+    });
+    fullViewMenu?.addEventListener("keydown", (e) => {
+      const items = Array.from(
+        fullViewMenu.querySelectorAll('[role="menuitemradio"]'),
+      );
+      if (!items.length) return;
+      const idx = items.indexOf(this.shadowRoot.activeElement);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this._setFullViewMenuOpen(false, { restoreTriggerFocus: true });
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        items[(idx + 1) % items.length].focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        items[(idx - 1 + items.length) % items.length].focus();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        items[0].focus();
+      } else if (e.key === "End") {
+        e.preventDefault();
+        items[items.length - 1].focus();
+      }
+    });
+    this.shadowRoot?.addEventListener?.("click", (e) => {
+      if (!this._fullViewMenuOpen) return;
+      const switcher = this.shadowRoot.querySelector(
+        ".scdaw-workbench__view-switcher",
+      );
+      if (switcher && !switcher.contains(e.target)) {
+        this._setFullViewMenuOpen(false);
+      }
+    });
+
     // Mode Switchers (Studio, Piano Roll Full, Sequencer Full, Mixer Full)
     this.shadowRoot
       .getElementById("mode-studio-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "studio";
         this._editorMode = "piano-roll";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
@@ -1540,6 +1656,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
       ?.addEventListener("click", () => {
         this._viewMode = "piano-roll-full";
         this._editorMode = "piano-roll";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
@@ -1547,6 +1664,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
       ?.addEventListener("click", () => {
         this._viewMode = "sequencer-full";
         this._editorMode = "step-sequencer";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
@@ -1554,6 +1672,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
       ?.addEventListener("click", () => {
         this._viewMode = "synth-full";
         this._editorMode = "synth";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
@@ -1561,6 +1680,7 @@ export class ShadowClawDawWorkbench extends BaseElement {
       ?.addEventListener("click", () => {
         this._viewMode = "audio-full";
         this._editorMode = "audio";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
@@ -1572,12 +1692,14 @@ export class ShadowClawDawWorkbench extends BaseElement {
       .getElementById("mode-browser-full-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "browser-full";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
     this.shadowRoot
       .getElementById("mode-mixer-full-btn")
       ?.addEventListener("click", () => {
         this._viewMode = "mixer-full";
+        this._setFullViewMenuOpen(false);
         this._updatePanels();
       });
 
@@ -2739,30 +2861,39 @@ export class ShadowClawDawWorkbench extends BaseElement {
     const bBtn = this.shadowRoot.getElementById("toggle-browser-btn");
     const mBtn = this.shadowRoot.getElementById("toggle-mixer-btn");
 
-    if (modeBrowserFull) {
-      modeBrowserFull.disabled = btnStates.browserFull.disabled;
-      modeBrowserFull.setAttribute(
-        "aria-disabled",
-        String(btnStates.browserFull.disabled),
+    const fullViewBtn = this.shadowRoot.getElementById("full-view-menu-btn");
+    const fullViewLabels = {
+      "browser-full": "Browser",
+      "mixer-full": "Mixer",
+      "piano-roll-full": "Piano Roll",
+      "sequencer-full": "Drum Matrix",
+      "synth-full": "Synth",
+      "audio-full": "Audio",
+    };
+    if (fullViewBtn) {
+      const isFull = this._viewMode !== "studio";
+      fullViewBtn.classList.toggle("btn-primary", isFull);
+      fullViewBtn.classList.toggle("scdaw-workbench__btn--active", isFull);
+      const labelEl = fullViewBtn.querySelector(
+        ".scdaw-workbench__view-trigger-label",
       );
-      modeBrowserFull.classList.toggle(
-        "btn-primary",
-        btnStates.browserFull.active,
-      );
-      modeBrowserFull.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.browserFull.active,
-      );
-      modeBrowserFull.setAttribute(
-        "aria-pressed",
-        String(btnStates.browserFull.active),
-      );
-      modeBrowserFull.setAttribute(
-        "aria-selected",
-        String(btnStates.browserFull.active),
-      );
+      if (labelEl) {
+        labelEl.textContent = isFull
+          ? `⛶ Full: ${fullViewLabels[this._viewMode] || "View"}`
+          : "⛶ Full View";
+      }
     }
 
+    const syncFullViewItem = (btn, state) => {
+      if (!btn) return;
+      btn.disabled = state.disabled;
+      btn.setAttribute("aria-disabled", String(state.disabled));
+      btn.classList.toggle("btn-primary", state.active);
+      btn.classList.toggle("scdaw-workbench__btn--active", state.active);
+      btn.setAttribute("aria-checked", String(state.active));
+    };
+
+    syncFullViewItem(modeBrowserFull, btnStates.browserFull);
     if (modeStudio) {
       modeStudio.disabled = btnStates.studio.disabled;
       modeStudio.setAttribute(
@@ -2776,106 +2907,11 @@ export class ShadowClawDawWorkbench extends BaseElement {
       );
       modeStudio.setAttribute("aria-pressed", String(btnStates.studio.active));
     }
-    if (modePiano) {
-      modePiano.disabled = btnStates.pianoRollFull.disabled;
-      modePiano.setAttribute(
-        "aria-disabled",
-        String(btnStates.pianoRollFull.disabled),
-      );
-      modePiano.classList.toggle("btn-primary", btnStates.pianoRollFull.active);
-      modePiano.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.pianoRollFull.active,
-      );
-      modePiano.setAttribute(
-        "aria-pressed",
-        String(btnStates.pianoRollFull.active),
-      );
-      modePiano.setAttribute(
-        "aria-selected",
-        String(btnStates.pianoRollFull.active),
-      );
-    }
-    if (modeSeq) {
-      modeSeq.disabled = btnStates.sequencerFull.disabled;
-      modeSeq.setAttribute(
-        "aria-disabled",
-        String(btnStates.sequencerFull.disabled),
-      );
-      modeSeq.classList.toggle("btn-primary", btnStates.sequencerFull.active);
-      modeSeq.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.sequencerFull.active,
-      );
-      modeSeq.setAttribute(
-        "aria-pressed",
-        String(btnStates.sequencerFull.active),
-      );
-      modeSeq.setAttribute(
-        "aria-selected",
-        String(btnStates.sequencerFull.active),
-      );
-    }
-    if (modeSynth) {
-      modeSynth.disabled = btnStates.synthFull.disabled;
-      modeSynth.setAttribute(
-        "aria-disabled",
-        String(btnStates.synthFull.disabled),
-      );
-      modeSynth.classList.toggle("btn-primary", btnStates.synthFull.active);
-      modeSynth.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.synthFull.active,
-      );
-      modeSynth.setAttribute(
-        "aria-pressed",
-        String(btnStates.synthFull.active),
-      );
-      modeSynth.setAttribute(
-        "aria-selected",
-        String(btnStates.synthFull.active),
-      );
-    }
-    if (modeAudio) {
-      modeAudio.disabled = btnStates.audioFull.disabled;
-      modeAudio.setAttribute(
-        "aria-disabled",
-        String(btnStates.audioFull.disabled),
-      );
-      modeAudio.classList.toggle("btn-primary", btnStates.audioFull.active);
-      modeAudio.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.audioFull.active,
-      );
-      modeAudio.setAttribute(
-        "aria-pressed",
-        String(btnStates.audioFull.active),
-      );
-      modeAudio.setAttribute(
-        "aria-selected",
-        String(btnStates.audioFull.active),
-      );
-    }
-    if (modeMixer) {
-      modeMixer.disabled = btnStates.mixerFull.disabled;
-      modeMixer.setAttribute(
-        "aria-disabled",
-        String(btnStates.mixerFull.disabled),
-      );
-      modeMixer.classList.toggle("btn-primary", btnStates.mixerFull.active);
-      modeMixer.classList.toggle(
-        "scdaw-workbench__btn--active",
-        btnStates.mixerFull.active,
-      );
-      modeMixer.setAttribute(
-        "aria-pressed",
-        String(btnStates.mixerFull.active),
-      );
-      modeMixer.setAttribute(
-        "aria-selected",
-        String(btnStates.mixerFull.active),
-      );
-    }
+    syncFullViewItem(modePiano, btnStates.pianoRollFull);
+    syncFullViewItem(modeSeq, btnStates.sequencerFull);
+    syncFullViewItem(modeSynth, btnStates.synthFull);
+    syncFullViewItem(modeAudio, btnStates.audioFull);
+    syncFullViewItem(modeMixer, btnStates.mixerFull);
     if (bBtn) {
       bBtn.disabled = btnStates.browser.disabled;
       bBtn.setAttribute("aria-disabled", String(btnStates.browser.disabled));

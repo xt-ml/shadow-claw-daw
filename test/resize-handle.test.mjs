@@ -573,36 +573,36 @@ test("shadow-claw-daw-workbench: ShadowClawDawWorkbench lifecycle, initial Studi
     const seqFullBtn = elements.get("mode-seq-full-btn");
     const synthFullBtn = elements.get("mode-synth-full-btn");
 
-    // 2. Verify initial Studio state: Browser, Studio, AND Mixer are all visible and highlighted
-    assert.equal(grid.style.gridTemplateColumns, "230px 8px 1fr 8px 320px");
-    assert.equal(bBtn.classList.contains("btn-primary"), true);
+    // 2. Verify initial Studio state: Studio is active, Browser and Mixer are hidden by default
+    assert.equal(grid.style.gridTemplateColumns, "1fr");
+    assert.equal(bBtn.classList.contains("btn-primary"), false);
     assert.equal(sBtn.classList.contains("btn-primary"), true);
-    assert.equal(mBtn.classList.contains("btn-primary"), true);
-    assert.equal(bCont.classList.contains("hidden"), false);
-    assert.equal(bHandle.classList.contains("hidden"), false);
+    assert.equal(mBtn.classList.contains("btn-primary"), false);
+    assert.equal(bCont.classList.contains("hidden"), true);
+    assert.equal(bHandle.classList.contains("hidden"), true);
     assert.equal(centerStack.classList.contains("hidden"), false);
-    assert.equal(mHandle.classList.contains("hidden"), false);
-    assert.equal(mCont.classList.contains("hidden"), false);
+    assert.equal(mHandle.classList.contains("hidden"), true);
+    assert.equal(mCont.classList.contains("hidden"), true);
     assert.equal(edCont.classList.contains("hidden"), false);
     assert.equal(seqCont.classList.contains("hidden"), true);
 
-    // 3. Click "Toggle Mixer" 1st time -> hides Mixer and mixer-handle; Browser and Studio stay active
-    mBtn.click();
-    assert.equal(mBtn.classList.contains("btn-primary"), false);
-    assert.equal(bBtn.classList.contains("btn-primary"), true);
-    assert.equal(sBtn.classList.contains("btn-primary"), true);
-    assert.equal(mCont.classList.contains("hidden"), true);
-    assert.equal(mHandle.classList.contains("hidden"), true);
-    assert.equal(bCont.classList.contains("hidden"), false);
-    assert.equal(bHandle.classList.contains("hidden"), false);
-    assert.equal(grid.style.gridTemplateColumns, "230px 8px 1fr");
-
-    // 4. Click "Toggle Mixer" 2nd time -> shows Mixer and mixer-handle again
+    // 3. Click "Toggle Mixer" 1st time -> shows Mixer and mixer-handle; Browser stays hidden
     mBtn.click();
     assert.equal(mBtn.classList.contains("btn-primary"), true);
+    assert.equal(bBtn.classList.contains("btn-primary"), false);
+    assert.equal(sBtn.classList.contains("btn-primary"), true);
     assert.equal(mCont.classList.contains("hidden"), false);
     assert.equal(mHandle.classList.contains("hidden"), false);
-    assert.equal(grid.style.gridTemplateColumns, "230px 8px 1fr 8px 320px");
+    assert.equal(bCont.classList.contains("hidden"), true);
+    assert.equal(bHandle.classList.contains("hidden"), true);
+    assert.equal(grid.style.gridTemplateColumns, "1fr 8px 320px");
+
+    // 4. Click "Toggle Mixer" 2nd time -> hides Mixer and mixer-handle again
+    mBtn.click();
+    assert.equal(mBtn.classList.contains("btn-primary"), false);
+    assert.equal(mCont.classList.contains("hidden"), true);
+    assert.equal(mHandle.classList.contains("hidden"), true);
+    assert.equal(grid.style.gridTemplateColumns, "1fr");
 
     // 5. Click "Mixer (Full)" -> shows Mixer only, hides BOTH resize handles and Browser/Center
     mixerFullBtn.click();
@@ -641,15 +641,15 @@ test("shadow-claw-daw-workbench: ShadowClawDawWorkbench lifecycle, initial Studi
     assert.equal(mHandle.classList.contains("hidden"), true);
     assert.equal(grid.style.gridTemplateColumns, "1fr");
 
-    // 8. Click "Studio" -> returns to 3-column Studio layout
+    // 8. Click "Studio" -> returns to Studio layout with Browser/Mixer hidden by default
     sBtn.click();
     assert.equal(sBtn.classList.contains("btn-primary"), true);
-    assert.equal(bCont.classList.contains("hidden"), false);
-    assert.equal(bHandle.classList.contains("hidden"), false);
+    assert.equal(bCont.classList.contains("hidden"), true);
+    assert.equal(bHandle.classList.contains("hidden"), true);
     assert.equal(centerStack.classList.contains("hidden"), false);
-    assert.equal(mHandle.classList.contains("hidden"), false);
-    assert.equal(mCont.classList.contains("hidden"), false);
-    assert.equal(grid.style.gridTemplateColumns, "230px 8px 1fr 8px 320px");
+    assert.equal(mHandle.classList.contains("hidden"), true);
+    assert.equal(mCont.classList.contains("hidden"), true);
+    assert.equal(grid.style.gridTemplateColumns, "1fr");
 
     // 9. In-Studio Center Editor Switcher toggles between Piano Roll, Step Sequencer, and Device Rack
     const centerSeqBtn = elements.get("center-editor-seq-btn");
@@ -659,9 +659,9 @@ test("shadow-claw-daw-workbench: ShadowClawDawWorkbench lifecycle, initial Studi
     centerSeqBtn.click();
     assert.equal(seqCont.classList.contains("hidden"), false);
     assert.equal(edCont.classList.contains("hidden"), true);
-    // Docks remain open in Studio mode!
-    assert.equal(bCont.classList.contains("hidden"), false);
-    assert.equal(mCont.classList.contains("hidden"), false);
+    // Docks remain in their current (default hidden) state in Studio mode
+    assert.equal(bCont.classList.contains("hidden"), true);
+    assert.equal(mCont.classList.contains("hidden"), true);
 
     centerPianoBtn.click();
     assert.equal(edCont.classList.contains("hidden"), false);

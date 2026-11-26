@@ -2804,8 +2804,8 @@ test("scdaw redesign: enforces Mobile-First, Responsive Design, Graceful Degrada
   // Landmarks
   assert.match(workbenchContent, /role=["']banner["']/);
   assert.match(workbenchContent, /role=["']toolbar["']/);
-  assert.match(workbenchContent, /role=["']tablist["']/);
-  assert.match(workbenchContent, /role=["']tab["']/);
+  assert.match(workbenchContent, /role=["']menu["']/);
+  assert.match(workbenchContent, /role=["']menuitemradio["']/);
   assert.match(workbenchContent, /role=["']main["']/);
   assert.match(workbenchContent, /role=["']region["']/);
   assert.match(workbenchContent, /role=["']contentinfo["']/);

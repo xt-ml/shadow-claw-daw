@@ -1124,7 +1124,7 @@
       "name": "shadow-claw-daw-workbench",
       "description": "Portable ESM engine logic and tool execution handler for shadow-claw-daw-workbench.",
       "url": "../../.agents/scripts/components/shadow-claw-daw-workbench.js",
-      "digest": "sha256:d255d1a542457952726a4bac9d21d2aed03ab94695edd7d4b346fd0798b0d14b"
+      "digest": "sha256:a298f2a5f2699be35dca13b6be56c82052f24cae4c84b321d23d95f2d8bb3599"
     },
     {
       "name": "shadow-claw-daw-adapter",
